@@ -8,7 +8,7 @@ import os from 'os';
 import path from 'path';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
-const vsix = path.join(root, 'agent-vscode-0.1.0.vsix');
+const vsix = path.join(root, 'agent-vscode-0.2.0.vsix');
 const shots = path.resolve(process.argv[2] ?? path.join(root, '.smoke', 'screenshots'));
 const codeDir = process.env.VSCODE_DIR ?? path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Microsoft VS Code');
 const codeExe = path.join(codeDir, process.platform === 'win32' ? 'Code.exe' : 'code');
@@ -71,6 +71,25 @@ async function shot(win, name) {
   result.screenshots.push(path.basename(p));
 }
 
+/** Opens the Agent Workspace from the Cockpit button and walks its views. */
+async function workspacePass(win, ck, theme, views) {
+  await ck.frame.evaluate(() => document.querySelector('[data-cmd="openWorkspace"]')?.click());
+  const ws = await webviewText(win, 'Live agents', 30_000);
+  check(`${theme}: Agent Workspace opens (Overview)`, ws, ws ? '' : 'no workspace text');
+  if (!ws) return;
+  await runCommand(win, 'View: Toggle Primary Side Bar Visibility');
+  await win.waitForTimeout(1500);
+  for (const [i, [view, heading]] of views.entries()) {
+    await ws.frame.evaluate(v => document.querySelector(`[data-nav="${v}"]`)?.click(), view);
+    await win.waitForTimeout(1200);
+    const txt = await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent ?? '');
+    check(`${theme}: workspace view ${view}`, txt === heading, txt);
+    await shot(win, `${theme === 'Dark' ? 1 : 2}${String(i).padStart(1, '0')}-workspace-${view}-${theme.toLowerCase()}`);
+  }
+  await runCommand(win, 'View: Toggle Primary Side Bar Visibility');
+  await win.waitForTimeout(800);
+}
+
 async function runCommand(win, label) {
   await win.keyboard.press('Escape');
   await win.keyboard.press('F1');
@@ -111,6 +130,7 @@ try {
     await ck.frame.evaluate(() => document.querySelector('[data-open]')?.click());
     const insp = await webviewText(win, 'EVIDENCE', 20_000) ?? await webviewText(win, 'Evidence', 5_000);
     check('Session inspector opens with evidence section', insp);
+    await win.waitForTimeout(1500);
     await shot(win, '03-inspector-dark');
   }
 
@@ -120,6 +140,10 @@ try {
   const act = await webviewText(win, 'Last 7 days', 20_000);
   check('Activity view renders weekly table and session graph', act && /Session graph/.test(act.txt));
   await shot(win, '04-activity-dark');
+
+  const ck2 = await webviewText(win, 'Open Agent workspace', 20_000);
+  if (ck2) await workspacePass(win, ck2, 'Dark', [['overview', 'Overview'], ['attention', 'Attention'], ['board', 'Board'], ['team', 'Team'], ['flow', 'Flow'], ['worktrees', 'Worktrees'], ['gantt', 'Last 24 h'], ['verify', 'Verification'], ['activity', 'Activity'], ['providers', 'Providers']]);
+  else check('Dark: Agent Workspace opens (Overview)', false, 'cockpit button not found');
 
   // Reload window and confirm reactivation
   await win.evaluate(() => (document.activeElement instanceof HTMLElement) && document.activeElement.blur());
@@ -155,6 +179,7 @@ try {
     await ck.frame.evaluate(() => document.querySelector('[data-open]')?.click());
     await webviewText(win, 'Evidence', 20_000);
     await shot(win, '07-inspector-light');
+    await workspacePass(win, ck, 'Light', [['overview', 'Overview'], ['team', 'Team'], ['flow', 'Flow'], ['gantt', 'Last 24 h']]);
   }
 } catch (e) {
   result.errors.push(String(e?.stack ?? e));

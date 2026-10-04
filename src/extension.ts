@@ -8,12 +8,14 @@ import { claudeInstalled, codexInstalled, InstalledVersion } from './providers/v
 import { SessionStore } from './sessions/store';
 import { keyOf, SessionsTree } from './ui/sessionsTree';
 import { AgentView, Inspector } from './ui/webviews';
+import { WorkspacePanel } from './ui/workspace';
 import { WebviewMessage } from './render/html';
 
 const TERN_COMMANDS = ['tern.revealWorktree', 'tern.revealRevision', 'tern.revealChangeSet'];
 
 export interface AgentApi {
   store: SessionStore;
+  openWorkspace(view?: string, key?: string): void;
   installed: { claude?: InstalledVersion; codex?: InstalledVersion };
   activationMs: number;
 }
@@ -31,7 +33,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
     idleMinutes: cfg().get<number>('idleMinutes', 10),
     git: vscode.workspace.isTrusted,
   });
-  const api: AgentApi = { store, installed: {}, activationMs: 0 };
+  const api: AgentApi = { store, installed: {}, activationMs: 0, openWorkspace: (v, k) => workspace.open(v as any, k) };
 
   let ternAvailable = false;
   const checkTern = async () => {
@@ -45,10 +47,13 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
   const activity = new AgentView('activity', store, m => onMessage(m));
   const inspector = new Inspector(store, m => onMessage(m), () => ternAvailable);
   const tree = new SessionsTree(store);
+  const workspace = new WorkspacePanel(store, m => onMessage(m), () => ternAvailable);
 
   function onMessage(m: WebviewMessage): void {
     if (m.type === 'ready') return; // handled by each view
     if (m.type === 'open') return inspector.open(m.key);
+    if (m.type === 'select') return workspace.open(undefined, m.key);
+    if (m.type === 'nav') return workspace.open(m.view);
     switch (m.cmd) {
       case 'refresh':
         void store.refresh();
@@ -70,11 +75,15 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
     timeline,
     activity,
     inspector,
+    workspace,
     vscode.window.registerWebviewViewProvider('agent.cockpit', cockpit),
     vscode.window.registerWebviewViewProvider('agent.timeline', timeline),
     vscode.window.registerWebviewViewProvider('agent.activity', activity),
     vscode.window.registerTreeDataProvider('agent.sessions', tree),
     vscode.commands.registerCommand('agent.refresh', () => store.refresh()),
+    vscode.commands.registerCommand('agent.openWorkspace', (arg?: unknown) => workspace.open(undefined, keyOf(arg))),
+    vscode.commands.registerCommand('agent.openAttention', () => workspace.open('attention')),
+    vscode.commands.registerCommand('agent.openTeam', (arg?: unknown) => workspace.open('team', keyOf(arg))),
     vscode.commands.registerCommand('agent.openSession', async (arg?: unknown) => {
       let key = keyOf(arg);
       if (!key) {

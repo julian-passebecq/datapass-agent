@@ -227,6 +227,10 @@ export class ClaudeAdapter implements ProviderAdapter {
         return;
       }
       case 'cost-state':
+        if (typeof o.totalCostUSD === 'number' && o.totalCostUSD >= 0) {
+          (acc.usage ??= { totalTokens: 0, outputTokens: 0, cachedInputTokens: 0 }).costUSD = o.totalCostUSD;
+          acc.ev('costUSD', 'OBSERVED', 'cost-state record .totalCostUSD (computed by Claude Code)');
+        }
         if (typeof o.totalLinesAdded === 'number') {
           acc.linesAdded = o.totalLinesAdded;
           acc.linesRemoved = typeof o.totalLinesRemoved === 'number' ? o.totalLinesRemoved : undefined;
@@ -307,6 +311,13 @@ export class ClaudeAdapter implements ProviderAdapter {
     if (typeof o.effort === 'string') {
       acc.effort = bounded(o.effort, 20);
       acc.ev('effort', 'OBSERVED', 'assistant record .effort');
+    }
+    const u = msg?.usage;
+    if (u && typeof u === 'object' && typeof msg.id === 'string') {
+      const n = (x: unknown) => (typeof x === 'number' && x >= 0 ? x : 0);
+      const cached = n(u.cache_read_input_tokens);
+      acc.addCallUsage(msg.id, n(u.input_tokens) + cached + n(u.cache_creation_input_tokens), n(u.output_tokens), cached);
+      acc.ev('usage', 'OBSERVED', 'assistant message .usage, one count per message id');
     }
     if (!Array.isArray(msg?.content)) return;
     for (const c of msg.content) {

@@ -49,6 +49,20 @@ export interface CommitObservation {
   attribution: 'during-session' | 'session-ran-git-commit';
 }
 
+/** Token accounting exactly as the provider recorded it. Nothing is priced or estimated by Agent. */
+export interface SessionUsage {
+  /** Sum over model calls of prompt tokens (incl. cache) + output tokens. */
+  totalTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  /** Prompt size of the latest model call, i.e. what the context window held. */
+  contextTokens?: number;
+  /** Only when the provider records the window size (Codex). */
+  contextWindow?: number;
+  /** Only when the provider itself records a cost (Claude Code cost-state). */
+  costUSD?: number;
+}
+
 export interface AgentSessionSnapshot {
   key: string; // provider:providerSessionId
   provider: Provider;
@@ -80,6 +94,10 @@ export interface AgentSessionSnapshot {
   workerLabel?: string; // e.g. Codex agent nickname or Claude subagent type
   isWorker: boolean;
   counts: { tools: number; commands: number; fileEdits: number; turns: number };
+  usage?: SessionUsage;
+  /** Latest command / file / test / worker event label, for "now doing" lines. */
+  lastAction?: string;
+  lastActionAt?: number;
   evidence: Evidence[];
   artifactPath: string;
   diagnostics: string[];

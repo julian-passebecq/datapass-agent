@@ -220,6 +220,19 @@ export class CodexAdapter implements ProviderAdapter {
         acc.event(toMs(p.completed_at) ?? at, 'SESSION_ACTIVITY', label, 'OBSERVED', turn && `tc:${turn}`);
         return;
       }
+      case 'token_count': {
+        const t = p.info?.total_token_usage, l = p.info?.last_token_usage;
+        const n = (x: unknown) => (typeof x === 'number' && x >= 0 ? x : 0);
+        if (!t || typeof t !== 'object') return;
+        const u = (acc.usage ??= { totalTokens: 0, outputTokens: 0, cachedInputTokens: 0 });
+        u.totalTokens = n(t.total_tokens);
+        u.outputTokens = n(t.output_tokens);
+        u.cachedInputTokens = n(t.cached_input_tokens);
+        if (l && typeof l === 'object') u.contextTokens = n(l.input_tokens);
+        if (typeof p.info.model_context_window === 'number') u.contextWindow = p.info.model_context_window;
+        acc.ev('usage', 'OBSERVED', 'event_msg token_count (cumulative)');
+        return;
+      }
       case 'item_completed':
         return this.item(acc, p.item, toMs(p.completed_at_ms) ?? at);
       case 'user_message':

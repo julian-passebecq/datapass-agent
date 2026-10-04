@@ -26,9 +26,9 @@ jobs:
       - run: npm run package
       - name: VSIX hash
         shell: pwsh
-        run: Get-FileHash agent-vscode-0.1.0.vsix -Algorithm SHA256 | Format-List
+        run: Get-FileHash agent-vscode-0.2.0.vsix -Algorithm SHA256 | Format-List
       - uses: actions/upload-artifact@v4
         with:
           name: agent-vscode-vsix
-          path: agent-vscode-0.1.0.vsix
+          path: agent-vscode-0.2.0.vsix
           if-no-files-found: error

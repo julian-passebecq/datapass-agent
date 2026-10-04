@@ -1,6 +1,8 @@
 import { AgentSessionSnapshot, ProviderState, TimelineEvent } from '../model';
 import { DayActivity, duration, summarize } from '../activity/activity';
 import { esc } from './html';
+import { resultCard } from './workspace';
+import { attention } from '../activity/insights';
 
 const PROV: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
 
@@ -45,7 +47,10 @@ export function renderCockpit(sessions: AgentSessionSnapshot[], providers: Provi
   const sum = summarize(sessions, now);
   const top = sessions.filter(s => !s.isWorker);
   const workersOf = (k: string) => sessions.filter(s => s.parentSessionId === k).length;
-  let h = `<div class="kpis"><div class="kpi"><b>${sum.active}</b><span>Active</span></div><div class="kpi"><b>${sum.idle}</b><span>Idle</span></div>${sum.needsInput ? `<div class="kpi"><b>${sum.needsInput}</b><span>Needs input</span></div>` : ''}<div class="kpi"><b>${sum.endedToday}</b><span>Ended today</span></div></div>`;
+  const att = attention(sessions, now).filter(a => a.severity !== 'low');
+  const byKey = new Map(sessions.map(s => [s.key, s]));
+  let h = `<div style="display:flex;gap:8px;align-items:center;margin:2px 0 4px"><button class="btn" data-cmd="openWorkspace">Open Agent workspace</button></div><div class="kpis"><div class="kpi"><b>${sum.active}</b><span>Active</span></div><div class="kpi"><b>${sum.idle}</b><span>Idle</span></div>${sum.needsInput ? `<div class="kpi"><b>${sum.needsInput}</b><span>Needs input</span></div>` : ''}<div class="kpi"><b>${sum.endedToday}</b><span>Ended today</span></div></div>`;
+  if (att.length) h += `<h2>Needs attention · ${att.length}</h2>${att.slice(0, 4).map(a => { const s = byKey.get(a.key)!; return `<div class="row" tabindex="0" role="button" data-open="${esc(s.key)}" title="${esc(a.basis)}"><span class="dot ${a.severity === 'high' ? 'NEEDS_INPUT' : 'IDLE'}"></span><span class="main">${esc(a.reason)}</span><span class="right">${esc(s.provider)}</span><span class="sub">${esc((s.title ?? s.sessionId).slice(0, 60))}</span></div>`; }).join('')}${att.length > 4 ? `<button class="link" data-nav="attention">all ${att.length} →</button>` : ''}`;
   for (const p of ['claude', 'codex'] as const) {
     const st = providers.find(x => x.provider === p);
     const live = top.filter(s => s.provider === p && (s.status === 'RUNNING' || s.status === 'NEEDS_INPUT' || s.status === 'IDLE'));
@@ -147,7 +152,8 @@ export function renderInspector(s: AgentSessionSnapshot, children: AgentSessionS
   const live = s.status !== 'ENDED';
   let h = `<h1 style="font-size:15px;margin:6px 0 2px">${esc(s.title ?? s.sessionId)}</h1><div class="muted">${esc(PROV[s.provider])} · <span class="dot ${s.status}"></span> ${esc(statusText(s))} <span class="chip" title="${esc(s.statusReason)}">${esc(s.statusReason)}</span></div>`;
   h += `<div style="margin:6px 0"><button class="link" data-cmd="copySessionId" data-key="${esc(s.key)}">Copy session id</button> · <button class="link" data-cmd="revealWorktree" data-key="${esc(s.key)}">Reveal worktree</button> · <button class="link" data-cmd="openTimeline" data-key="${esc(s.key)}">Show in Timeline</button> · <button class="link" data-cmd="openArtifactFolder" data-key="${esc(s.key)}">Open provider session folder</button>${ternAvailable ? ` · <button class="link" data-cmd="openInTern" data-key="${esc(s.key)}">Open in Tern</button>` : ''}</div>`;
-  h += `<h2>Status</h2><dl>${dd('Session id', s.sessionId)}${dd('Provider version', s.providerVersion, 'providerVersion')}${dd('Model', s.model, 'model')}${dd('Effort', s.effort, 'effort')}${dd('Started', s.startedAt && new Date(s.startedAt).toLocaleString())}${dd('Last activity', s.lastActivityAt && new Date(s.lastActivityAt).toLocaleString(), 'lastActivityAt')}${dd(live ? 'Duration' : 'Ended', live ? duration(Date.now() - (s.startedAt ?? Date.now())) : s.endedAt && new Date(s.endedAt).toLocaleString(), live ? undefined : 'endedAt')}${dd('Turns / tools / commands', `${s.counts.turns} / ${s.counts.tools} / ${s.counts.commands}`)}</dl>`;
+  h += `<h2>Result</h2>${resultCard(s, Date.now())}`;
+  h += `<h2>Status</h2><dl>${dd('Session id', s.sessionId)}${dd('Provider version', s.providerVersion, 'providerVersion')}${dd('Model', s.model, 'model')}${dd('Effort', s.effort, 'effort')}${dd('Started', s.startedAt && new Date(s.startedAt).toLocaleString())}${dd('Last activity', s.lastActivityAt && new Date(s.lastActivityAt).toLocaleString(), 'lastActivityAt')}${dd(live ? 'Duration' : 'Ended', live ? duration(Date.now() - (s.startedAt ?? Date.now())) : s.endedAt && new Date(s.endedAt).toLocaleString(), live ? undefined : 'endedAt')}${dd('Turns / tools / commands', `${s.counts.turns} / ${s.counts.tools} / ${s.counts.commands}`)}${dd('Tokens (provider-recorded)', s.usage && `${s.usage.totalTokens.toLocaleString()} total · ${s.usage.outputTokens.toLocaleString()} output · ${s.usage.cachedInputTokens.toLocaleString()} cached input`, 'usage')}${dd('Context (latest call)', s.usage?.contextTokens && `${s.usage.contextTokens.toLocaleString()} tokens${s.usage.contextWindow ? ` of ${s.usage.contextWindow.toLocaleString()}` : ''}`)}${s.usage?.costUSD !== undefined ? dd('Cost (recorded by provider)', `$${s.usage.costUSD.toFixed(4)}`, 'costUSD') : ''}</dl>`;
   h += `<h2>Location</h2><dl>${dd('cwd', s.cwd, 'cwd')}${dd('Repository', s.repository, 'repository')}${dd('Worktree', s.worktree ? `${s.worktree}${s.isLinkedWorktree ? ' (linked worktree)' : ''}` : undefined, 'worktree')}${dd('Branch', s.branch ?? (s.detachedHead ? 'detached HEAD' : undefined), 'branch')}</dl>`;
   const lines = s.linesAdded !== undefined ? `+${s.linesAdded} / -${s.linesRemoved ?? 0}` : undefined;
   h += `<h2>Change</h2><dl>${dd('HEAD before', s.headBefore?.slice(0, 12), 'headBefore')}${dd('HEAD after', s.headAfter?.slice(0, 12), 'headAfter')}${dd('Lines', lines, 'linesAdded')}${dd('Working tree', s.dirty === undefined ? undefined : s.dirty ? 'uncommitted changes' : 'clean')}</dl>`;
