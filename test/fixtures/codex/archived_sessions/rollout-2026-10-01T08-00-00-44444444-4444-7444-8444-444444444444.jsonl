@@ -1,0 +1,4 @@
+{"timestamp":"2026-10-01T08:00:00.000Z","type":"session_meta","payload":{"id":"44444444-4444-7444-8444-444444444444","timestamp":"2026-10-01T08:00:00.000Z","cwd":"__MISSING__","originator":"codex_exec","cli_version":"0.118.0-alpha.2","source":"exec"}}
+{"timestamp":"2026-10-01T08:00:02.000Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"bash\",\"-lc\",\"cargo test\"]}","call_id":"call_old1"}}
+{"timestamp":"2026-10-01T08:00:30.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_old1","output":"{\"output\":\"ok\",\"metadata\":{\"exit_code\":0,\"duration_seconds\":28}}"}}
+{"timestamp":"2026-10-01T08:00:31.000Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"x1"}}

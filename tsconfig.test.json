@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "out-test", "noEmit": false },
+  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["src/extension.ts", "src/ui/**"]
+}
