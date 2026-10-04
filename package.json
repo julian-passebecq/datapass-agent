@@ -69,7 +69,7 @@
     "check": "tsc -p . --noEmit",
     "build": "node scripts/build.mjs",
     "compile-tests": "tsc -p tsconfig.test.json",
-    "test": "npm run compile-tests && node --test out-test/test/",
+    "test": "npm run compile-tests && node --test \"out-test/test/*.test.js\"",
     "package": "npm run build && vsce package --no-dependencies --out agent-vscode-0.1.0.vsix",
     "smoke": "node scripts/smoke.mjs",
     "perf": "npm run compile-tests && node out-test/scripts/perf.js"
