@@ -6,6 +6,7 @@ import { ClaudeAdapter } from '../src/providers/claude/claude';
 import { CodexAdapter } from '../src/providers/codex/codex';
 import { SessionStore } from '../src/sessions/store';
 import { clearGitCache } from '../src/git/git';
+import { canonical } from '../src/util/paths';
 import { FIXTURES, git, jpath, makeRepo, materialize, snapshotTree, T, tmpDir } from './helpers';
 
 function setup(clockIso: string) {
@@ -87,7 +88,7 @@ test('codex adapter: meta, turn state, exit-code tests, file changes, subagent p
   assert.equal(s.status, 'RUNNING', 'turn t2 open with recent activity');
   assert.deepEqual(s.tests.map(t => [t.command, t.outcome, t.exitCode]), [['pytest -q', 'PASS', 0], ['npm test', 'FAIL', 1]], 'dedupe + exit codes');
   assert.ok(s.changedFiles.includes('src/panel.ts') && s.changedFiles.includes('README.md'));
-  assert.equal(s.worktree, repo);
+  assert.equal(canonical(s.worktree!).toLowerCase(), canonical(repo).toLowerCase());
   const kids = store.children(s.key);
   assert.equal(kids.length, 1);
   assert.equal(kids[0].workerLabel, 'Euclid · /root/tests');
@@ -121,7 +122,7 @@ test('git: linked worktree and detached HEAD are reported', async () => {
   assert.equal(s.isLinkedWorktree, true);
   assert.equal(s.detachedHead, true);
   assert.equal(s.branch, undefined);
-  assert.equal(s.repository?.toLowerCase(), repo.toLowerCase());
+  assert.equal(canonical(s.repository!).toLowerCase(), canonical(repo).toLowerCase());
 });
 
 test('security: provider artifacts are never mutated by ingestion', async () => {

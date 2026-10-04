@@ -29,6 +29,23 @@ export function normalizeCase(p: string): string {
 /** Repo-relative display path when `file` is inside `root`. */
 export function relTo(root: string | undefined, file: string): string {
   if (!root) return file;
-  const rel = path.relative(root, file);
-  return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel.replace(/\\/g, '/') : file;
+  const inside = (r: string, f: string) => {
+    const rel = path.relative(r, f);
+    return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel.replace(/\\/g, '/') : undefined;
+  };
+  // Providers may record 8.3 short paths (C:\Users\RUNNER~1\…) while git reports long ones: compare canonical forms.
+  return inside(root, file) ?? inside(canonical(root), canonical(file)) ?? file;
+}
+
+/** Long, case-correct path when it (or its parent, for deleted files) exists; otherwise unchanged. */
+export function canonical(p: string): string {
+  try {
+    return fs.realpathSync.native(p);
+  } catch {
+    try {
+      return path.join(fs.realpathSync.native(path.dirname(p)), path.basename(p));
+    } catch {
+      return p;
+    }
+  }
 }
