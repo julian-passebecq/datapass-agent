@@ -247,3 +247,50 @@ export function cwdPrefix(s: AgentSessionSnapshot): string {
   const orig = s.cwd.slice(s.cwd.length - rel.length);
   return orig.replace(/\\/g, '/') + '/';
 }
+
+/** Commits a session's window shares with other sessions of the same worktree (audit A3 P1-9). */
+export interface SharedWindow {
+  /** Window-attributed commits ("during-session") that also fall inside another session's window: sha → other session keys. */
+  shas: Map<string, string[]>;
+  /** Every other session sharing at least one of those commits (sorted). */
+  others: string[];
+  /** Sessions sharing the window, this one included. */
+  n: number;
+}
+
+const WINDOW_SLACK_MS = 60_000; // same slack as correlate() in git.ts
+
+/** Root of a lead/worker family: workers run in their lead's worktree and are not a competing session. */
+const familyOf = (s: AgentSessionSnapshot) => (s.isWorker && s.parentSessionId ? s.parentSessionId : s.key);
+
+/**
+ * INFERRED overlap: when two or more sessions (different families) were active in the same worktree at the time of a
+ * commit, a commit attributed to one of them only by its time window cannot be told apart. A commit the session ran
+ * itself ("session-ran-git-commit", OBSERVED) is never marked. Pure: no git call. Returns only sessions with a shared commit.
+ */
+export function sharedWindows(sessions: AgentSessionSnapshot[], now: number): Map<string, SharedWindow> {
+  const out = new Map<string, SharedWindow>();
+  const byWt = new Map<string, { s: AgentSessionSnapshot; from: number; to: number }[]>();
+  for (const s of sessions) {
+    if (!s.worktree || s.startedAt === undefined) continue;
+    const live = s.status !== 'ENDED' && s.status !== 'UNKNOWN'; // as correlate() in git.ts
+    const to = (live ? now : s.lastActivityAt ?? s.startedAt) + WINDOW_SLACK_MS;
+    const k = s.worktree.toLowerCase().replace(/[\/]+$/, '');
+    byWt.set(k, [...(byWt.get(k) ?? []), { s, from: s.startedAt, to }]);
+  }
+  for (const ws of byWt.values()) {
+    if (ws.length < 2) continue;
+    for (const a of ws) {
+      const shas = new Map<string, string[]>();
+      for (const c of a.s.commits) {
+        if (c.attribution !== 'during-session') continue;
+        const others = ws.filter(b => b !== a && familyOf(b.s) !== familyOf(a.s) && c.at >= b.from && c.at <= b.to).map(b => b.s.key);
+        if (others.length) shas.set(c.sha, others);
+      }
+      if (!shas.size) continue;
+      const others = [...new Set([...shas.values()].flat())].sort();
+      out.set(a.s.key, { shas, others, n: others.length + 1 });
+    }
+  }
+  return out;
+}

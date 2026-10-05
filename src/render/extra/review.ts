@@ -9,6 +9,8 @@ import { esc } from '../html';
 import { ago, prettyModel, repoOf, titleOf, WsData, WsState } from '../workspace';
 import { actBtn, ExtraView, loadError, loading, opt, seg, toolbar } from './kit';
 import { Feed, FeedCtx, feedValue } from './feeds';
+import { sharedBadge } from './changes';
+import { SharedWindow, sharedWindows } from '../../git/changes';
 
 const FEED_ID = 'review.prs';
 
@@ -65,6 +67,14 @@ function who(s: AgentSessionSnapshot): string {
   return [PROV[s.provider], prettyModel(s.model), s.effort].filter(Boolean).join(' · ');
 }
 
+/** Shared-window overlap per render (one pass over the sessions per WsData snapshot). */
+const sharedCache = new WeakMap<WsData, { m: Map<string, SharedWindow>; by: Map<string, AgentSessionSnapshot> }>();
+function sharedChip(it: ReviewItem, d: WsData, cls: string): string {
+  let c = sharedCache.get(d);
+  if (!c) sharedCache.set(d, (c = { m: sharedWindows(d.sessions, d.now), by: new Map(d.sessions.map(s => [s.key, s])) }));
+  return sharedBadge(c.m.get(it.s.key), it.s.commits.length, c.by, cls);
+}
+
 function card(it: ReviewItem, d: WsData, st: WsState, compactCards: boolean): string {
   const s = it.s;
   const repo = repoOf(s);
@@ -77,7 +87,7 @@ function card(it: ReviewItem, d: WsData, st: WsState, compactCards: boolean): st
 <div class="rv-ct"><span class="dot ${esc(s.status)}" title="${esc(`${s.status}: ${s.statusReason}`)}"></span><b class="rv-ti">${esc(titleOf(s).slice(0, 90))}</b>${s.isWorker ? '<span class="chip">worker</span>' : ''}<span class="rv-age" title="${esc(new Date(it.at).toLocaleString())}">${esc(short(d.now, it.at))}</span></div>
 <div class="rv-sub"><span class="rv-repo">${esc(repo)}</span>${br}<span class="muted rv-who">${esc(who(s))}</span></div>
 <div class="rv-why" title="${esc(`${it.kind}: ${it.basis}`)}">${esc(it.reason)}</div>
-${compactCards ? '' : `<div class="rv-foot">${stepStrip(it.steps)}</div>`}${prs || wk || copy ? `<div class="rv-acts">${prs}${wk}${copy}</div>` : ''}</div>`;
+${compactCards ? '' : `<div class="rv-foot">${stepStrip(it.steps)}${sharedChip(it, d, 'rv-shared')}</div>`}${prs || wk || copy ? `<div class="rv-acts">${prs}${wk}${copy}</div>` : ''}</div>`;
 }
 
 function groupKey(it: ReviewItem, by: string): string {
@@ -125,7 +135,7 @@ function table(items: ReviewItem[], d: WsData, st: WsState, group: string): stri
       .map(it => {
         const s = it.s;
         const p = it.pr;
-        return `<tr class="${LANE_CLS[it.lane]}${st.selected === s.key ? ' sel' : ''}" data-select="${esc(s.key)}" tabindex="0"><td><span class="rv-lane" title="${esc(LANE_HINT[it.lane])}">${esc(LANE_LABEL[it.lane])}</span></td><td class="rv-tt"><span class="dot ${esc(s.status)}"></span> ${esc(titleOf(s).slice(0, 70))}${it.workers ? ` <span class="muted">+${it.workers}w</span>` : ''}</td><td><span class="rv-sw" style="background:${identityColor(repoOf(s))}"></span>${esc(repoOf(s))}</td><td class="rv-brc" title="${esc(it.branch ?? '')}">${esc(it.branch ?? '')}</td><td>${stepStrip(it.steps)}</td><td>${p ? prChip(p, d.now) : ''}${p && it.prLink?.kind === 'INFERRED' ? ` <span class="muted" title="${esc(`INFERRED: ${it.prLink.basis}`)}">≈</span>` : ''}</td><td class="rv-whyc" title="${esc(`${it.kind}: ${it.basis}`)}">${esc(it.reason)}</td><td class="r muted" title="${esc(new Date(it.at).toLocaleString())}">${esc(short(d.now, it.at))}</td></tr>`;
+        return `<tr class="${LANE_CLS[it.lane]}${st.selected === s.key ? ' sel' : ''}" data-select="${esc(s.key)}" tabindex="0"><td><span class="rv-lane" title="${esc(LANE_HINT[it.lane])}">${esc(LANE_LABEL[it.lane])}</span></td><td class="rv-tt"><span class="dot ${esc(s.status)}"></span> ${esc(titleOf(s).slice(0, 70))}${it.workers ? ` <span class="muted">+${it.workers}w</span>` : ''}</td><td><span class="rv-sw" style="background:${identityColor(repoOf(s))}"></span>${esc(repoOf(s))}</td><td class="rv-brc" title="${esc(it.branch ?? '')}">${esc(it.branch ?? '')}</td><td>${stepStrip(it.steps)}${sharedChip(it, d, 'rv-shared')}</td><td>${p ? prChip(p, d.now) : ''}${p && it.prLink?.kind === 'INFERRED' ? ` <span class="muted" title="${esc(`INFERRED: ${it.prLink.basis}`)}">≈</span>` : ''}</td><td class="rv-whyc" title="${esc(`${it.kind}: ${it.basis}`)}">${esc(it.reason)}</td><td class="r muted" title="${esc(new Date(it.at).toLocaleString())}">${esc(short(d.now, it.at))}</td></tr>`;
       })
       .join('');
   const head = '<tr><th>Lane</th><th>Session</th><th>Repo</th><th>Branch</th><th title="Edit · Test · Commit · Push · PR · CI · Review · Merge (hover a step for its evidence)">Pipeline</th><th>PR / MR</th><th>Why</th><th class="r">Last</th></tr>';
@@ -217,7 +227,7 @@ function render(d: WsData, st: WsState): string {
   }
 
   const legend = `<div class="legend rv-leg">Pipeline: <span class="rv-st rv-st-done">done</span><span class="rv-st rv-st-live">in progress</span><span class="rv-st rv-st-fail">failed</span><span class="rv-st rv-st-none">not seen</span> · CI <span class="rv-ci rv-ci-pass">✓</span> pass <span class="rv-ci rv-ci-fail">✗</span> fail <span class="rv-ci rv-ci-pending">●</span> running · hover any value for its evidence (OBSERVED / DERIVED / INFERRED / UNKNOWN).</div>`;
-  const foot = `<div class="foot">Lanes come from session status, git commits in the session window, and push / <code>gh pr create</code> / <code>glab mr create</code> / merge commands the sessions recorded (OBSERVED). PR / MR, CI and review state come from the forge only when <code>agent.review.prState</code> is on; the session↔PR link is INFERRED ("linked by branch", ≈) unless the session's own push / PR command named that branch. Commits are those in the session window (DERIVED, not proof the session made them) unless the session ran git commit. Absences ("none observed") are DERIVED from the loaded records. Workers roll into their lead unless they have their own branch PR or push. No merge, comment or approval is ever sent from here.</div>`;
+  const foot = `<div class="foot">Lanes come from session status, git commits in the session window, and push / <code>gh pr create</code> / <code>glab mr create</code> / merge commands the sessions recorded (OBSERVED). PR / MR, CI and review state come from the forge only when <code>agent.review.prState</code> is on; the session↔PR link is INFERRED ("linked by branch", ≈) unless the session's own push / PR command named that branch. Commits are those in the session window (DERIVED, not proof the session made them) unless the session ran git commit; "shared window (n sessions)" (INFERRED) marks window commits that also fall inside another session's window in the same worktree. Absences ("none observed") are DERIVED from the loaded records. Workers roll into their lead unless they have their own branch PR or push. No merge, comment or approval is ever sent from here.</div>`;
   return `<div class="rv">${tb1}${feedLine(f, d)}${kpis}${body}${legend}${prList}${foot}</div>`;
 }
 
@@ -254,6 +264,7 @@ const CSS = `
 .rv .rv-foot { margin-top: 2px; }
 .rv .rv-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 2px; }
 .rv .rv-steps { display: inline-flex; gap: 1px; flex-wrap: nowrap; }
+.rv .rv-shared { color: var(--warn); border: 1px dashed var(--warn); border-radius: 3px; padding: 0 3px; font-size: 0.85em; white-space: nowrap; cursor: help; }
 .rv .rv-st { font-size: 9.5px; padding: 0 4px; border: 1px solid var(--line); color: var(--vscode-descriptionForeground); line-height: 14px; }
 .rv .rv-st:first-child { border-radius: 3px 0 0 3px; } .rv .rv-st:last-child { border-radius: 0 3px 3px 0; }
 .rv .rv-leg .rv-st { border-radius: 3px; }
