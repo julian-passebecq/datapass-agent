@@ -3,6 +3,7 @@ name: release-qualification
 # Release gate: full qualification of the packaged VSIX, run by hand or on a version tag.
 # ci.yml stays the fast per-push check; this workflow adds the installed-VSIX smoke (scripts/smoke.mjs),
 # which needs a real VS Code: it is downloaded with @vscode/test-electron (no repo dependency change).
+# Runners have no Claude/Codex history, so the smoke runs on a synthetic home built from test/fixtures (--fixture-home).
 # If VS Code cannot be downloaded or launched, the smoke step is skipped with a clear notice unless
 # `require_smoke` is true (the default for tags).
 
@@ -70,10 +71,10 @@ jobs:
           "## Smoke skipped`n$msg" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           if ($env:REQUIRE_SMOKE -eq 'true') { Write-Error 'require_smoke is on: failing the release gate'; exit 1 }
 
-      - name: Installed-VSIX smoke (Playwright _electron, dark + light, every screen)
+      - name: Installed-VSIX smoke (Playwright _electron, dark + light, every screen, synthetic fixture home)
         if: steps.vscode.outputs.available == 'true'
         shell: pwsh
-        run: node scripts/smoke.mjs .smoke/screenshots
+        run: node scripts/smoke.mjs .smoke/screenshots --fixture-home
 
       - name: Smoke summary
         if: always() && steps.vscode.outputs.available == 'true'
@@ -87,10 +88,16 @@ jobs:
             foreach ($c in $failed) { "- FAIL $($c.name): $($c.detail)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
           } else { 'No smoke-result.json written.' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
 
+      - name: Artifact name (branch refs such as p5/gate contain a slash, not allowed in artifact names)
+        if: always()
+        shell: pwsh
+        run: |
+          "ARTIFACT_NAME=agent-vscode-release-$($env:GITHUB_REF_NAME -replace '[^A-Za-z0-9._-]', '-')-$($env:GITHUB_RUN_NUMBER)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: agent-vscode-release-${{ github.ref_name }}-${{ github.run_number }}
+          name: ${{ env.ARTIFACT_NAME }}
           path: |
             agent-vscode-*.vsix
             vsix-sha256.txt
