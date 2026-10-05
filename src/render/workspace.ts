@@ -7,6 +7,7 @@ import { digitOf, esc } from './html';
 import { extraViews } from './extra';
 import { hhmm, statusText } from './views';
 import { endInferred } from '../sessions/classify';
+import { endObserved } from '../activity/audit';
 
 export const WS_VIEWS = ['overview', 'attention', 'board', 'team', 'flow', 'worktrees', 'gantt', 'verify', 'activity', 'providers'] as const;
 export type CoreView = (typeof WS_VIEWS)[number];
@@ -112,8 +113,16 @@ export function card(s: AgentSessionSnapshot, d: WsData, sel?: string, extra = '
   const u = usageLine(s);
   const act = live && s.lastAction ? `<div class="cl act">▸ ${esc(s.lastAction)} <span class="muted">${esc(ago(d.now, s.lastActionAt))}</span></div>` : '';
   return `<div class="card${sel === s.key ? ' sel' : ''}" style="--id:${identityColor(repoOf(s))}" data-select="${esc(s.key)}" tabindex="0" title="${esc(statusText(s) + ' — ' + s.statusReason)}">
-<div class="ct"><span class="dot ${s.status}"></span><b title="${esc(titleOf(s))}">${esc(titleOf(s))}</b><span class="right"${!live && endInferred(s) ? ` title="${esc(END_INFERRED_TIP)}"` : ''}>${esc(dur)}</span></div>
+<div class="ct"><span class="dot ${s.status}"></span><b title="${esc(titleOf(s))}">${esc(titleOf(s))}</b><span class="right" title="${esc(durTip(s, live))}">${esc(dur)}</span></div>
 <div class="cl"><span class="who">${esc(who)}</span></div><div class="cl muted">${esc(where)}</div>${u ? `<div class="cl num">${esc(u)}</div>` : ''}${ctxBar(s)}${act}${extra}<div>${stageStrip(s)}</div></div>`;
+}
+
+/** Evidence title of a card's duration / end cell. */
+export function durTip(s: AgentSessionSnapshot, live = isLive(s)): string {
+  if (live) return 'DERIVED: time since the first record; the session is still live';
+  if (endObserved(s)) return 'OBSERVED: end recorded by the provider';
+  if (endInferred(s) || s.endedAt === undefined) return END_INFERRED_TIP;
+  return 'DERIVED: end time from the session status (no provider end record)';
 }
 
 export function kpi(value: string | number, label: string, cls = '', title = ''): string {
@@ -134,7 +143,20 @@ function overview(d: WsData, st: WsState): string {
   const commits = new Set(d.sessions.flatMap(s => s.commits).filter(c => c.at >= today).map(c => c.sha));
   const u = usageSince(d.sessions, today);
   const workers = d.sessions.filter(s => s.isWorker && isLive(s)).length;
-  let h = `<div class="kpis big">${kpi(live.filter(s => s.status === 'RUNNING').length, 'Running', 'k-run')}${kpi(live.filter(s => s.status === 'NEEDS_INPUT').length, 'Needs input', 'k-need')}${kpi(live.filter(s => s.status === 'IDLE').length, 'Idle', 'k-idle')}${kpi(workers, 'Live workers')}${kpi(att.filter(a => a.severity !== 'low').length, 'Attention', att.some(a => a.severity === 'high') ? 'k-need' : '')}${kpi(todays.length, 'Sessions 24 h')}${kpi(commits.size, 'Commits 24 h', '', COMMIT_CAVEAT)}${kpi(`${tests.filter(t => t.outcome === 'PASS').length}/${tests.length}`, 'Tests pass 24 h', tests.some(t => t.outcome === 'FAIL') ? 'k-fail' : '', 'observed test/build commands in the last 24 hours')}${kpi(compact(u.tokens), 'Tokens 24 h', '', `provider-recorded tokens of ${u.sessions} session(s) active in the last 24 hours (whole-session totals)`)}${u.costSessions ? kpi(`$${u.costUSD.toFixed(2)}`, 'Cost recorded', '', `sum of Claude Code cost-state over ${u.costSessions} session(s) active in the last 24 hours (whole-session totals); Codex records no cost`) : ''}</div>`;
+  const passN = tests.filter(t => t.outcome === 'PASS').length;
+  const status = (k: string) => `DERIVED: lead sessions whose current status is ${k} (each status carries its own evidence: live registry, open turn, recent activity)`;
+  let h = `<div class="kpis big">${[
+    kpi(live.filter(s => s.status === 'RUNNING').length, 'Running', 'k-run', status('running')),
+    kpi(live.filter(s => s.status === 'NEEDS_INPUT').length, 'Needs input', 'k-need', status('needs input')),
+    kpi(live.filter(s => s.status === 'IDLE').length, 'Idle', 'k-idle', status('idle')),
+    kpi(workers, 'Live workers', '', 'DERIVED: worker sessions (subagents) whose current status is running, idle or needs input'),
+    kpi(att.filter(a => a.severity !== 'low').length, 'Attention', att.some(a => a.severity === 'high') ? 'k-need' : '', 'DERIVED: medium and high attention items; each item shows the observation behind it'),
+    kpi(todays.length, 'Sessions 24 h', '', 'DERIVED: lead sessions with recorded activity in the last 24 hours'),
+    kpi(commits.size, 'Commits 24 h', '', 'DERIVED: distinct commits from git log in the last 24 hours, in the window of a loaded session. Not proof a session made them (only a recorded `git commit` by the session is).'),
+    kpi(`${passN}/${tests.length}`, 'Tests pass 24 h', tests.some(t => t.outcome === 'FAIL') ? 'k-fail' : '', `DERIVED: ${passN} passing of ${tests.length} test / build commands OBSERVED in the last 24 hours (outcome from exit code or provider error flag)`),
+    kpi(compact(u.tokens), 'Tokens 24 h', '', `DERIVED: sum of provider-recorded (OBSERVED) token totals of ${u.sessions} session(s) active in the last 24 hours (whole-session totals)`),
+    u.costSessions ? kpi(`$${u.costUSD.toFixed(2)}`, 'Cost recorded', '', `DERIVED: sum of Claude Code cost-state (OBSERVED) over ${u.costSessions} session(s) active in the last 24 hours (whole-session totals); Codex records no cost`) : '',
+  ].join('')}</div>`;
   h += `<div class="cols"><div><h2>Live agents · ${live.length}</h2>${live.length ? `<div class="grid">${live.map(s => card(s, d, st.selected, workersLine(s, d))).join('')}</div>` : '<div class="empty">No live session. Ended sessions are on the Board.</div>'}</div>`;
   h += `<div><h2>Needs attention · ${att.length}</h2>${att.length ? attList(att.slice(0, 6), d, st) : '<div class="empty">Nothing needs you.</div>'}${att.length > 6 ? `<button class="link" data-nav="attention">all ${att.length} items →</button>` : ''}</div></div>`;
   h += `<h2>Last 24 hours</h2>${gantt(d, st, 14)}`;
@@ -169,18 +191,20 @@ function attentionView(d: WsData, st: WsState): string {
   return attList(att, d, st);
 }
 
+const BOARD_TIP = (k: string) => `DERIVED: lead sessions whose current status is ${k} (each card shows its own status evidence)`;
+
 function board(d: WsData, st: WsState): string {
   const today = d.now - DAY;
   const top = d.sessions.filter(s => !s.isWorker);
-  const cols: [string, string, AgentSessionSnapshot[]][] = [
-    ['NEEDS_INPUT', 'Needs input', top.filter(s => s.status === 'NEEDS_INPUT')],
-    ['RUNNING', 'Running', top.filter(s => s.status === 'RUNNING')],
-    ['IDLE', 'Idle', top.filter(s => s.status === 'IDLE')],
-    ['UNKNOWN', 'Unknown', top.filter(s => s.status === 'UNKNOWN')],
-    ['ENDED', 'Ended · 24 h', top.filter(s => s.status === 'ENDED' && (s.endedAt ?? s.lastActivityAt ?? 0) >= today)],
+  const cols: [string, string, AgentSessionSnapshot[], string][] = [
+    ['NEEDS_INPUT', 'Needs input', top.filter(s => s.status === 'NEEDS_INPUT'), BOARD_TIP('needs input')],
+    ['RUNNING', 'Running', top.filter(s => s.status === 'RUNNING'), BOARD_TIP('running')],
+    ['IDLE', 'Idle', top.filter(s => s.status === 'IDLE'), BOARD_TIP('idle')],
+    ['UNKNOWN', 'Unknown', top.filter(s => s.status === 'UNKNOWN'), 'UNKNOWN: lead sessions whose status cannot be decided from the records'],
+    ['ENDED', 'Ended · 24 h', top.filter(s => s.status === 'ENDED' && (s.endedAt ?? s.lastActivityAt ?? 0) >= today), 'DERIVED: lead sessions ended in the last 24 hours (recorded end, else last record)'],
   ];
   return `<div class="board">${cols
-    .map(([k, label, list]) => `<div class="col"><div class="colh"><span class="dot ${k}"></span>${esc(label)}<span class="n">${list.length}</span></div>${list.length ? list.slice(0, 40).map(s => card(s, d, st.selected)).join('') + (list.length > 40 ? `<div class="muted">… ${list.length - 40} more</div>` : '') : '<div class="empty">No session in this column.</div>'}</div>`)
+    .map(([k, label, list, tip]) => `<div class="col"><div class="colh"><span class="dot ${k}"></span>${esc(label)}<span class="n" title="${esc(tip)}">${list.length}</span></div>${list.length ? list.slice(0, 40).map(s => card(s, d, st.selected)).join('') + (list.length > 40 ? `<div class="muted">… ${list.length - 40} more</div>` : '') : '<div class="empty">No session in this column.</div>'}</div>`)
     .join('')}</div>`;
 }
 
@@ -459,10 +483,12 @@ export function inspectorJumps(key: string): string {
 export function resultCard(s: AgentSessionSnapshot, now: number): string {
   const pass = s.tests.filter(t => t.outcome === 'PASS').length, fail = s.tests.filter(t => t.outcome === 'FAIL').length;
   const live = isLive(s);
+  // No recorded end: the duration stops at the last recorded activity, so it is a lower bound (audit A3 P2-15).
+  const open = !live && (endInferred(s) || !endObserved(s));
   const cell = (label: string, v: string, cls = '') => `<div class="rc ${cls}"><span>${esc(label)}</span><b>${v}</b></div>`;
   const u = s.usage;
   let h = '';
-  h += `<div class="rcard">${cell(!live && endInferred(s) ? 'Duration (to last record)' : 'Duration', esc(duration((live ? now : (s.lastActivityAt ?? now)) - (s.startedAt ?? now))))}${cell('Model', esc([prettyModel(s.model), s.effort].filter(Boolean).join(' · ') || '—'))}${cell('HEAD', `<code>${esc(s.headBefore?.slice(0, 7) ?? '?')}</code> → <code>${esc(s.headAfter?.slice(0, 7) ?? '?')}</code>`)}${cell('Commits', commitCount(s), s.commits.length ? 'ok' : '')}${cell('Files', String(s.changedFiles.length))}${cell('Lines', s.linesAdded !== undefined ? `<span class="pass">+${s.linesAdded}</span> <span class="fail">−${s.linesRemoved ?? 0}</span>` : '—')}${cell('Tests', s.tests.length ? `<span class="pass">${pass}✓</span> <span class="fail">${fail}✗</span>` : '—', fail && s.tests[s.tests.length - 1].outcome === 'FAIL' ? 'bad' : '')}${cell('Tokens', u ? esc(compact(u.totalTokens)) : '—')}${u?.costUSD !== undefined ? cell('Cost (recorded)', `$${u.costUSD.toFixed(2)}`) : ''}${u?.contextTokens ? cell('Context', esc(u.contextWindow ? `${Math.round((100 * u.contextTokens) / u.contextWindow)}%` : compact(u.contextTokens))) : ''}</div>${ctxBar(s)}`;
+  h += `<div class="rcard">${cell(open ? 'Duration (to last record)' : 'Duration', `<span title="${esc(open ? 'DERIVED: first record to last record; no end recorded, so a lower bound' : live ? 'DERIVED: first record to now; the session is still live' : 'DERIVED: first record to the recorded end')}">${open ? '≥ ' : ''}${esc(duration((live ? now : (s.lastActivityAt ?? now)) - (s.startedAt ?? now)))}</span>`)}${cell('Model', esc([prettyModel(s.model), s.effort].filter(Boolean).join(' · ') || '—'))}${cell('HEAD', `<code>${esc(s.headBefore?.slice(0, 7) ?? '?')}</code> → <code>${esc(s.headAfter?.slice(0, 7) ?? '?')}</code>`)}${cell('Commits', commitCount(s), s.commits.length ? 'ok' : '')}${cell('Files', String(s.changedFiles.length))}${cell('Lines', s.linesAdded !== undefined ? `<span class="pass">+${s.linesAdded}</span> <span class="fail">−${s.linesRemoved ?? 0}</span>` : '—')}${cell('Tests', s.tests.length ? `<span class="pass">${pass}✓</span> <span class="fail">${fail}✗</span>` : '—', fail && s.tests[s.tests.length - 1].outcome === 'FAIL' ? 'bad' : '')}${cell('Tokens', u ? esc(compact(u.totalTokens)) : '—')}${u?.costUSD !== undefined ? cell('Cost (recorded)', `$${u.costUSD.toFixed(2)}`) : ''}${u?.contextTokens ? cell('Context', esc(u.contextWindow ? `${Math.round((100 * u.contextTokens) / u.contextWindow)}%` : compact(u.contextTokens))) : ''}</div>${ctxBar(s)}`;
   h += `<div class="sidestages">${stageStrip(s)}</div>`;
   return h;
 }
