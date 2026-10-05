@@ -2,7 +2,7 @@
 
 Agent answers one question inside VS Code: **what are my coding agents doing, where, and what did they actually change?**
 
-It **observes** provider-native sessions. It does not launch, schedule, steer, stop or route agents, and it adds no hooks to the providers.
+It **observes** provider-native sessions. It does not schedule, steer, stop or route agents, and it adds no hooks to the providers. The one exception is the Launcher screen, which starts or resumes a session in a terminal only after you confirm the exact folder and command.
 
 - **Cockpit**: live sessions per provider, ended today, recent sessions.
 - **Sessions**: tree grouped by provider, with workers nested under their parent where the provider exposes the link.
@@ -33,33 +33,38 @@ Agent stands alone. It needs no DataPass, Tern, Factory, MongoDB or cloud backen
 
 ## Screens
 
-Add-on screens sit in the rail under group headings. Every value shows its evidence kind (OBSERVED, DERIVED, INFERRED, UNKNOWN) in a tooltip or legend. "Git" means read-only hardened git in repositories the agents used. "gh / glab" means the GitHub / GitLab CLI, run only when the opt-in setting is on and the workspace is trusted. Nothing else starts a process or uses the network.
+Add-on screens sit in the rail under group headings. Every value shows its evidence kind (OBSERVED, DERIVED, INFERRED, UNKNOWN) in a tooltip or legend. "Git" means read-only hardened git in repositories the agents used. "gh / glab" means the GitHub / GitLab CLI, run only when the opt-in setting is on and the workspace is trusted. Nothing else starts a process or uses the network, except the Launcher (after your confirmation) and the Catalog CLI probe (`agent.catalog.runCli`). No LLM runs in Agent.
 
 | Group | Screen | What it shows | Source | Evidence | Git | gh / glab |
 |---|---|---|---|---|---|---|
 | Now | Live | Every live session and worker: current tool, tokens per minute, pace | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
 | Now | Workflows | Claude Code workflow runs: phases, agents, model, time, tokens; background subagents and Codex workers | workflow files, transcripts | OBSERVED, DERIVED, INFERRED | no | no |
 | Now | Projects | Company, project, repository, sessions tree; click sets the scope for every screen | sessions + `agent.projects` | OBSERVED, DERIVED, INFERRED | no | no |
+| Now | Codex | Codex app state: threads, projects, sub-agents, automations, goals, queue, turn timing. Labelled "Codex app state (undocumented, may change)" | sqlite copies read from `~/.codex` | OBSERVED | no | no |
+| Sessions | Roles | Which role each session played (recorded type, else title pattern) and how each role performs: table, scorecard, hand-off graph, file overlap, wave Gantt. Patterns in `agent.roles.patterns` | sessions, workflow runs, titles | OBSERVED, DERIVED, INFERRED | no | no |
 | Sessions | Topology | Lead, workers and nested workers as a tree with rolled-up tokens, cost, time | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
 | Sessions | Transcript | One session as a conversation (prompts, replies, tool calls), redacted | one transcript / rollout, read on demand | OBSERVED, DERIVED, INFERRED | no | no |
 | Sessions | Replay | Step through one session's events with play, pause, speed | recorded events | OBSERVED, DERIVED, INFERRED | no | no |
 | Time | Week | Sessions on a Monday to Sunday calendar | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
 | Time | Run strips | One row per repository over 14 days, concurrency per hour against `agent.parallelTarget` | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
 | Time | Forecast | Gantt of running work with end times projected from your own history (median and quartiles, sample size shown) | local history | INFERRED from OBSERVED durations | no | no |
-| Time | History | Weeks side by side from the weekly archive | `~/.agent/history` | DERIVED | no | no |
+| Time | History | Weeks side by side from the weekly archive; *+ Archive* adds sessions known only from the daily archive (ARCHIVED) | `~/.agent/history`, `~/.agent/archive` | DERIVED | no | no |
 | Git | Repositories | Branches, worktrees, dirty state, ahead / behind, recent commits | git | OBSERVED, DERIVED | yes | no |
 | Git | Changes | Per-file +/- over each session's commit window, uncommitted work per worktree, edit heat | git, edit calls | OBSERVED, DERIVED | yes | no |
 | Git | Review | Working / Needs you / In review / Ready to merge / CI failed lanes | sessions, recorded commands, PR / MR state | OBSERVED, DERIVED, INFERRED | no | yes, opt-in network (`agent.review.prState`) |
 | Git | Pipelines | GitHub Actions and GitLab runs, jobs as a Gantt, what blocks, runner | gh / glab | OBSERVED, DERIVED, INFERRED | no | yes, opt-in network (`agent.pipelines.enabled`) |
 | Usage | Explore | Pivot sessions by dimension and metric as bars, table, treemap, heatmap or line; CSV export | loaded sessions | DERIVED | no | no |
+| Usage | Limits | Codex 5 h / weekly used %, reset countdown and trend as recorded in rollouts; Claude 5-hour blocks derived from per-call tokens and compared with your own past blocks. Claude records no limit, so no official quota is claimed. Thresholds `agent.limits.warnPercent` (70) and `agent.limits.alertPercent` (90) | Codex rollouts, Claude per-call usage | OBSERVED (Codex), DERIVED, INFERRED (Claude projection) | no | no |
 | Usage | Token rhythm | Tokens per minute, hour or day by provider, model, repo or session; peaks, context growth | provider usage records | OBSERVED, DERIVED | no | no |
 | Quality | Signals | Unsolved, blocked, permissions, swallowed, looping, each with its basis | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
 | Quality | Health | Test pass rate, commits per session, context use against a reference window | provider artifacts | OBSERVED, DERIVED | no | no |
-| Quality | Backlog | Packages and checklist items from `handoff/PLAN.md`, `ROADMAP.md`, `TODO.md` with the sessions that mention them | plan files (read-only, size cap) | OBSERVED, DERIVED, INFERRED | no | no |
+| Quality | Backlog | Packages and checklist items from `handoff/PLAN.md`, `ROADMAP.md`, `TODO.md` with the sessions that mention them; *+ Daily archive* keeps closed or removed items visible | plan files (read-only, size cap), `~/.agent/archive` | OBSERVED, DERIVED, INFERRED | no | no |
 | System | Audit trail | Observed transitions, filters, local JSONL export | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
+| System | Catalog | Everything Claude Code and Codex have installed: skills, agents, commands, plugins, hooks, MCP servers, settings keys, instruction files, CLI options. Read-only; open and copy actions only. `agent.catalog.runCli` (default on, trusted workspace only) runs `claude --help` / `--version` and `codex --help`, 5 s timeout, cached one day | provider folders, repositories used, CLI help | OBSERVED | no | no |
+| System | Launcher | Start or resume a Claude Code / Codex session in a terminal Agent owns. Documented flags only; permission modes limited to default, plan, acceptEdits (never bypassPermissions); nothing starts until you confirm the exact folder and command | your choice, session list | OBSERVED (sessions to resume) | no | no |
 | System | Settings | Effective Claude Code and Codex configuration layers, agents, hooks (read-only, redacted) | settings files, `config.toml` | OBSERVED | no | no |
 
-The Launcher screen is not enabled in this version.
+The Launcher is the only screen that starts a process, and never without your confirmation. The daily archive (`npm run archive`, scheduled by `scripts/install-archive-task.ps1`, which you run yourself) is described under Daily archive below.
 
 ### Multiple tabs and project scope
 
@@ -161,6 +166,12 @@ Defined in `package.json`. Commands are in the Command Palette under "Agent:".
 | `agent.pipelines.extraRepos` | list | `[]` | Pipelines screen: extra local repository paths to include. |
 | `agent.history.dir` | string | `""` | History screen: folder holding the weekly archive (empty = ~/.agent/history). Written by npm run weekly or the screen's Build now. |
 | `agent.history.maxWeeks` | number | `52` | History screen: how many of the newest week files are read. |
+| `agent.catalog.extraRoots` | list | `[]` | Catalog screen: extra folders scanned. |
+| `agent.catalog.maxRepos` | number | `40` | Catalog screen: most repositories read. |
+| `agent.catalog.runCli` | boolean | `true` | Catalog screen: run `claude --help` / `--version` and `codex --help` (trusted workspaces only, 5 s timeout, cached one day). |
+| `agent.roles.patterns` | list | 4 rules | Roles screen: case-insensitive regex on the session title mapped to a role (defaults: PM, coordinator, architect, reviewer). |
+| `agent.limits.warnPercent` | number | `70` | Limits screen: warning threshold (%). |
+| `agent.limits.alertPercent` | number | `90` | Limits screen: alert threshold (%); also drives the rail badge. |
 | `agent.archive.dir` | string | `""` | Daily archive folder (empty = ~/.agent/archive). Written by npm run archive; read by the History and Backlog screens. |
 | `agent.archive.maxDays` | number | `400` | History / Backlog screens: how many of the newest daily archive files are read. |
 | `agent.archive.rawTranscripts` | boolean | `false` | Daily archive: also keep gzip copies of transcripts and rollouts in <archive>/raw (full text, local only; auth / secret files never copied). |
