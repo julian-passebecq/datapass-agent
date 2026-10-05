@@ -42,4 +42,14 @@ Left: the session log (real timeline events with t+offset). Centre: the session 
 - **P9 · Project tree in the rail**: repo → live sessions under the screen list, with counts; click scopes every screen to that repo.
 - Not for Agent: architecture map / code-path flow (Tern / Factory), firewall, canary deploys, connection-sync tiles (not agent observation).
 
-Order: P1 → P2 → P3 → P4 → P5–P9 (P5 is the only one that reaches the network, and only on opt-in) (P1 and P2 touch different files and can run in parallel).
+### Last batch (2026-10-05, via ACC 2: Cezar cockpit, crawler visual, T3 orchestrator, context thread, calendar, Lens, kanban)
+
+- Into **P1**: the 24 h / week bars end with a commit or PR chip (Cezar night timeline).
+- Into **P4**: workers grouped under their lead, collapsed by default ("3 subagents · 3 done"), each with duration and a one-line result (the parent's recorded Agent tool result, cut to 120 characters and redacted) (T3 orchestrator).
+- Into **P7**: the newest event flashes briefly in the live trail (crawler TL;DR feed).
+- Into **P8**: a context bar marker at a configurable long-context threshold (default 272k), labelled as a setting, not a fact (Codex context thread).
+- **P10 · PR stage**: the stage strip gains a "PR" step when the session ran `gh pr create` or `glab mr create` (Cezar autofix chain: verify → implement → review → PR).
+- **P11 · Concurrency**: peak sessions running at once per hour over the last 24 h, against an optional `agent.parallelTarget`; "waiting for you" is counted separately from running (Cezar slots).
+- Skipped: spider and crawler animation (decoration), queueing and dispatch of tasks (control, which Agent never does), the Chrome extension prompt.
+
+Order: P1 → P2 → P3 → P4 → P5–P11 (P5 is the only one that reaches the network, and only on opt-in) (P1 and P2 touch different files and can run in parallel).
