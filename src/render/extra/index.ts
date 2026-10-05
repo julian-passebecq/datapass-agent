@@ -3,6 +3,7 @@
 import { ExtraView, KIT_CSS } from './kit';
 import { auditView } from './audit';
 import { backlogView } from './backlog';
+import { benchmarksView } from './benchmarks';
 import { catalogView } from './catalog';
 import { changesView } from './changes';
 import { codexView } from './codex';
@@ -41,6 +42,7 @@ export function allExtra(): ExtraView[] {
   return (all ??= [
   auditView,
   backlogView,
+  benchmarksView,
   catalogView,
   changesView,
   codexView,
