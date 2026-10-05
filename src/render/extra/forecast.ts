@@ -7,7 +7,7 @@ import { esc } from '../html';
 import { hhmm } from '../views';
 import { kpi, WsData, WsState } from '../workspace';
 import { feedValue, Feed } from './feeds';
-import { ExtraView, opt, seg, toolbar } from './kit';
+import { ExtraView, loadError, loading, opt, seg, toolbar } from './kit';
 import { workflowsFeed } from './workflows';
 
 const ZOOM: Record<string, { span: number; tick: number }> = {
@@ -250,7 +250,7 @@ export function renderForecast(d: WsData, st: WsState, snap: WorkflowsSnapshot |
   const last = withEta.filter(it => it.depth === 0).sort((a, b) => b.est!.etaAt! - a.est!.etaAt!)[0];
   const rate = running.filter(it => it.depth === 0).reduce((n, it) => n + (it.ratePerMin ?? 0), 0);
   const kpis = `<div class="kpis">${kpi(running.length, 'running items', 'k-run', 'runs, phases, agents, sessions and workers (INFERRED from recency)')}${kpi(`${withEta.length}/${running.length}`, 'with ETA', '', 'INFERRED from local history')}${kpi(next ? `${hhmm(next.est!.etaAt)}` : '—', next ? `next: ${next.label.slice(0, 22)}` : 'next ETA', '', next ? `INFERRED: ${next.est!.basis}` : '')}${kpi(last ? hhmm(last.est!.etaAt) : '—', 'all top-level done', '', 'latest ETA among running top-level items (INFERRED)')}${kpi(running.filter(it => it.est?.overrun).length, 'over typical', '', 'running longer than almost every similar finished item')}${kpi(rate ? `${compact(Math.round(rate))}/min` : '—', 'tokens burn', '', 'sum of top-level token rates (DERIVED)')}${kpi(f.accuracy.medianAbsErr !== undefined ? `${Math.round(f.accuracy.medianAbsErr * 100)} %` : '—', 'median |error|', '', 'back-test at 50 % elapsed (Accuracy view)')}</div>`;
-  const note = !snap ? `<div class="muted fc-note">${esc(error ? `Workflow scan failed: ${error}` : 'Scanning ~/.claude/projects for workflow runs… sessions shown meanwhile.')}</div>` : '';
+  const note = snap ? '' : `<div class="fc-note">${error ? loadError(`Workflow scan failed: ${error}`, 'refresh') : loading('forecast.workflows', 'Scanning ~/.claude/projects for workflow runs… sessions shown meanwhile.', { retry: 'refresh', inline: true })}</div>`;
   let body: string;
   if (view === 'accuracy') {
     const level = opt(st, 'forecast.level', 'all');
@@ -277,6 +277,7 @@ export const forecastView: ExtraView = {
   ready: true,
   feeds: [workflowsFeed as Feed],
   badge: () => '',
+  actions: { refresh: (_arg, ctx) => ctx.refreshFeeds() },
   render: (d, st) => {
     const fv = feedValue<WorkflowsSnapshot>(workflowsFeed.id);
     return `<div class="fc">${renderForecast(d, st, fv.value, fv.error)}</div>`;
