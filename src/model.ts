@@ -98,11 +98,51 @@ export interface AgentSessionSnapshot {
   /** Latest command / file / test / worker event label, for "now doing" lines. */
   lastAction?: string;
   lastActionAt?: number;
+  /** Richer facts (filled by the "data" package; every field optional, absent = not exposed). */
+  facts?: SessionFacts;
   evidence: Evidence[];
   artifactPath: string;
   /** Size of the provider artifact when last read (bytes). */
   artifactBytes?: number;
   diagnostics: string[];
+}
+
+/** Per-session detail extracted from transcripts / rollouts. All OBSERVED unless noted. */
+export interface SessionFacts {
+  /** Tool name → calls (e.g. Bash, Edit, Read, Task, exec_command, apply_patch, web_search). */
+  toolCounts?: Record<string, number>;
+  /** Tool calls whose result the provider flagged as error. */
+  toolErrors?: number;
+  /** A tool call with no recorded result yet (what the session is doing right now). */
+  currentTool?: { name: string; detail: string; startedAt: number };
+  /** User prompts (human turns) and assistant replies. */
+  prompts?: number;
+  replies?: number;
+  /** Files the session edited with per-file edit counts (repo-relative when possible, capped at 300). */
+  files?: { path: string; edits: number; lastAt: number }[];
+  /** Tokens per model, as recorded. */
+  modelTokens?: Record<string, number>;
+  /** Per model call: [at, promptTokens, outputTokens], capped at the latest 2000 calls (token rhythm). */
+  calls?: [number, number, number][];
+  /** Permission / approval / sandbox mode as recorded by the provider. */
+  permissionMode?: string;
+  sandbox?: string;
+  /** Git branch the provider recorded in the transcript (no git call). */
+  recordedBranch?: string;
+  /** Context compactions recorded. */
+  compactions?: number;
+  /** Claude Task / Codex spawn calls: requested worker type and short description. */
+  spawns?: { at: number; type: string; description: string }[];
+  /** Web fetches / searches and MCP tool calls. */
+  web?: number;
+  mcp?: Record<string, number>;
+  /** Longest gap waiting on the user (ms), and total time waiting. DERIVED. */
+  waitMaxMs?: number;
+  waitTotalMs?: number;
+  /** Active time = sum of gaps < 5 min between events. DERIVED. */
+  activeMs?: number;
+  /** CLI entry point / originator (cli, vscode, exec, sdk …). */
+  entrypoint?: string;
 }
 
 /** One data source Agent reads. Missing access is shown, never hidden. */
