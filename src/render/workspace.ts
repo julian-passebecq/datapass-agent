@@ -35,6 +35,8 @@ export interface WsData {
   git?: { enabled: boolean; lastMs?: number; at?: number };
   /** Lazy access to the store's event history for screens that need more than `events`. */
   timeline?: (key?: string, limit?: number) => TimelineEvent[];
+  /** Reads an `agent.*` setting at render time ("agent.x" or "x"). */
+  config?: <T>(key: string, fallback: T) => T;
   /** Last refresh pass, for the status strip (host-measured). */
   stats?: { refreshMs: number; gitMs: number; bytesRead: number; artifacts: number; heapMB: number; at: number };
 }

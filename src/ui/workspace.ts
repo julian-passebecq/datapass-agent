@@ -75,7 +75,7 @@ export class WorkspacePanel implements vscode.Disposable {
 
   private feedCtx(): FeedCtx {
     const cfg = vscode.workspace.getConfiguration('agent');
-    return { sessions: scoped({ sessions: this.store.all(), providers: [], events: [], now: Date.now(), ternAvailable: false }, this.state.opts?.scope).sessions, trusted: vscode.workspace.isTrusted, config: (k, f) => cfg.get(k, f), now: Date.now() };
+    return { sessions: scoped({ sessions: this.store.all(), providers: [], events: [], now: Date.now(), ternAvailable: false }, this.state.opts?.scope).sessions, trusted: vscode.workspace.isTrusted, config: (k, f) => cfg.get(k.replace(/^agent\./, ''), f), now: Date.now() };
   }
 
   private pumpFeeds(force = false): void {
@@ -134,7 +134,7 @@ export class WorkspacePanel implements vscode.Disposable {
     const full = this.state.view === 'activity';
     const events = full ? this.store.timeline(undefined, 200_000) : this.state.selected ? this.store.timeline(this.state.selected) : [];
     this.pumpFeeds();
-    return renderWorkspace({ sessions: this.store.all(), providers: this.store.providerStates, events, now: Date.now(), ternAvailable: this.ternAvailable(), git: { enabled: this.store.opts.git, lastMs: this.store.lastStats?.gitMs, at: this.store.lastStats?.at }, idleAlertMinutes: vscode.workspace.getConfiguration('agent').get<number>('idleAlertMinutes', 30), timeline: (k, n) => this.store.timeline(k, n), stats: this.stats() }, this.state);
+    return renderWorkspace({ sessions: this.store.all(), providers: this.store.providerStates, events, now: Date.now(), ternAvailable: this.ternAvailable(), git: { enabled: this.store.opts.git, lastMs: this.store.lastStats?.gitMs, at: this.store.lastStats?.at }, idleAlertMinutes: vscode.workspace.getConfiguration('agent').get<number>('idleAlertMinutes', 30), timeline: (k, n) => this.store.timeline(k, n), stats: this.stats(), config: (k, f) => vscode.workspace.getConfiguration('agent').get(k.replace(/^agent\./, ''), f) }, this.state);
   }
 
   private stats() {

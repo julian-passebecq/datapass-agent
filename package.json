@@ -109,6 +109,10 @@
       {
         "command": "agent.showDiagnostics",
         "title": "Agent: Show Diagnostics"
+      },
+      {
+        "command": "agent.readTranscript",
+        "title": "Agent: Read Session Transcript"
       }
     ],
     "menus": {
@@ -277,6 +281,146 @@
           "type": "boolean",
           "default": true,
           "description": "Settings screen: also read the machine managed-settings.json (admin policy layer) if present."
+        },
+        "agent.transcript.maxBytes": {
+          "type": "number",
+          "default": 5242880,
+          "minimum": 65536,
+          "description": "Transcript screen: bytes read from the end of a transcript."
+        },
+        "agent.transcript.maxRecords": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 100,
+          "description": "Transcript screen: most conversation entries kept per transcript (oldest dropped first)."
+        },
+        "agent.transcript.pageSize": {
+          "type": "number",
+          "default": 150,
+          "minimum": 20,
+          "description": "Transcript screen: entries per page."
+        },
+        "agent.parallelTarget": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Target number of agents running at once: draws a target line on concurrency charts (0 = no target)."
+        },
+        "agent.health.contextWindow": {
+          "type": "number",
+          "default": 272000,
+          "minimum": 1000,
+          "description": "Reference context window and marker line; used as the window when the provider records none (Claude Code). A setting, not a fact."
+        },
+        "agent.health.warnPercent": {
+          "type": "number",
+          "default": 80,
+          "minimum": 1,
+          "description": "Context % at which bars, KPIs and badges turn red."
+        },
+        "agent.backlog.extraRoots": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Backlog screen: extra folders scanned for plan files besides the repositories agents used."
+        },
+        "agent.backlog.maxRepos": {
+          "type": "number",
+          "default": 40,
+          "minimum": 1,
+          "description": "Backlog screen: most recent repositories scanned."
+        },
+        "agent.backlog.maxKB": {
+          "type": "number",
+          "default": 200,
+          "minimum": 1,
+          "description": "Backlog screen: plan files larger than this (KB) are skipped and listed."
+        },
+        "agent.backlog.archive": {
+          "type": "boolean",
+          "default": true,
+          "description": "Backlog screen: also read handoff/archive/*.md for the weekly archive."
+        },
+        "agent.review.prState": {
+          "type": "boolean",
+          "default": false,
+          "description": "Review screen: read PR / MR, CI and review state with gh / glab (read-only, network). Off: lanes from sessions and recorded commands only."
+        },
+        "agent.review.maxRepos": {
+          "type": "number",
+          "default": 12,
+          "minimum": 1,
+          "description": "Review screen: repositories queried (most recent first)."
+        },
+        "agent.review.limit": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "description": "Review screen: PRs / MRs listed per remote."
+        },
+        "agent.changes.maxSessions": {
+          "type": "number",
+          "default": 60,
+          "minimum": 1,
+          "description": "Changes screen: most recent sessions whose commit window gets a git diff --numstat."
+        },
+        "agent.changes.maxWorktrees": {
+          "type": "number",
+          "default": 16,
+          "minimum": 1,
+          "description": "Changes screen: worktrees inspected for uncommitted work."
+        },
+        "agent.changes.worktreeHours": {
+          "type": "number",
+          "default": 24,
+          "minimum": 1,
+          "description": "Changes screen: inspect a worktree if a session there is live or was active within this many hours."
+        },
+        "agent.changes.untracked": {
+          "type": "boolean",
+          "default": true,
+          "description": "Changes screen: count untracked files."
+        },
+        "agent.pipelines.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Pipelines screen: read GitHub Actions / GitLab CI through the gh / glab CLIs (read-only, network). Off by default."
+        },
+        "agent.pipelines.maxRepos": {
+          "type": "number",
+          "default": 12,
+          "minimum": 1,
+          "description": "Pipelines screen: most recently used agent repositories checked."
+        },
+        "agent.pipelines.runsPerRepo": {
+          "type": "number",
+          "default": 20,
+          "minimum": 1,
+          "description": "Pipelines screen: runs listed per remote."
+        },
+        "agent.pipelines.jobRuns": {
+          "type": "number",
+          "default": 4,
+          "minimum": 0,
+          "description": "Pipelines screen: runs per remote whose jobs are loaded (active first, then newest, then latest failures)."
+        },
+        "agent.pipelines.gitlabHosts": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Pipelines screen: extra self-managed GitLab host names."
+        },
+        "agent.pipelines.extraRepos": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Pipelines screen: extra local repository paths to include."
         }
       }
     }
