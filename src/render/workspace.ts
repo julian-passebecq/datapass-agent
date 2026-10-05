@@ -537,6 +537,25 @@ export const RAIL_GROUP_HINT: Record<string, string> = {
   System: 'Configuration, collectors, and the screens that run a process (Catalog CLI probe, Launcher).',
 };
 
+/** One entry of the jump-to-screen picker (webview "g" / Ctrl+K and the "Agent: Go to screen…" command). */
+export interface ScreenEntry { id: string; label: string; group: string; hint: string }
+
+/** Every registered screen exactly once, in rail order (group by group), with its label, group and hint. */
+export function screenIndex(): ScreenEntry[] {
+  const ext = new Map(extraViews().map(x => [x.id, x]));
+  const groupOf = (v: string) => CORE_GROUP[v] ?? ext.get(v)?.group ?? 'System';
+  const rank = (v: string) => (RAIL_ORDER.indexOf(v) < 0 ? 999 : RAIL_ORDER.indexOf(v));
+  const gi = (g: string) => (RAIL_GROUPS.indexOf(g) < 0 ? RAIL_GROUPS.length : RAIL_GROUPS.indexOf(g));
+  return [...new Set(allViews())]
+    .map(id => ({ id, label: viewLabel(id), group: groupOf(id), hint: viewHint(id) }))
+    .sort((a, b) => gi(a.group) - gi(b.group) || rank(a.id) - rank(b.id));
+}
+
+/** Hidden source list the webview picker reads when it opens (outside the rail; never a [data-nav] element). */
+export function screenPickerSource(): string {
+  return `<ul class="gp-src" hidden aria-hidden="true">${screenIndex().map(s => `<li data-gp="${esc(s.id)}" data-group="${esc(s.group)}" data-hint="${esc(s.hint)}">${esc(s.label)}</li>`).join('')}</ul>`;
+}
+
 function bodies(d: WsData, st: WsState): Record<string, () => string> {
   const body: Record<string, () => string> = {
     overview: () => overview(d, st), attention: () => attentionView(d, st), board: () => board(d, st), team: () => team(d, st), flow: () => flowView(d, st), worktrees: () => worktrees(d, st), gantt: () => gantt(d, st), verify: () => verify(d, st), activity: () => activity(d), providers: () => providersView(d, st),
@@ -591,8 +610,8 @@ export function renderWorkspace(d0: WsData, st0: WsState): string {
   const rail = `<nav class="rail"><div class="brand">Agent <button class="link" data-cmd="openWorkspaceNewTab" title="Open another Agent tab (own screen and scope)">+ tab</button></div>${groups.map(railGroup).join('')}<div class="railfoot">${d.providers.map(p => `<div><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span> ${esc(PROV[p.provider])} ${esc(p.version ?? '')}</div>`).join('')}${collectorSummary(d)}<div class="muted">local · read-only</div></div></nav>`;
   const body = bodies(d, st);
   if (!body[st.view]) st = { ...st, view: 'overview' };
-  const keys = `<div class="keys"><b>1–0</b> screens with a number in the rail <b>Tab</b> / <b>j/k</b> move <b>Space</b> select <b>Enter</b> inspect <b>/</b> filter <b>Esc</b> clear <b>r</b> refresh <b>?</b> keys</div>`;
+  const keys = `<div class="keys"><b>1–0</b> screens with a number in the rail <b>Tab</b> / <b>j/k</b> move <b>Space</b> select <b>Enter</b> inspect <b>/</b> filter <b>g</b> go to screen <b>Esc</b> clear <b>r</b> refresh <b>?</b> keys</div>`;
   const main = `<main class="mainw"><header class="mh"><h1>${esc(label(st.view))}</h1>${st.opts?.scope ? `<button class="link scope" data-opt="scope" data-val="" title="Clear scope">scope: ${esc(st.opts.scope)} ✕</button>` : ""}<span class="muted hint" title="${esc(hint(st.view))}">${esc(hint(st.view))}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}${keys}${statusStrip(d)}</main>`;
-  return `<div class="ws">${rail}${main}<aside class="side">${side(d, st.selected)}</aside></div>`;
+  return `<div class="ws">${rail}${main}<aside class="side">${side(d, st.selected)}</aside>${screenPickerSource()}</div>`;
 }
 

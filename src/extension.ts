@@ -11,6 +11,7 @@ import { SessionStore } from './sessions/store';
 import { keyOf, SessionsTree } from './ui/sessionsTree';
 import { AgentView, Inspector } from './ui/webviews';
 import { WorkspacePanel } from './ui/workspace';
+import { screenIndex } from './render/workspace';
 import { WebviewMessage } from './render/html';
 
 const TERN_COMMANDS = ['tern.revealWorktree', 'tern.revealRevision', 'tern.revealChangeSet'];
@@ -122,6 +123,15 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
       newTab(undefined, scope ? undefined : keyOf(arg), scope && /^[a-z0-9._:-]{1,40}$/.test(scope) ? { scope } : undefined);
     }),
     { dispose: () => tabs.forEach(t => t.dispose()) },
+    // Jump to any screen: label + group + hint, then navigate the focused Agent tab (else the main workspace).
+    vscode.commands.registerCommand('agent.goToScreen', async () => {
+      const target = [workspace, ...tabs].find(p => p.active) ?? workspace;
+      const pick = await vscode.window.showQuickPick(
+        screenIndex().map(s => ({ label: s.label, description: s.group, detail: s.hint || undefined, id: s.id })),
+        { title: 'Agent: Go to screen', placeHolder: 'Type to filter screens', matchOnDescription: true, matchOnDetail: true },
+      );
+      if (pick) target.open(pick.id);
+    }),
     vscode.commands.registerCommand('agent.readTranscript', (arg?: unknown) => workspace.open('transcript', keyOf(arg))),
     vscode.commands.registerCommand('agent.openAttention', () => workspace.open('attention')),
     vscode.commands.registerCommand('agent.openTeam', (arg?: unknown) => workspace.open('team', keyOf(arg))),
