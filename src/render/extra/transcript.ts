@@ -10,6 +10,7 @@ import { esc } from '../html';
 import type { WsData, WsState } from '../workspace';
 import { ago, bytes, prettyModel, repoOf, titleOf } from '../workspace';
 import type { Feed, FeedCtx } from './feeds';
+import { redact } from '../../util/redact';
 import { actBtn, ExtraView, opt, seg, toolbar } from './kit';
 
 interface Settings {
@@ -353,7 +354,8 @@ export function toMarkdown(s: AgentSessionSnapshot, t: Transcript): string {
     else if (e.kind === 'compact') out.push('', `---`, `_${e.text} · ${at}_`, '');
     else if (e.kind === 'command') out.push(`- command \`${e.name}\` ${e.text}`);
   }
-  return out.join('\n') + '\n';
+  // Final pass through the one redaction layer: title, repo path and anything a future line adds.
+  return redact(out.join('\n')) + '\n';
 }
 
 const CSS = `

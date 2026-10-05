@@ -6,6 +6,8 @@ import { extraViews, extraCss } from '../render/extra';
 import { ActCtx } from '../render/extra/kit';
 import { Feed, FeedCtx, pump, setFeedScope } from '../render/extra/feeds';
 import { visibleViews } from '../activity/panes';
+import { isForbidden } from '../feeds/settings';
+import { isCredentialPath } from '../util/redact';
 
 let panelSeq = 0;
 
@@ -107,7 +109,11 @@ export class WorkspacePanel implements vscode.Disposable {
 
   private ctx(): ActCtx {
     return {
-      openFile: async p => void (await vscode.window.showTextDocument(vscode.Uri.file(p), { preview: true })),
+      openFile: async p => {
+        // Central guard whatever screen asks: Agent never opens auth / credential files.
+        if (isForbidden(p) || isCredentialPath(p)) return void vscode.window.showWarningMessage('Agent never opens credential or auth files.');
+        await vscode.window.showTextDocument(vscode.Uri.file(p), { preview: true });
+      },
       revealInOs: async p => void (await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(p))),
       openUrl: async u => {
         if (/^https:\/\//.test(u)) await vscode.env.openExternal(vscode.Uri.parse(u));

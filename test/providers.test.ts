@@ -36,7 +36,7 @@ test('claude adapter: session, location, model/effort, tests, files, worker tree
   assert.equal(s.status, 'ENDED', 'no live registry, old activity');
   assert.equal(s.startedAt, T('2026-10-04T09:12:00Z'));
   assert.equal(s.lastActivityAt, T('2026-10-04T09:28:00Z'), 'unknown record types still count as activity');
-  assert.deepEqual(s.tests.map(t => t.outcome), ['PASS', 'FAIL']);
+  assert.deepEqual(s.tests.map(t => t.outcome), ['PASS'], 'npm run build is a build, not a test');
   assert.equal(s.tests[0].source, 'provider-tool-error-flag');
   assert.deepEqual(s.changedFiles, ['src/foo.ts', 'src/f1.ts'].filter(f => s.changedFiles.includes(f)));
   assert.ok(s.changedFiles.includes('src/foo.ts'));

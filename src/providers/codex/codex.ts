@@ -60,9 +60,9 @@ export class CodexAdapter implements ProviderAdapter {
     const accs = [...this.accs.values()];
     const has = (p: string) => fs.existsSync(path.join(this.root, p));
     return [
-      { id: 'codex.rollouts', label: 'Codex rollouts', status: detected ? 'ready' : 'missing', detail: detected ? 'sessions/YYYY/MM/DD/rollout-*.jsonl' : 'no ~/.codex/sessions', count: accs.length - this.archived.size, at },
+      { id: 'codex.rollouts', label: 'Codex rollouts', status: detected ? 'ready' : 'missing', detail: detected ? 'sessions/YYYY/MM/DD/rollout-*.jsonl (record shapes undocumented, may change)' : 'no ~/.codex/sessions', count: accs.length - this.archived.size, at },
       { id: 'codex.archive', label: 'Codex archive', status: has('archived_sessions') ? 'ready' : 'missing', detail: has('archived_sessions') ? 'archived_sessions/ (archived = ENDED)' : 'no archived_sessions/: archived threads not visible', count: this.archived.size, at },
-      { id: 'codex.index', label: 'Codex thread titles', status: has('session_index.jsonl') ? 'ready' : 'partial', detail: has('session_index.jsonl') ? 'session_index.jsonl thread_name' : 'no session_index.jsonl: titles fall back to the first prompt', count: this.titles.size, at },
+      { id: 'codex.index', label: 'Codex thread titles', status: has('session_index.jsonl') ? 'ready' : 'partial', detail: has('session_index.jsonl') ? 'session_index.jsonl thread_name (undocumented, may change)' : 'no session_index.jsonl: titles fall back to the first prompt', count: this.titles.size, at },
       { id: 'codex.live', label: 'Codex live status', status: detected ? 'partial' : 'missing', detail: 'no process registry exposed: open turn + recency (INFERRED)', at },
       { id: 'codex.usage', label: 'Codex usage', status: detected ? 'ready' : 'missing', detail: 'token_count totals + model_context_window; no cost recorded', count: accs.filter(a => a.usage).length, at },
       ...codexStateSources(this.root, at),
@@ -171,8 +171,15 @@ export class CodexAdapter implements ProviderAdapter {
           acc.cwd = p.cwd;
           acc.ev('cwd', 'OBSERVED', 'turn_context.cwd');
         }
+        // approval_policy is an approval policy, not a permission mode: kept as approvalPolicy. permissionMode stays
+        // filled as a legacy alias because existing screens read it (and label it "approval" for Codex).
+        acc.setFact('approvalPolicy', p.approval_policy, 30);
         acc.setFact('permissionMode', p.approval_policy, 30);
         acc.setFact('sandbox', typeof p.sandbox_policy === 'string' ? p.sandbox_policy : p.sandbox_policy?.type ?? p.sandbox_policy?.mode, 40);
+        acc.setFact('permissionProfile', profileId(p.active_permission_profile) ?? profileId(p.permission_profile), 40);
+        acc.setFact('collaborationMode', p.collaboration_mode?.mode ?? p.collaboration_mode_kind, 30, at);
+        if (typeof p.approval_policy === 'string') acc.ev('facts.approvalPolicy', 'OBSERVED', 'turn_context.approval_policy (approval policy, not a permission mode)');
+        if (typeof (p.collaboration_mode?.mode ?? p.collaboration_mode_kind) === 'string') acc.ev('facts.collaborationMode', 'OBSERVED', 'turn_context.collaboration_mode.mode (plan = Codex plan mode)');
         return;
       case 'event_msg':
         acc.touch(at);
@@ -184,6 +191,9 @@ export class CodexAdapter implements ProviderAdapter {
         acc.touch(at);
         acc.event(at, 'SESSION_ACTIVITY', 'context compacted', 'OBSERVED');
         acc.bump('compactions', 'record');
+        if (at !== undefined) acc.compactInfo({ at, window: typeof p.window_number === 'number' ? p.window_number : undefined });
+        acc.ev('facts.compactions', 'DERIVED', 'max of `compacted` records and ContextCompaction items (two records of one compaction count once)');
+        acc.ev('facts.compacts', 'OBSERVED', 'compacted record window_number');
         return;
       default:
         if (typeof o.type === 'string') acc.touch(at);
@@ -238,6 +248,7 @@ export class CodexAdapter implements ProviderAdapter {
       case 'task_started': {
         acc.counts.turns++;
         acc.humanPrompt(toMs(p.started_at) ?? at, null);
+        acc.setFact('collaborationMode', p.collaboration_mode_kind, 30, toMs(p.started_at) ?? at);
         if (turn) set(this.openTurns, acc).add(turn);
         acc.event(toMs(p.started_at) ?? at, 'SESSION_ACTIVITY', 'turn started', 'OBSERVED', turn && `ts:${turn}`);
         return;
@@ -259,10 +270,16 @@ export class CodexAdapter implements ProviderAdapter {
         if (!t || typeof t !== 'object') return;
         const u = (acc.usage ??= { totalTokens: 0, outputTokens: 0, cachedInputTokens: 0 });
         // Per-call rhythm: a cumulative total that grew means one more model call (repeated records carry the same total).
-        if (n(t.total_tokens) > u.totalTokens && l && typeof l === 'object') acc.modelCall(undefined, at, n(l.input_tokens), n(l.output_tokens));
+        if (n(t.total_tokens) > u.totalTokens && l && typeof l === 'object') {
+          acc.modelCall(undefined, at, n(l.input_tokens), n(l.output_tokens));
+          acc.ev('facts.calls', 'INFERRED', 'one model call per growth of the cumulative token_count total (Codex records no call id)');
+        }
         u.totalTokens = n(t.total_tokens);
         u.outputTokens = n(t.output_tokens);
         u.cachedInputTokens = n(t.cached_input_tokens);
+        // Optional fields only when recorded (cumulative, like the others).
+        if (typeof t.cache_write_input_tokens === 'number' && t.cache_write_input_tokens >= 0) u.cacheCreationInputTokens = t.cache_write_input_tokens;
+        if (typeof t.reasoning_output_tokens === 'number' && t.reasoning_output_tokens >= 0) u.reasoningOutputTokens = t.reasoning_output_tokens;
         if (l && typeof l === 'object') u.contextTokens = n(l.input_tokens);
         if (typeof p.info.model_context_window === 'number') u.contextWindow = p.info.model_context_window;
         acc.ev('usage', 'OBSERVED', 'event_msg token_count (cumulative)');
@@ -325,13 +342,17 @@ export class CodexAdapter implements ProviderAdapter {
         return;
       }
       case 'CollabAgentToolCall':
-        if (it.tool === 'spawn_agent' || it.tool === 'spawn') acc.event(at, 'WORKER_STARTED', 'subagent spawned', 'OBSERVED', id);
-        else acc.counts.tools++;
+        if (it.tool === 'spawn_agent' || it.tool === 'spawn') {
+          const recv = Array.isArray(it.receiver_thread_ids) ? it.receiver_thread_ids.filter((x: unknown) => typeof x === 'string').slice(0, 20) : [];
+          this.spawned(acc, at, [id, ...recv], 'subagent spawned', typeof it.agent_type === 'string' ? it.agent_type : 'agent', '');
+        } else acc.counts.tools++;
         return;
-      case 'SubAgentActivity':
-        if (it.kind === 'started' || it.kind === 'spawned') acc.event(at, 'WORKER_STARTED', 'subagent started', 'OBSERVED', id);
-        else if (it.kind === 'completed' || it.kind === 'finished' || it.kind === 'closed') acc.event(at, 'WORKER_ENDED', 'subagent finished', 'OBSERVED', id);
+      case 'SubAgentActivity': {
+        const thread = typeof it.agent_thread_id === 'string' ? it.agent_thread_id : undefined;
+        if (it.kind === 'started' || it.kind === 'spawned') this.spawned(acc, at, [id, thread], 'subagent started', 'agent', typeof it.agent_path === 'string' ? it.agent_path : '');
+        else if (it.kind === 'completed' || it.kind === 'finished' || it.kind === 'closed') acc.event(at, 'WORKER_ENDED', 'subagent finished', 'OBSERVED', thread ? `end:${thread}` : id);
         return;
+      }
       case 'AgentMessage':
         acc.bump('replies', 'item');
         return;
@@ -366,10 +387,7 @@ export class CodexAdapter implements ProviderAdapter {
       acc.toolResult(p.call_id, outputChars(p.output), at);
     }
     if (p.type === 'function_call' && typeof p.name === 'string') {
-      if (p.name === 'spawn_agent') {
-        acc.event(at, 'WORKER_STARTED', 'spawn_agent', 'OBSERVED', p.call_id);
-        return;
-      }
+      if (p.name === 'spawn_agent') return; // WORKER_STARTED and the spawn fact come from callStart (deduplicated)
       if (p.name === 'shell' || p.name === 'container.exec' || p.name === 'shell_command') {
         const args = typeof p.arguments === 'string' ? safeParse(p.arguments) : undefined;
         const cmd = commandText(args?.command ?? args?.cmd);
@@ -414,10 +432,22 @@ export class CodexAdapter implements ProviderAdapter {
       if (p.name === 'update_plan') planTodos(acc, args, at);
       if (p.name === 'spawn_agent') {
         const type = typeof args?.agent_type === 'string' ? args.agent_type : typeof args?.role === 'string' ? args.role : 'agent';
-        acc.spawn(at, bounded(type, 40), bounded(args?.task_name ?? args?.description, 80));
+        this.spawned(acc, at, [id], 'spawn_agent', type, typeof args?.task_name === 'string' ? args.task_name : args?.description);
       }
     }
     acc.toolStart(name, detail, at, id);
+  }
+
+  /** One subagent spawn, recorded by up to three records (function_call spawn_agent, CollabAgentToolCall,
+   *  SubAgentActivity started) that share the call id and / or the child thread id. The first record emits
+   *  WORKER_STARTED and the spawn fact; later ones only link their ids to it. */
+  private spawned(acc: SessionAccumulator, at: number | undefined, ids: (string | undefined)[], label: string, type: unknown, description: unknown): void {
+    const keys = ids.filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= 200).map(x => `spawn:${x}`);
+    const seen = keys.some(k => acc.seenIds.has(k));
+    for (const k of keys) acc.seenIds.add(k);
+    if (seen || at === undefined) return;
+    acc.spawn(at, bounded(type, 40) || 'agent', bounded(description, 80));
+    acc.event(at, 'WORKER_STARTED', label, 'OBSERVED');
   }
 
   private command(acc: SessionAccumulator, cmd: string, exit: number | undefined, at: number | undefined, id?: string, duration?: any, status?: string): void {
@@ -430,9 +460,12 @@ export class CodexAdapter implements ProviderAdapter {
     const label = bounded(commandLabel(cmd), 100);
     const durMs = typeof duration?.secs === 'number' ? duration.secs * 1000 + Math.round((duration.nanos ?? 0) / 1e6) : undefined;
     if (isVerificationCommand(cmd)) {
-      const outcome = exit === undefined ? 'UNKNOWN' : exit === 0 ? 'PASS' : 'FAIL';
-      acc.tests.push({ command: testLabel(cmd), at: durMs ? at - durMs : at, outcome, exitCode: exit, durationMs: durMs, source: 'provider-exit-code' });
-      acc.event(at, 'TEST', `${outcome} ${testLabel(cmd)}`, 'OBSERVED');
+      // "Is a test" comes from the command text: OBSERVED only when Codex recorded the exit code, else INFERRED.
+      const outcome = exit !== undefined ? (exit === 0 ? 'PASS' : 'FAIL') : status === 'failed' ? 'FAIL' : 'UNKNOWN';
+      const source = exit !== undefined ? 'provider-exit-code' : 'provider-tool-error-flag';
+      acc.tests.push({ command: testLabel(cmd), at: durMs ? at - durMs : at, outcome, exitCode: exit, durationMs: durMs, source });
+      acc.event(at, 'TEST', `${outcome} ${testLabel(cmd)}`, exit !== undefined ? 'OBSERVED' : 'INFERRED');
+      acc.ev('tests', exit !== undefined ? 'OBSERVED' : 'INFERRED', 'test / build command recognised by its text; outcome from the recorded exit code when present');
     } else acc.event(at, 'PROCESS_ACTIVITY', `$ ${label}${exit !== undefined && exit !== 0 ? `  → exit ${exit}` : status === 'failed' ? '  → failed' : ''}`, 'OBSERVED');
     if (isGitCommit(cmd) && (exit === undefined || exit === 0)) {
       acc.ranGitCommit = true;
@@ -478,6 +511,17 @@ export class CodexAdapter implements ProviderAdapter {
   private diag(m: string): void {
     if (this.diagnostics.length < 20 && !this.diagnostics.includes(m)) this.diagnostics.push(m);
   }
+}
+
+/** Permission profile as recorded: a string, or an object with an id / name. */
+function profileId(v: unknown): string | undefined {
+  if (typeof v === 'string') return v;
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    if (typeof o.id === 'string') return o.id;
+    if (typeof o.name === 'string') return o.name;
+  }
+  return undefined;
 }
 
 function set<K, V>(m: Map<K, Set<V>>, k: K): Set<V> {

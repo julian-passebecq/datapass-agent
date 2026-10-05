@@ -4,7 +4,7 @@ import { AgentSessionSnapshot, EventType, TimelineEvent } from '../src/model';
 // Load the workspace before the screen module (the screen imports workspace helpers; workspace imports the registry).
 import { renderWorkspace, WsData } from '../src/render/workspace';
 import { dwell, loopStats, machine, statusPath, workPath, workState } from '../src/activity/lifecycle';
-import { lifecycleView, renderLifecycle, sessTok } from '../src/render/extra/lifecycle';
+import { edgeKind, lifecycleView, renderLifecycle, sessTok } from '../src/render/extra/lifecycle';
 import { T } from './helpers';
 
 const NOW = T('2026-10-05T12:00:00Z');
@@ -60,6 +60,7 @@ test('statusPath: started → running ⇄ idle → ended with evidence', () => {
   const p = statusPath(a, events, { now: NOW });
   assert.deepEqual(p.map(v => v.state), ['STARTED', 'RUNNING', 'IDLE', 'RUNNING', 'ENDED']);
   assert.equal(p[0].evidence, 'OBSERVED');
+  assert.equal(p[1].evidence, 'INFERRED', 'RUNNING from a record timestamp is inferred');
   assert.equal(p[2].evidence, 'INFERRED');
   assert.equal(p[2].at, NOW - 113 * M);
   assert.equal(p[4].at, NOW - 67 * M);
@@ -111,6 +112,11 @@ test('screen renders both machines, lists sessions, escapes', () => {
   assert.ok(h.includes('marker-end="url(#lcs-ar)"') && h.includes('marker-end="url(#lcw-ar)"'));
   assert.ok(h.includes('OBSERVED') && h.includes('INFERRED') && h.includes('DERIVED'));
   assert.ok(!h.includes('<b>bug</b>'));
+  assert.ok(h.includes('lc-k-inferred'), 'inferred edges styled apart');
+  assert.ok(h.includes('INFERRED (dashed, lighter)'), 'edge legend');
+  assert.equal(edgeKind({ OBSERVED: 3, INFERRED: 1 }), 'INFERRED');
+  assert.equal(edgeKind({ OBSERVED: 3, UNKNOWN: 1 }), 'UNKNOWN');
+  assert.equal(edgeKind({ DERIVED: 2 }), 'DERIVED');
   const l = renderLifecycle(d, { view: 'lifecycle', opts: { 'lifecycle.period': 'all', 'lifecycle.state': 'NEEDS_INPUT' } });
   assert.ok(l.includes(`data-select="${B}"`));
   assert.ok(!l.includes(`data-select="${A}"`));
