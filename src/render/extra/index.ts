@@ -18,6 +18,7 @@ import { runsView } from './runs';
 import { settingsView } from './settings';
 import { signalsView } from './signals';
 import { tokensView } from './tokens';
+import { transcriptView } from './transcript';
 import { topologyView } from './topology';
 import { weekView } from './week';
 
@@ -39,6 +40,7 @@ export const ALL_EXTRA: ExtraView[] = [
   settingsView,
   signalsView,
   tokensView,
+  transcriptView,
   topologyView,
   weekView,
 ];
