@@ -54,7 +54,8 @@ test('gitSignal: stable without change, moves on commit and checkout, no spawn; 
   git(repo, ['worktree', 'add', '-q', wt, '-b', 'side']);
   const dirs = gitDirs(path.join(wt));
   assert.ok(dirs && /worktrees/.test(dirs.gitDir), `linked worktree git dir ${dirs?.gitDir}`);
-  assert.equal(path.resolve(dirs!.commonDir).toLowerCase(), path.join(repo, '.git').toLowerCase());
+  const real = (p: string) => fs.realpathSync.native(path.resolve(p)).toLowerCase(); // 8.3 short names on CI runners
+  assert.equal(real(dirs!.commonDir), real(path.join(repo, '.git')));
   const w1 = gitSignal(wt);
   assert.equal(gitSignal(wt), w1);
   fs.writeFileSync(path.join(wt, 'w.txt'), 'w\n');
