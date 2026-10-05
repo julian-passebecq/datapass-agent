@@ -52,4 +52,12 @@ Left: the session log (real timeline events with t+offset). Centre: the session 
 - **P11 · Concurrency**: peak sessions running at once per hour over the last 24 h, against an optional `agent.parallelTarget`; "waiting for you" is counted separately from running (Cezar slots).
 - Skipped: spider and crawler animation (decoration), queueing and dispatch of tasks (control, which Agent never does), the Chrome extension prompt.
 
-Order: P1 → P2 → P3 → P4 → P5–P11 (P5 is the only one that reaches the network, and only on opt-in) (P1 and P2 touch different files and can run in parallel).
+### Final 3 (CodeAlta, remediation Sankey, trading dashboard)
+
+- **P12 · Flow drill-down** (remediation Sankey): Flow gains a 4th column, verification (tests pass / fail / none); clicking a node or band filters a session table under the diagram.
+- **P13 · Per-file changes** (CodeAlta "Modified files"): the Inspector lists files with +/− per file (git `diff --numstat` over the session window, live and recent sessions only).
+- **P14 · Status strip** (trading dashboard footer): a thin bottom bar with last refresh ms, Git ms, bytes read, memory, and a ticker of live repos with their status dots.
+- Into **P8**: compact context readout "17.5k / 272k · 6 %" in cards (CodeAlta status bar).
+- Skipped: the Effect TS layer tree and AGENTS.md tweet (not UI), mermaid rendering and tabs (VS Code already has these), and the trading widgets themselves.
+
+Order: P1 → P2 → P3 → P4 → P5–P14 (P5 is the only one that reaches the network, and only on opt-in) (P1 and P2 touch different files and can run in parallel).
