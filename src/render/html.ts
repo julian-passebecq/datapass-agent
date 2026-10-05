@@ -148,6 +148,8 @@ function applyFilter() {
   if (!q) return;
   const t = q.value.trim().toLowerCase();
   for (const el of root.querySelectorAll('main [data-select]')) el.classList.toggle('hide', !!t && !el.textContent.toLowerCase().includes(t));
+  // Plain table rows (catalog, backlog, changes …) filter too; header rows stay.
+  for (const el of root.querySelectorAll('main table tr:not([data-select])')) if (!el.querySelector('th')) el.classList.toggle('hide', !!t && !el.textContent.toLowerCase().includes(t));
 }
 if (q) q.addEventListener('input', applyFilter);
 function items() { return [...root.querySelectorAll('main [data-select]')].filter(e => !e.classList.contains('hide')); }
