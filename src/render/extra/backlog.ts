@@ -10,6 +10,8 @@ import {
 import { duration } from '../../activity/activity';
 import { compact, identityColor } from '../../activity/insights';
 import { MAX_BYTES, scanBacklog, uniqueRoots } from '../../feeds/backlog';
+import { ARCHIVE_FEED, archiveFeed, ArchiveView, itemKey } from '../../archive/reader';
+import * as path from 'path';
 import { esc } from '../html';
 import { ago, bytes, kpi, titleOf, WsData, WsState } from '../workspace';
 import { actBtn, ActCtx, ExtraView, opt, seg, toolbar } from './kit';
@@ -63,6 +65,8 @@ interface Row {
   /** Age reference: written date, else file mtime. */
   since: number;
   sinceBasis: 'dated' | 'file';
+  /** Known only from Agent's daily archive: last day the item was seen. */
+  arch?: string;
 }
 
 const nk = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
@@ -87,6 +91,8 @@ interface Cfg {
   gran: 'week' | 'day';
   span: number;
   archive: boolean;
+  /** Include items kept in Agent's daily archive that are no longer in the plan files. */
+  snap: boolean;
   file: string;
 }
 
@@ -105,6 +111,7 @@ function conf(st: WsState): Cfg {
     gran: pick('gran', ['week', 'day'] as const, 'week'),
     span: { '4': 4, '8': 8, '16': 16, '52': 52 }[opt(st, 'backlog.span', '8')] ?? 8,
     archive: opt(st, 'backlog.archive', 'hide') === 'show',
+    snap: opt(st, 'backlog.snap', 'on') !== 'off',
     file: opt(st, 'backlog.file', ''),
   };
 }
@@ -161,6 +168,10 @@ function idChip(it: BacklogItem, repo: string): string {
   return it.id ? `<code class="bl-id" style="--id:${identityColor(repo)}">${esc(it.id)}</code>` : '';
 }
 
+function archTag(r: Row): string {
+  return r.arch ? ` <span class="bl-archd" title="${esc(`ARCHIVED · OBSERVED in ${fileName(r.f)} on ${r.arch} by Agent's daily archive; no longer in the file today (state as last seen)`)}">ARCHIVED ${esc(r.arch)}</span>` : '';
+}
+
 function stack(counts: Record<ItemState, number>, wide = false): string {
   const total = STATE_ORDER.reduce((a, s) => a + counts[s], 0) || 1;
   return `<span class="bl-stack${wide ? ' wide' : ''}">${['done', 'active', 'blocked', 'open', 'dropped']
@@ -191,7 +202,7 @@ function tableView(d: WsData, st: WsState, c: Cfg, rows: Row[], byKey: Map<strin
     h += rs
       .slice(0, 400)
       .map(
-        r => `<tr class="bl-r bl-row-${r.it.state}"><td>${stPill(r.it)}</td><td>${idChip(r.it, r.f.repo)}</td><td class="bl-ti" style="padding-left:${6 + 12 * r.it.depth}px" title="${esc(`${r.it.title}\n${fileName(r.f)}:${r.it.line}`)}">${esc(r.it.title)}</td>${c.group === 'section' ? '' : `<td class="bl-sec muted" title="${esc(r.it.section)}">${esc(r.it.section)}</td>`}<td class="r">${ageCell(d, r)}</td><td>${sessChips(d, st, r.links, byKey)}</td><td class="bl-acts">${actBtn('open', r.f.file, `L${r.it.line}`, `Open ${fileName(r.f)} (item on line ${r.it.line})`)}</td></tr>`,
+        r => `<tr class="bl-r bl-row-${r.it.state}"><td>${stPill(r.it)}</td><td>${idChip(r.it, r.f.repo)}</td><td class="bl-ti" style="padding-left:${6 + 12 * r.it.depth}px" title="${esc(`${r.it.title}\n${fileName(r.f)}:${r.it.line}`)}">${esc(r.it.title)}${archTag(r)}</td>${c.group === 'section' ? '' : `<td class="bl-sec muted" title="${esc(r.it.section)}">${esc(r.it.section)}</td>`}<td class="r">${ageCell(d, r)}</td><td>${sessChips(d, st, r.links, byKey)}</td><td class="bl-acts">${r.arch ? '' : actBtn('open', r.f.file, `L${r.it.line}`, `Open ${fileName(r.f)} (item on line ${r.it.line})`)}</td></tr>`,
       )
       .join('');
     if (rs.length > 400) h += `<tr><td colspan="7" class="muted">+${rs.length - 400} more in this group</td></tr>`;
@@ -202,7 +213,7 @@ function tableView(d: WsData, st: WsState, c: Cfg, rows: Row[], byKey: Map<strin
 function boardView(d: WsData, st: WsState, c: Cfg, rows: Row[], byKey: Map<string, AgentSessionSnapshot>): string {
   const states = STATE_ORDER.filter(s => keep(c, s) && (s !== 'dropped' || c.state === 'dropped' || c.state === 'all'));
   const card = (r: Row) =>
-    `<div class="bl-c bl-c-${r.it.state}" style="--id:${identityColor(r.f.repo)}" title="${esc(`${r.it.title}\n${fileName(r.f)}:${r.it.line} · ${r.it.section}`)}"><div class="bl-ch">${idChip(r.it, r.f.repo)}<span class="bl-ct">${esc(r.it.title)}</span></div><div class="bl-cm muted">${c.group === 'repo' || c.group === 'none' ? `${esc(r.f.repo)} · ` : ''}${esc(r.it.section.split(' › ').pop() ?? '')} · ${ageCell(d, r)} ${actBtn('open', r.f.file, `L${r.it.line}`, `Open ${fileName(r.f)} (line ${r.it.line})`)}</div>${r.links.length ? `<div>${sessChips(d, st, r.links, byKey, 3)}</div>` : ''}</div>`;
+    `<div class="bl-c bl-c-${r.it.state}" style="--id:${identityColor(r.f.repo)}" title="${esc(`${r.it.title}\n${fileName(r.f)}:${r.it.line} · ${r.it.section}`)}"><div class="bl-ch">${idChip(r.it, r.f.repo)}<span class="bl-ct">${esc(r.it.title)}</span></div><div class="bl-cm muted">${c.group === 'repo' || c.group === 'none' ? `${esc(r.f.repo)} · ` : ''}${esc(r.it.section.split(' › ').pop() ?? '')} · ${ageCell(d, r)} ${r.arch ? archTag(r) : actBtn('open', r.f.file, `L${r.it.line}`, `Open ${fileName(r.f)} (line ${r.it.line})`)}</div>${r.links.length ? `<div>${sessChips(d, st, r.links, byKey, 3)}</div>` : ''}</div>`;
   const cap = 60;
   const lane = (s: ItemState) => {
     const rs = sortRows(c, rows.filter(r => r.it.state === s));
@@ -271,6 +282,26 @@ function weeksView(d: WsData, st: WsState, c: Cfg, files: PlanFile[], lk: Map<st
   return h;
 }
 
+// ---------------------------------------------------------------- daily archive
+
+/** Items of the daily archive's backlog snapshots that are no longer in today's plan files (in scope only). */
+function archivedRows(av: ArchiveView | undefined, files: PlanFile[], inScope: (root: string) => boolean): Row[] {
+  if (!av?.items.length) return [];
+  const present = new Set<string>();
+  for (const f of files) for (const it of f.items) present.add(itemKey(f.root, f.rel, it));
+  const synth = new Map<string, PlanFile>();
+  const out: Row[] = [];
+  for (const a of av.items) {
+    if (!inScope(a.root) || present.has(itemKey(a.root, a.rel, a.item))) continue;
+    const fk = `${nk(a.root)}|${a.rel}`;
+    let f = synth.get(fk);
+    if (!f) synth.set(fk, (f = { root: a.root, repo: a.repo, rel: a.rel, file: path.join(a.root, ...a.rel.split('/')), bytes: 0, mtime: 0, archive: false, items: [] }));
+    const seen = new Date(`${a.day}T12:00:00`).getTime();
+    out.push({ f, it: a.item, links: [], since: a.item.dated ?? seen, sinceBasis: a.item.dated !== undefined ? 'dated' : 'file', arch: a.day });
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- render
 
 function render(d: WsData, st: WsState): string {
@@ -295,6 +326,9 @@ function render(d: WsData, st: WsState): string {
       const ls = lk.get(`${f.file}#${it.line}`) ?? [];
       all.push({ f, it, links: ls, since: it.dated ?? f.mtime, sinceBasis: it.dated !== undefined ? 'dated' : 'file' });
     }
+  const av = feedValue<ArchiveView>(ARCHIVE_FEED).value;
+  const archived = c.snap && !c.file ? archivedRows(av, allFiles, (root: string) => inScope.has(nk(root)) || extra.has(nk(root))) : [];
+  all.push(...archived);
   const rows = all.filter(r => keep(c, r.it.state) && (c.link === 'all' || (c.link === 'linked') === r.links.length > 0));
 
   // KPIs over every item in scope (not the state filter)
@@ -317,6 +351,7 @@ function render(d: WsData, st: WsState): string {
     c.view === 'weeks' ? seg(st, 'backlog.gran', [['week', 'Week'], ['day', 'Day']], 'week', 'Granularity') : '',
     c.view === 'weeks' ? seg(st, 'backlog.span', [['4', '4 w'], ['8', '8 w'], ['16', '16 w'], ['52', '1 y']], '8', 'Period') : '',
     c.view !== 'weeks' ? seg(st, 'backlog.archive', [['hide', 'Live plans'], ['show', '+ archive']], 'hide', 'Include handoff/archive/*.md (always counted in Weeks)') : '',
+    c.view === 'board' || c.view === 'table' ? seg(st, 'backlog.snap', [['on', `+ Daily archive${archived.length ? ` ${archived.length}` : ''}`], ['off', 'Files only']], 'on', `Include items seen earlier by Agent's daily archive (npm run archive${av ? `, ${av.backlogDays.length} snapshot(s)` : ''}) that are no longer in the plan files: shown as ARCHIVED with the last day seen`) : '',
     fsel ? `<button class="pill on" data-opt="backlog.file" data-val="" title="Show every file" style="--id:${identityColor(fsel.repo)}">${esc(fileName(fsel))} ✕</button>` : '',
     `<span class="muted" title="${esc(new Date(report.at).toLocaleString())}">read ${esc(ago(d.now, report.at))}${fs.ms !== undefined ? ` in ${fs.ms} ms` : ''}</span>`,
     actBtn('refresh', '', 'Re-read', 'Read the plan files again'),
@@ -350,7 +385,7 @@ export const backlogView: ExtraView = {
   group: 'Quality',
   hint: 'Plans and packages found in repositories (handoff/PLAN.md, ROADMAP.md, TODO.md): state, age, the sessions that worked on them, and a weekly archive.',
   ready: true,
-  feeds: [backlogFeed as Feed],
+  feeds: [backlogFeed as Feed, archiveFeed as Feed],
   render,
   badge: () => {
     const out = feedValue<FeedOut>(FEED_ID).value;
@@ -434,5 +469,6 @@ export const backlogView: ExtraView = {
 .bl .bl-wh { margin: 10px 0 2px; font-size: 12px; }
 .bl .bl-when { white-space: nowrap; width: 90px; }
 .bl .bl-legend { margin-top: 12px; }
+.bl .bl-archd { display: inline-block; font-size: 9.5px; font-weight: 600; padding: 0 5px; border-radius: 8px; border: 1px dashed var(--quiet); color: var(--vscode-descriptionForeground); white-space: nowrap; margin-left: 4px; }
 `,
 };

@@ -85,6 +85,36 @@ Windows Task Scheduler, every Monday 08:00 (run `npm run compile-tests` once in 
 schtasks /Create /SC WEEKLY /D MON /ST 08:00 /TN "Agent weekly history" /TR "node <checkout>\out-test\scripts\weekly.js"
 ```
 
+## Daily archive (nothing disappears)
+
+Claude Code deletes transcripts older than `cleanupPeriodDays` (default 30) and Codex rotates its data, so Agent keeps its own durable archive:
+
+```
+npm run archive
+```
+
+It reads all local Claude Code and Codex history still on disk (subagents, Codex archived sessions, workflow runs) and the plan files of the repositories agents used, then writes `~/.agent/archive/` (setting `agent.archive.dir`):
+
+- `sessions/YYYY/MM/YYYY-MM-DD.jsonl`: one line per session archived or changed that day (every snapshot field, facts, tests, commits, up to 2000 timeline events, redacted). Re-running the same day replaces that session's line; lines of earlier days stay forever, even after the provider deleted the transcript. **No prompt or reply text**; a title is kept only when the provider named the session.
+- `backlog/YYYY-MM-DD.json`: plan items seen that day, so closed or removed items stay visible.
+- `workflows/YYYY-MM-DD.jsonl`: workflow run summaries (phases, agents, status, tokens; no agent results).
+- `index.json`: session → first / last archived day.
+- `raw/` (opt-in: `--raw` or `agent.archive.rawTranscripts`, capped by `agent.archive.rawMaxGB`, default 5 GB): gzip copies of transcripts / rollouts. These hold the full conversation text, locally. Auth and secret files are never copied.
+
+Provider files are only read; writes go through a temp file + rename under the archive folder, with a lock file, so it is safe while Claude or Codex run. Options (after `--`): `--out <dir>`, `--days <n>`, `--no-git`, `--no-backlog`, `--raw`, `--raw-max-gb <n>`, `--settings <settings.json>`, `--dry`. The script reads only the `agent.archive.*` keys of your VS Code user settings.
+
+History and Backlog have a toggle (*+ Archive* / *+ Daily archive*) that adds sessions and items known only from the archive, tagged ARCHIVED with the archive day (OBSERVED on that day).
+
+Schedule it daily at 03:17 (Windows Task Scheduler, current user, no admin). Run this yourself once, from the checkout:
+
+```
+powershell -ExecutionPolicy Bypass -File scripts\install-archive-task.ps1
+```
+
+It compiles `out-test` and registers the task "Agent daily archive" with the `node` on your PATH (`-Raw` adds `--raw`, `-Time 03:17` changes the hour, `-Uninstall` removes it). Check it with `schtasks /Query /TN "Agent daily archive"`.
+
+To make Claude Code itself keep transcripts longer, raise `cleanupPeriodDays` in `~/.claude/settings.json` (for example `"cleanupPeriodDays": 365`); the default is 30 days.
+
 ## Settings
 
 Defined in `package.json`. Commands are in the Command Palette under "Agent:".
@@ -131,6 +161,10 @@ Defined in `package.json`. Commands are in the Command Palette under "Agent:".
 | `agent.pipelines.extraRepos` | list | `[]` | Pipelines screen: extra local repository paths to include. |
 | `agent.history.dir` | string | `""` | History screen: folder holding the weekly archive (empty = ~/.agent/history). Written by npm run weekly or the screen's Build now. |
 | `agent.history.maxWeeks` | number | `52` | History screen: how many of the newest week files are read. |
+| `agent.archive.dir` | string | `""` | Daily archive folder (empty = ~/.agent/archive). Written by npm run archive; read by the History and Backlog screens. |
+| `agent.archive.maxDays` | number | `400` | History / Backlog screens: how many of the newest daily archive files are read. |
+| `agent.archive.rawTranscripts` | boolean | `false` | Daily archive: also keep gzip copies of transcripts and rollouts in <archive>/raw (full text, local only; auth / secret files never copied). |
+| `agent.archive.rawMaxGB` | number | `5` | Daily archive: size cap of the raw copies, in GB. |
 
 ## No AI
 
