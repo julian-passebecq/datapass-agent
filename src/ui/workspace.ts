@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { SessionStore } from '../sessions/store';
 import { EXTRA_NAV, page, validateMessage, WebviewMessage } from '../render/html';
 import { renderWorkspace, scoped, WsState, WsView } from '../render/workspace';
-import { EXTRA_VIEWS, extraCss } from '../render/extra';
+import { extraViews, extraCss } from '../render/extra';
 import { ActCtx } from '../render/extra/kit';
 import { FeedCtx, pump } from '../render/extra/feeds';
 
@@ -19,7 +19,7 @@ export class WorkspacePanel implements vscode.Disposable {
 
   constructor(private store: SessionStore, private onMessage: (m: WebviewMessage) => void, private ternAvailable: () => boolean, private onClosed?: (p: WorkspacePanel) => void) {
     this.sub = store.onDidChange(() => this.schedule());
-    for (const v of EXTRA_VIEWS) EXTRA_NAV.add(v.id);
+    for (const v of extraViews()) EXTRA_NAV.add(v.id);
   }
 
   get isOpen(): boolean {
@@ -79,12 +79,12 @@ export class WorkspacePanel implements vscode.Disposable {
   }
 
   private pumpFeeds(force = false): void {
-    const v = EXTRA_VIEWS.find(x => x.id === this.state.view);
+    const v = extraViews().find(x => x.id === this.state.view);
     if (v?.feeds?.length) pump(v.feeds, this.feedCtx(), () => this.schedule(), force);
   }
 
   private async act(name: string, arg: string): Promise<void> {
-    const v = EXTRA_VIEWS.find(x => x.id === this.state.view);
+    const v = extraViews().find(x => x.id === this.state.view);
     const fn = v?.actions?.[name];
     if (!fn) return;
     try {

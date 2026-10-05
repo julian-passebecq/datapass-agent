@@ -23,7 +23,11 @@ import { topologyView } from './topology';
 import { weekView } from './week';
 import { workflowsView } from './workflows';
 
-export const ALL_EXTRA: ExtraView[] = [
+// Built lazily: screens import render/workspace, which imports this file, so the list must not be
+// read while modules are still initialising (whichever module a test loads first).
+let all: ExtraView[] | undefined;
+export function allExtra(): ExtraView[] {
+  return (all ??= [
   auditView,
   backlogView,
   changesView,
@@ -45,10 +49,14 @@ export const ALL_EXTRA: ExtraView[] = [
   topologyView,
   weekView,
   workflowsView,
-];
+]);
+}
 
-export const EXTRA_VIEWS: ExtraView[] = ALL_EXTRA.filter(v => v.ready !== false);
+/** Screens that are built (ready !== false), in registry order. */
+export function extraViews(): ExtraView[] {
+  return allExtra().filter(v => v.ready !== false);
+}
 
 export function extraCss(): string {
-  return KIT_CSS + EXTRA_VIEWS.map(v => v.css ?? '').join('\n');
+  return KIT_CSS + extraViews().map(v => v.css ?? '').join('\n');
 }

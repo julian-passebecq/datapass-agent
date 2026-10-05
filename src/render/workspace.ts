@@ -4,7 +4,7 @@ import { AgentSessionSnapshot, ProviderState, SourceState, TimelineEvent } from 
 import { duration, weekly } from '../activity/activity';
 import { attention, AttentionItem, base, compact, dayStart, flow, hourly, identityColor, isLive, outcome, Outcome, OUTCOME_LABEL, stages, usageSince, verification, Verification, VERIFY_LABEL, workerRole } from '../activity/insights';
 import { esc } from './html';
-import { EXTRA_VIEWS } from './extra';
+import { extraViews } from './extra';
 import { hhmm, statusText } from './views';
 
 export const WS_VIEWS = ['overview', 'attention', 'board', 'team', 'flow', 'worktrees', 'gantt', 'verify', 'activity', 'providers'] as const;
@@ -14,7 +14,7 @@ export type WsView = string;
 
 /** Every screen id, core first then add-ons. */
 export function allViews(): string[] {
-  return [...WS_VIEWS, ...EXTRA_VIEWS.map(v => v.id)];
+  return [...WS_VIEWS, ...extraViews().map(v => v.id)];
 }
 
 export interface WsState {
@@ -488,17 +488,17 @@ export function renderWorkspace(d0: WsData, st0: WsState): string {
     team: String(d.sessions.filter(s => s.isWorker && isLive(s)).length || ''),
     verify: String(d.sessions.filter(s => isLive(s) && s.tests[s.tests.length - 1]?.outcome === 'FAIL').length || ''),
   };
-  for (const x of EXTRA_VIEWS) if (x.badge) badge[x.id] = x.badge(d);
-  const ext = new Map(EXTRA_VIEWS.map(x => [x.id, x]));
+  for (const x of extraViews()) if (x.badge) badge[x.id] = x.badge(d);
+  const ext = new Map(extraViews().map(x => [x.id, x]));
   const label = (v: string) => (VIEW_LABEL as Record<string, string>)[v] ?? ext.get(v)?.label ?? v;
   const hint = (v: string) => (VIEW_HINT as Record<string, string>)[v] ?? ext.get(v)?.hint ?? '';
   const navBtn = (v: string) => `<button class="nav${st.view === v ? ' on' : ''}" data-nav="${esc(v)}">${esc(label(v))}${badge[v] ? `<span class="nb${v === 'attention' || v === 'verify' ? ' hot' : ''}">${esc(badge[v])}</span>` : ''}</button>`;
-  const groups = ['Now', 'Sessions', 'Time', 'Git', 'Usage', 'Quality', 'System'].map(g => [g, EXTRA_VIEWS.filter(x => x.group === g)] as const).filter(([, xs]) => xs.length);
+  const groups = ['Now', 'Sessions', 'Time', 'Git', 'Usage', 'Quality', 'System'].map(g => [g, extraViews().filter(x => x.group === g)] as const).filter(([, xs]) => xs.length);
   const rail = `<nav class="rail"><div class="brand">Agent <button class="link" data-cmd="openWorkspaceNewTab" title="Open another Agent tab (own screen and scope)">+ tab</button></div>${WS_VIEWS.map(navBtn).join('')}${groups.map(([g, xs]) => `<div class="railg">${esc(g)}</div>${xs.map(x => navBtn(x.id)).join('')}`).join('')}<div class="railfoot">${d.providers.map(p => `<div><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span> ${esc(PROV[p.provider])} ${esc(p.version ?? '')}</div>`).join('')}${collectorSummary(d)}<div class="muted">local · read-only</div></div></nav>`;
   const body: Record<string, () => string> = {
     overview: () => overview(d, st), attention: () => attentionView(d, st), board: () => board(d, st), team: () => team(d, st), flow: () => flowView(d, st), worktrees: () => worktrees(d, st), gantt: () => gantt(d, st), verify: () => verify(d, st), activity: () => activity(d), providers: () => providersView(d, st),
   };
-  for (const x of EXTRA_VIEWS) body[x.id] = () => x.render(d, st);
+  for (const x of extraViews()) body[x.id] = () => x.render(d, st);
   if (!body[st.view]) st = { ...st, view: 'overview' };
   const keys = `<div class="keys"><b>1–0</b> screens <b>j/k</b> move <b>Enter</b> inspect <b>/</b> filter <b>Esc</b> clear <b>r</b> refresh <b>?</b> keys</div>`;
   const main = `<main class="mainw"><header class="mh"><h1>${esc(label(st.view))}</h1>${st.opts?.scope ? `<button class="link scope" data-opt="scope" data-val="" title="Clear scope">scope: ${esc(st.opts.scope)} ✕</button>` : ""}<span class="muted">${esc(hint(st.view))}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}${keys}${statusStrip(d)}</main>`;
