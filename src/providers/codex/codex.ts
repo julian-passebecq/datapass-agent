@@ -269,6 +269,9 @@ export class CodexAdapter implements ProviderAdapter {
         if (typeof p.message === 'string' && !p.message.startsWith('<')) acc.bump('prompts', 'event');
         if (!acc.firstPrompt && typeof p.message === 'string') acc.firstPrompt = bounded(p.message, 80);
         return;
+      case 'plan_update':
+        planTodos(acc, p, at);
+        return;
       case 'agent_message':
         acc.bump('replies', 'event');
         return;
@@ -389,6 +392,7 @@ export class CodexAdapter implements ProviderAdapter {
       // "exec" runs a small script calling tools.<name>(…): report the first inner tool, not the script.
       const inner = /\btools\.([A-Za-z_][\w]{0,59})\s*\(/.exec(p.input.slice(0, 4000));
       if (p.name === 'exec' && inner) name = inner[1];
+      if (p.name === 'exec' && inner?.[1] === 'update_plan') planTodos(acc, objectArg(p.input, inner.index), at);
       if (p.name === 'apply_patch') detail = patchTarget(p.input);
       else detail = codeCmd(p.input.slice(inner?.index ?? 0));
     } else {
@@ -399,6 +403,7 @@ export class CodexAdapter implements ProviderAdapter {
         else if (typeof args.task_name === 'string') detail = bounded(args.task_name, 80);
         else if (typeof args.target === 'string') detail = bounded(args.target, 60);
       }
+      if (p.name === 'update_plan') planTodos(acc, args, at);
       if (p.name === 'spawn_agent') {
         const type = typeof args?.agent_type === 'string' ? args.agent_type : typeof args?.role === 'string' ? args.role : 'agent';
         acc.spawn(at, bounded(type, 40), bounded(args?.task_name ?? args?.description, 80));
@@ -492,4 +497,29 @@ function safeDir(d: string): string[] {
   } catch {
     return [];
   }
+}
+
+/** update_plan arguments ({explanation?, plan: [{step, status}]}) → the session's todo list. */
+function planTodos(acc: SessionAccumulator, args: any, at: number | undefined): void {
+  if (!args || !Array.isArray(args.plan)) return;
+  acc.setTodos(at, 'update_plan', args.plan.slice(0, 200).map((x: any) => ({ text: x?.step, status: x?.status })));
+}
+
+/** First balanced {…} after `from` in a script (strings respected), parsed as JSON; undefined if not JSON. */
+export function objectArg(src: string, from: number): unknown {
+  const start = src.indexOf('{', from);
+  if (start < 0) return undefined;
+  let depth = 0;
+  let q = '';
+  const end = Math.min(src.length, start + 64 * 1024);
+  for (let i = start; i < end; i++) {
+    const ch = src[i];
+    if (q) {
+      if (ch === '\\') i++;
+      else if (ch === q) q = '';
+    } else if (ch === '"' || ch === "'" || ch === '`') q = ch;
+    else if (ch === '{') depth++;
+    else if (ch === '}' && --depth === 0) return safeParse(src.slice(start, i + 1));
+  }
+  return undefined;
 }
