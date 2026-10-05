@@ -3,7 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { SourceState, ProviderState } from '../../model';
 import { SessionAccumulator } from '../../sessions/accumulator';
-import { commandLabel, commandText, isGitCommit, isVerificationCommand, testLabel } from '../../sessions/classify';
+import { checkKind, commandLabel, commandText, isGitCommit, isVerificationCommand, testLabel, testVerdict } from '../../sessions/classify';
 import { readNewLines, safeParse, toMs } from '../../util/jsonl';
 import { isInside, isPlausibleLocalPath } from '../../util/paths';
 import { bounded } from '../../util/redact';
@@ -362,6 +362,8 @@ export class ClaudeAdapter implements ProviderAdapter {
           test.source = 'provider-exit-code';
           test.outcome = test.exitCode === 0 ? 'PASS' : 'FAIL';
         }
+        // A piped or chained test with only the tool error flag: the flag is the last command's status, not the test's.
+        test.outcome = testVerdict(test).outcome;
         if (at && at >= test.at) test.durationMs = at - test.at;
         // "Is a test" comes from the command regex: INFERRED unless the provider recorded an exit code.
         t.acc.event(at, 'TEST', `${test.outcome} ${test.command}`, test.source === 'provider-exit-code' ? 'OBSERVED' : 'INFERRED', `${c.tool_use_id}:r`);
@@ -460,7 +462,7 @@ export class ClaudeAdapter implements ProviderAdapter {
         const cmd = commandText(input.command);
         const label = bounded(commandLabel(cmd), 100);
         if (isVerificationCommand(cmd)) {
-          acc.tests.push({ command: testLabel(cmd), at: at ?? 0, outcome: 'UNKNOWN', source: 'provider-tool-error-flag' });
+          acc.tests.push({ command: testLabel(cmd), at: at ?? 0, outcome: 'UNKNOWN', kind: checkKind(cmd), source: 'provider-tool-error-flag' });
           acc.ev('tests', 'INFERRED', 'test / build command recognised by its text; outcome DERIVED from tool_result.is_error (Claude records no exit code)');
           if (id) this.pendingTests.set(id, { acc, idx: acc.tests.length - 1 });
           if (this.pendingTests.size > MAX_PENDING) this.pendingTests.delete(this.pendingTests.keys().next().value!);

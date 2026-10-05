@@ -2,6 +2,7 @@
 // event times; nothing reads or judges message text. Signals needing judgement (invented, unhappy,
 // unsafe) are deliberately absent. "unsolved" never means "failed": it means the end state shows open work.
 import { AgentSessionSnapshot, EvidenceKind, TimelineEvent } from '../model';
+import { testVerdict } from '../sessions/classify';
 
 export type SignalKind = 'unsolved' | 'blocked' | 'permissions' | 'swallowed' | 'looping';
 export const SIGNAL_KINDS: SignalKind[] = ['unsolved', 'blocked', 'permissions', 'swallowed', 'looping'];
@@ -76,7 +77,7 @@ function runs(s: AgentSessionSnapshot, ev: TimelineEvent[]): Run[] {
     const cmd = e.label.replace(/^\s*\$\s*/, '').replace(/\s+→\s+(exit\s+-?\d+|failed)\s*$/i, '');
     out.push({ at: e.at, cmd, norm: normalizeCommand(e.label), exit, fail: (exit !== undefined && exit !== 0) || /→\s+failed\s*$/.test(e.label), test: false });
   }
-  for (const t of s.tests) out.push({ at: t.at, cmd: t.command, norm: normalizeCommand(t.command), exit: t.exitCode, fail: t.outcome === 'FAIL', test: true });
+  for (const t of s.tests) out.push({ at: t.at, cmd: t.command, norm: normalizeCommand(t.command), exit: t.exitCode, fail: testVerdict(t).outcome === 'FAIL', test: true });
   return out.filter(r => r.norm).sort((a, b) => a.at - b.at);
 }
 
@@ -106,7 +107,7 @@ export function signals(s: AgentSessionSnapshot, events: TimelineEvent[], opts: 
   let unsolvedTest = false;
   if (end.ended && !s.isWorker) {
     const endAt = s.endedAt ?? last;
-    if (lastTest?.outcome === 'FAIL') {
+    if (lastTest && testVerdict(lastTest).outcome === 'FAIL') {
       unsolvedTest = true;
       out.push({ kind: 'unsolved', key: s.key, at: endAt, times: [lastTest.at, endAt], reason: `Ended with the last test failing: ${fmtCmd(lastTest.command)}`, basis: `${lastTest.exitCode !== undefined ? `exit code ${lastTest.exitCode}` : 'provider tool error flag'}; ${end.basis}`, evidence: end.kind === 'INFERRED' ? 'INFERRED' : 'OBSERVED' });
     } else {

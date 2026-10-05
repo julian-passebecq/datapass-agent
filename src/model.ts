@@ -1,5 +1,7 @@
 // Normalized read model. Providers fill only what they actually expose; every claim carries provenance.
 
+import type { CheckKind } from './sessions/classify';
+
 export type Provider = 'claude' | 'codex';
 
 /** OBSERVED: read from a provider artifact. DERIVED: computed deterministically (git, arithmetic).
@@ -34,6 +36,8 @@ export interface TestObservation {
   command: string; // bounded, redacted
   at: number;
   outcome: TestOutcome;
+  /** What the command checks, from its program at command position (checkKind, DERIVED). Absent when not filled by the provider adapter. */
+  kind?: CheckKind;
   exitCode?: number;
   durationMs?: number;
   /** Where the outcome comes from. "provider-exit-code": provider recorded the process exit code.
