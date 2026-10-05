@@ -433,6 +433,8 @@ interface Cached {
 
 const CACHE = new Map<string, Cached>();
 const CACHE_MAX = 6;
+/** Appended bytes are read and parsed this many at a time (memory stays bounded whatever the window). */
+const READ_CHUNK = 1 << 20;
 
 export function clearTranscriptCache(): void {
   CACHE.clear();
@@ -469,38 +471,41 @@ export function readTranscript(path: string, provider: Provider, opts: ReadOpts 
     let fd: number | undefined;
     try {
       fd = fs.openSync(path, 'r');
-      const len = size - c.offset;
-      const buf = Buffer.alloc(len);
-      let got = 0;
-      while (got < len) {
-        const n = fs.readSync(fd, buf, got, len - got, c.offset + got);
-        if (!n) break;
-        got += n;
-      }
-      let data = c.tail.length ? Buffer.concat([c.tail, buf.subarray(0, got)]) : buf.subarray(0, got);
+      const buf = Buffer.allocUnsafe(Math.min(READ_CHUNK, size - c.offset));
       // A window that starts mid-file begins with a partial line: skip it.
-      if (c.offset === c.from && c.from > 0 && c.records === 0 && c.bad === 0 && !c.tail.length) {
-        const nl = data.indexOf(0x0a);
-        data = nl < 0 ? Buffer.alloc(0) : data.subarray(nl + 1);
-      }
-      const last = data.lastIndexOf(0x0a);
-      const whole = last < 0 ? '' : data.subarray(0, last).toString('utf8');
-      c.tail = Buffer.from(last < 0 ? data : data.subarray(last + 1));
-      if (c.tail.length > maxBytes) c.tail = Buffer.alloc(0); // runaway line without newline
-      c.offset += got;
-      for (const l of whole.split('\n')) {
-        if (!l.trim()) continue;
-        let o: unknown;
-        try {
-          o = JSON.parse(l);
-        } catch {
-          c.bad++;
-          continue;
+      let skipPartial = c.offset === c.from && c.from > 0 && c.records === 0 && c.bad === 0 && !c.tail.length;
+      while (c.offset < size) {
+        const n = fs.readSync(fd, buf, 0, Math.min(buf.length, size - c.offset), c.offset);
+        if (!n) break;
+        c.offset += n;
+        let data = c.tail.length ? Buffer.concat([c.tail, buf.subarray(0, n)]) : buf.subarray(0, n);
+        if (skipPartial) {
+          const nl = data.indexOf(0x0a);
+          if (nl < 0) {
+            c.tail = Buffer.alloc(0);
+            continue;
+          }
+          data = data.subarray(nl + 1);
+          skipPartial = false;
         }
-        c.records++;
-        if (o && typeof o === 'object') feed(c.st, o as Record<string, unknown>);
+        const last = data.lastIndexOf(0x0a);
+        const whole = last < 0 ? '' : data.subarray(0, last).toString('utf8');
+        c.tail = Buffer.from(last < 0 ? data : data.subarray(last + 1));
+        if (c.tail.length > maxBytes) c.tail = Buffer.alloc(0); // runaway line without newline
+        for (const l of whole.split('\n')) {
+          if (!l.trim()) continue;
+          let o: unknown;
+          try {
+            o = JSON.parse(l);
+          } catch {
+            c.bad++;
+            continue;
+          }
+          c.records++;
+          if (o && typeof o === 'object') feed(c.st, o as Record<string, unknown>);
+        }
+        trim(c.st, maxEntries);
       }
-      trim(c.st, maxEntries);
     } catch (e) {
       return { ...empty(`Read failed: ${String((e as Error)?.message ?? e).slice(0, 120)}`), size };
     } finally {

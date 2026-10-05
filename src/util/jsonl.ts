@@ -21,6 +21,19 @@ export interface ReadResult {
 
 const CHUNK = 1 << 20;
 export const MAX_LINE_BYTES = 8 << 20;
+/** Files above this size are only ever read from the last cursor offset, CHUNK bytes at a time. */
+export const LARGE_FILE_BYTES = 4 << 20;
+
+/** Counters for tests and the perf probe (process-wide, reset with resetReadStats). */
+export const readStats = { calls: 0, bytes: 0, resets: 0, largeFull: 0, largeTail: 0, maxChunk: 0 };
+export function resetReadStats(): void {
+  Object.assign(readStats, { calls: 0, bytes: 0, resets: 0, largeFull: 0, largeTail: 0, maxChunk: 0 });
+}
+
+// One CHUNK buffer reused by every synchronous read (a fresh 1 MB zeroed buffer per artifact per refresh was the
+// main allocation of an idle pass). A re-entrant call (from inside onLine) gets its own buffer.
+let shared: Buffer | undefined;
+let sharedBusy = false;
 
 function readHead(fd: number): string {
   const b = Buffer.alloc(64);
@@ -48,35 +61,49 @@ export function readNewLines(file: string, prev?: Cursor, onLine?: (line: string
     let oversize = false;
     let pos = offset;
     let consumed = offset;
-    const buf = Buffer.alloc(CHUNK);
-    while (pos < st.size) {
-      const n = fs.readSync(fd, buf, 0, Math.min(CHUNK, st.size - pos), pos);
-      if (n <= 0) break;
-      let start = 0;
-      for (let i = 0; i < n; i++) {
-        if (buf[i] !== 0x0a) continue;
-        if (oversize) {
-          skippedOversize++;
-        } else {
-          const part = buf.subarray(start, i);
-          const line = pendingLen ? Buffer.concat([...pending, part]).toString('utf8') : part.toString('utf8');
-          if (line.trim()) emit(line);
-        }
-        pending = [];
-        pendingLen = 0;
-        oversize = false;
-        start = i + 1;
-        consumed = pos + i + 1;
-      }
-      if (start < n && !oversize) {
-        pendingLen += n - start;
-        if (pendingLen > MAX_LINE_BYTES) {
-          oversize = true;
-          pending = [];
-        } else pending.push(Buffer.from(buf.subarray(start, n)));
-      }
-      pos += n;
+    const own = sharedBusy || pos >= st.size;
+    const buf = own ? Buffer.allocUnsafe(Math.min(CHUNK, Math.max(1, st.size - pos))) : (shared ??= Buffer.allocUnsafe(CHUNK));
+    if (!own) sharedBusy = true;
+    readStats.calls++;
+    if (reset) readStats.resets++;
+    if (st.size > LARGE_FILE_BYTES) {
+      if (offset === 0) readStats.largeFull++;
+      else readStats.largeTail++;
     }
+    try {
+      while (pos < st.size) {
+        const n = fs.readSync(fd, buf, 0, Math.min(buf.length, st.size - pos), pos);
+        readStats.maxChunk = Math.max(readStats.maxChunk, n);
+        if (n <= 0) break;
+        let start = 0;
+        for (let i = 0; i < n; i++) {
+          if (buf[i] !== 0x0a) continue;
+          if (oversize) {
+            skippedOversize++;
+          } else {
+            const part = buf.subarray(start, i);
+            const line = pendingLen ? Buffer.concat([...pending, part]).toString('utf8') : part.toString('utf8');
+            if (line.trim()) emit(line);
+          }
+          pending = [];
+          pendingLen = 0;
+          oversize = false;
+          start = i + 1;
+          consumed = pos + i + 1;
+        }
+        if (start < n && !oversize) {
+          pendingLen += n - start;
+          if (pendingLen > MAX_LINE_BYTES) {
+            oversize = true;
+            pending = [];
+          } else pending.push(Buffer.from(buf.subarray(start, n)));
+        }
+        pos += n;
+      }
+    } finally {
+      if (!own) sharedBusy = false;
+    }
+    readStats.bytes += pos - offset;
     return {
       lines,
       cursor: { offset: consumed, size: st.size, mtimeMs: st.mtimeMs, head: head.slice(0, 32) },
