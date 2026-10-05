@@ -161,8 +161,33 @@ function parseLog(out: string): CommitObservation[] {
   });
 }
 
-export async function diffStat(cwd: string, from: string, to: string): Promise<{ files: string[]; added: number; removed: number } | undefined> {
+export interface DiffStat {
+  files: string[];
+  added: number;
+  removed: number;
+}
+
+/** `from..to` diff stats by worktree: commits are immutable, so a computed result never changes (bounded LRU). */
+const diffCache = new Map<string, DiffStat>();
+const DIFF_CACHE_MAX = 1000;
+
+export async function diffStat(cwd: string, from: string, to: string): Promise<DiffStat | undefined> {
   if (!/^[0-9a-f]{7,40}$/.test(from) || !/^[0-9a-f]{7,40}$/.test(to)) return undefined;
+  const key = `${cwd.toLowerCase()}|${from}..${to}`;
+  const hit = diffCache.get(key);
+  if (hit) {
+    diffCache.delete(key);
+    diffCache.set(key, hit);
+    return { files: [...hit.files], added: hit.added, removed: hit.removed };
+  }
+  const d = await once(`diff:${key}`, () => diffStatUncached(cwd, from, to));
+  if (!d) return undefined;
+  diffCache.set(key, d);
+  if (diffCache.size > DIFF_CACHE_MAX) diffCache.delete(diffCache.keys().next().value!);
+  return { files: [...d.files], added: d.added, removed: d.removed };
+}
+
+async function diffStatUncached(cwd: string, from: string, to: string): Promise<DiffStat | undefined> {
   const out = await git(cwd, ['diff', '--numstat', '--no-renames', '--no-ext-diff', '--no-textconv', `${from}..${to}`]);
   if (out === undefined) return undefined;
   let added = 0, removed = 0;
@@ -266,7 +291,90 @@ export async function correlate(s: AgentSessionSnapshot, now = Date.now(), windo
   return s;
 }
 
+interface GitDirs {
+  gitDir: string;
+  commonDir: string;
+}
+
+const dirsCache = new Map<string, GitDirs | null>();
+const lastSignal = new Map<string, string>();
+
+/** The repository's git dir (per worktree) and common dir for `cwd`, found by walking up to `.git` (a dir, or a
+ *  `gitdir:` file in a linked worktree). Plain fs reads of a few bytes: no git spawn. */
+export function gitDirs(cwd: string): GitDirs | undefined {
+  const c = dirsCache.get(cwd);
+  if (c !== undefined) return c ?? undefined;
+  let found: GitDirs | null = null;
+  for (let d = path.resolve(cwd), i = 0; i < 64; i++) {
+    const dot = path.join(d, '.git');
+    try {
+      const st = fs.statSync(dot);
+      let gitDir = dot;
+      if (st.isFile()) {
+        const m = /^gitdir:\s*(.+?)\s*$/m.exec(fs.readFileSync(dot, 'utf8').slice(0, 4096));
+        if (!m) break;
+        gitDir = path.resolve(d, m[1]);
+      }
+      let commonDir = gitDir;
+      try {
+        commonDir = path.resolve(gitDir, fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim());
+      } catch {
+        /* not a linked worktree */
+      }
+      found = { gitDir, commonDir };
+      break;
+    } catch {
+      /* no .git here */
+    }
+    const up = path.dirname(d);
+    if (up === d) break;
+    d = up;
+  }
+  dirsCache.set(cwd, found);
+  return found ?? undefined;
+}
+
+function stamp(f: string): string {
+  try {
+    const st = fs.statSync(f);
+    return `${st.mtimeMs}:${st.size}`;
+  } catch {
+    return '-';
+  }
+}
+
+/**
+ * Cheap change signal for the git state seen from `cwd`: mtime/size of HEAD, its reflog, the index, the checked-out
+ * branch ref and packed-refs (a commit, checkout, reset, merge, stage or ref update changes one of them). Same string
+ * means nothing git-visible moved, so a correlation keyed on it can be reused. When it changes, the cached location
+ * (HEAD, branch, dirty) for this cwd is dropped so the next `locate` asks git again.
+ */
+export function gitSignal(cwd: string | undefined): string {
+  if (!cwd || !isPlausibleLocalPath(cwd)) return 'none';
+  if (!fs.existsSync(cwd)) return 'missing';
+  const dirs = gitDirs(cwd);
+  if (!dirs) return 'no-repo';
+  let head = '';
+  try {
+    head = fs.readFileSync(path.join(dirs.gitDir, 'HEAD'), 'utf8').slice(0, 512).trim();
+  } catch {
+    /* repository gone */
+  }
+  const ref = /^ref:\s*(refs\/[\w./-]+)$/.exec(head)?.[1];
+  const sig = [head, stamp(path.join(dirs.gitDir, 'index')), stamp(path.join(dirs.gitDir, 'logs', 'HEAD')), ref ? stamp(path.join(dirs.commonDir, ref)) : '', stamp(path.join(dirs.commonDir, 'packed-refs'))].join('|');
+  const prev = lastSignal.get(cwd);
+  if (prev !== undefined && prev !== sig) {
+    locCache.delete(cwd);
+    dirsCache.delete(cwd);
+  }
+  lastSignal.set(cwd, sig);
+  return sig;
+}
+
 export function clearGitCache(): void {
   locCache.clear();
   logCache.clear();
+  diffCache.clear();
+  dirsCache.clear();
+  lastSignal.clear();
 }

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { SessionStore } from '../sessions/store';
+import { SessionStore, viewNeedsRender } from '../sessions/store';
 import { EXTRA_NAV, page, validateMessage, WebviewMessage } from '../render/html';
 import { allViews, renderWorkspace, scoped, WsState, WsView } from '../render/workspace';
 import { extraViews, extraCss } from '../render/extra';
@@ -17,11 +17,15 @@ export class WorkspacePanel implements vscode.Disposable {
   private state: WsState = { view: 'overview', opts: {} };
   private timer?: NodeJS.Timeout;
   private last = '';
+  /** Store version and time of the last built page, and whether a feed landed since (see `storeChanged`). */
+  private renderedVersion = -1;
+  private renderedAt = 0;
+  private feedPending = false;
   private sub: { dispose(): void };
   private terminals = new Map<string, vscode.Terminal>();
 
   constructor(private store: SessionStore, private onMessage: (m: WebviewMessage) => void, private ternAvailable: () => boolean, private onClosed?: (p: WorkspacePanel) => void) {
-    this.sub = store.onDidChange(() => this.schedule());
+    this.sub = store.onDidChange(() => this.storeChanged());
     for (const v of extraViews()) EXTRA_NAV.add(v.id);
   }
 
@@ -86,7 +90,11 @@ export class WorkspacePanel implements vscode.Disposable {
     // The visible screen, or every pane of the Panes screen; a feed shared by two panes loads once.
     const feeds = new Map<string, Feed>();
     for (const v of this.visibleExtra()) for (const f of v.feeds ?? []) feeds.set(f.id, f);
-    if (feeds.size) pump([...feeds.values()], this.feedCtx(), () => this.schedule(), force);
+    if (feeds.size)
+      pump([...feeds.values()], this.feedCtx(), () => {
+        this.feedPending = true;
+        this.schedule();
+      }, force);
   }
 
   private visibleExtra() {
@@ -159,8 +167,16 @@ export class WorkspacePanel implements vscode.Disposable {
     return r ? { refreshMs: r.ms, gitMs: r.gitMs, bytesRead: r.bytesRead, artifacts: r.artifacts, heapMB: Math.round(process.memoryUsage().heapUsed / 2 ** 20), at: r.at } : undefined;
   }
 
+  /** A store notification: skip building the page when the projection did not move (idle refresh), except to keep
+   *  relative times and the refresh line from going stale for more than VIEW_STALE_MS. */
+  private storeChanged(): void {
+    if (!viewNeedsRender({ version: this.store.version, renderedVersion: this.renderedVersion, renderedAt: this.renderedAt, feedPending: this.feedPending, now: Date.now() })) return;
+    this.schedule();
+  }
+
   private schedule(): void {
-    if (this.timer || !this.panel) return;
+    // Hidden panel: no timer and no page build; becoming visible renders (onDidChangeViewState).
+    if (this.timer || !this.panel?.visible) return;
     this.timer = setTimeout(() => {
       this.timer = undefined;
       this.render();
@@ -170,6 +186,9 @@ export class WorkspacePanel implements vscode.Disposable {
   private render(force = false, top = false): void {
     const p = this.panel;
     if (!p || !p.visible) return;
+    this.renderedVersion = this.store.version;
+    this.renderedAt = Date.now();
+    this.feedPending = false;
     const html = this.body();
     if (!force && html === this.last) return;
     this.last = html;
