@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { AgentSessionSnapshot } from '../../model';
-import { ChangesData, collectChanges, WorktreeChanges, WtFileState } from '../../git/changes';
+import { ChangesData, collectChanges, SharedWindow, sharedWindows, WorktreeChanges, WtFileState } from '../../git/changes';
 import { churn, factPath, FileRow, fileRows, folderOf, Gran, GroupBy, groupRows, heat, isPeriod, Period, since, SortBy, sortRows, SessionRow, sessionRows, wtCounts } from '../../activity/changes';
 import { base, compact, identityColor, isLive } from '../../activity/insights';
 import { esc } from '../html';
@@ -99,6 +99,17 @@ function sessDots(keys: string[], by: Map<string, AgentSessionSnapshot>, max = 6
 function divBar(a: number, r: number, max: number): string {
   const w = (v: number) => (max > 0 ? Math.max(v ? 1 : 0, (50 * v) / max) : 0).toFixed(2);
   return `<span class="chg-div" title="${esc(`+${a} −${r} lines`)}"><i class="chg-dr" style="width:${w(r)}%"></i><i class="chg-da" style="width:${w(a)}%"></i></span>`;
+}
+
+/** "shared window (n sessions)" badge: INFERRED, tooltip names the other sessions of the same worktree (audit A3 P1-9). */
+export function sharedBadge(sw: SharedWindow | undefined, commits: number, by: Map<string, AgentSessionSnapshot>, cls = 'chg-shared'): string {
+  if (!sw) return '';
+  const names = sw.others.map(k => {
+    const o = by.get(k);
+    return o ? `${titleOf(o).slice(0, 60)} (${o.provider}, ${o.status})` : k;
+  });
+  const tip = `INFERRED: ${sw.shas.size} of ${commits} window commit(s) also fall inside the window of ${sw.others.length} other session(s) active in this worktree, so authorship cannot be told apart: ${names.join('; ')}. A commit the session ran itself (git commit) stays OBSERVED.`;
+  return ` <span class="${cls}" data-ev="INFERRED" title="${esc(tip)}">shared window (${sw.n} sessions)</span>`;
 }
 
 const EV = {
@@ -229,6 +240,9 @@ function drill(d: WsData, st: WsState, r: FileRow | undefined, all: FileRow[], b
 // ---------------------------------------------------------------- sessions tab
 
 function sessionsTab(d: WsData, st: WsState, c: Cfg, data: ChangesData | undefined): string {
+  const shared = sharedWindows(d.sessions, d.now);
+  const byKey = new Map(d.sessions.map(s => [s.key, s]));
+  const sb = (s: AgentSessionSnapshot) => sharedBadge(shared.get(s.key), s.commits.length, byKey);
   const who = opt(st, 'changes.who', 'leads');
   const sort = opt(st, 'changes.ssort', 'recent');
   const layout = opt(st, 'changes.slayout', 'table');
@@ -247,17 +261,17 @@ function sessionsTab(d: WsData, st: WsState, c: Cfg, data: ChangesData | undefin
   let h: string;
   if (layout === 'cards') {
     h = `<div class="chg-cards">${rows
-      .map(r => `<div class="chg-card${st.selected === r.s.key ? ' sel' : ''}" style="--id:${identityColor(repoOf(r.s))}" data-select="${esc(r.s.key)}" tabindex="0"><div class="chg-ch"><span class="dot ${esc(r.s.status)}"></span><b>${esc(titleOf(r.s).slice(0, 60))}</b><span class="right">${lines(r)}</span></div><div class="muted">${esc([repoOf(r.s), r.s.branch, r.s.provider, prettyModel(r.s.model)].filter(Boolean).join(' · '))}</div><div>${r.files} file(s) · ${r.edits} edit call(s) · ${r.s.commits.length} commit(s) ${isLive(r.s) || r.wt ? wtSummary(r.wt) : ''}</div><div class="chg-tfs">${topFiles(r, 6)}</div></div>`)
+      .map(r => `<div class="chg-card${st.selected === r.s.key ? ' sel' : ''}" style="--id:${identityColor(repoOf(r.s))}" data-select="${esc(r.s.key)}" tabindex="0"><div class="chg-ch"><span class="dot ${esc(r.s.status)}"></span><b>${esc(titleOf(r.s).slice(0, 60))}</b><span class="right">${lines(r)}</span></div><div class="muted">${esc([repoOf(r.s), r.s.branch, r.s.provider, prettyModel(r.s.model)].filter(Boolean).join(' · '))}</div><div>${r.files} file(s) · ${r.edits} edit call(s) · ${r.s.commits.length} commit(s)${sb(r.s)} ${isLive(r.s) || r.wt ? wtSummary(r.wt) : ''}</div><div class="chg-tfs">${topFiles(r, 6)}</div></div>`)
       .join('')}</div>`;
   } else {
     h = `<table class="chg-t"><tr><th>Session</th><th>Repo · branch</th><th>Who</th><th class="r" title="${esc(EV.lines)}">Lines</th><th class="r">Files</th><th class="r" title="${esc(EV.edits)}">Edits</th><th class="r" title="commits observed during the session window">Commits</th><th title="${esc(EV.wt)}">Worktree now</th><th>Top files</th><th class="r">Last</th></tr>${rows
-      .map(r => `<tr class="${st.selected === r.s.key ? 'sel' : ''}" data-select="${esc(r.s.key)}" tabindex="0"><td><span class="dot ${esc(r.s.status)}"></span> ${esc(titleOf(r.s).slice(0, 56))}${r.s.isWorker ? ' <span class="muted">worker</span>' : ''}</td><td class="muted"><span class="chg-sw" style="background:${identityColor(repoOf(r.s))}"></span>${esc(repoOf(r.s))}${r.s.branch ? ` · ${esc(r.s.branch)}` : ''}</td><td class="muted chg-nw"><span class="chg-pv ${r.s.provider}"></span>${esc(prettyModel(r.s.model) || r.s.provider)}</td><td class="r chg-nw">${lines(r)}</td><td class="r">${r.files}</td><td class="r">${r.edits || ''}</td><td class="r">${r.s.commits.length || ''}</td><td>${wtSummary(r.wt, true)}</td><td class="chg-tfs">${topFiles(r, 3)}</td><td class="r muted">${esc(ago(d.now, r.s.lastActivityAt))}</td></tr>`)
+      .map(r => `<tr class="${st.selected === r.s.key ? 'sel' : ''}" data-select="${esc(r.s.key)}" tabindex="0"><td><span class="dot ${esc(r.s.status)}"></span> ${esc(titleOf(r.s).slice(0, 56))}${r.s.isWorker ? ' <span class="muted">worker</span>' : ''}</td><td class="muted"><span class="chg-sw" style="background:${identityColor(repoOf(r.s))}"></span>${esc(repoOf(r.s))}${r.s.branch ? ` · ${esc(r.s.branch)}` : ''}</td><td class="muted chg-nw"><span class="chg-pv ${r.s.provider}"></span>${esc(prettyModel(r.s.model) || r.s.provider)}</td><td class="r chg-nw">${lines(r)}</td><td class="r">${r.files}</td><td class="r">${r.edits || ''}</td><td class="r">${r.s.commits.length || ''}${sb(r.s)}</td><td>${wtSummary(r.wt, true)}</td><td class="chg-tfs">${topFiles(r, 3)}</td><td class="r muted">${esc(ago(d.now, r.s.lastActivityAt))}</td></tr>`)
       .join('')}</table>`;
   }
   const sel = rows.find(r => r.s.key === st.selected);
   if (sel) {
     const maxL = Math.max(1, ...sel.top.map(f => Math.max(f.added, f.removed)));
-    h += `<div class="chg-drill"><h2>${esc(titleOf(sel.s).slice(0, 80))} · ${sel.files} file(s) ${lines(sel)}${sel.diff ? ` <span class="muted" title="${esc(EV.lines)}">${esc(sel.diff.from.slice(0, 7))}..${esc(sel.diff.to.slice(0, 7))}</span>` : ''}</h2><table class="chg-t chg-mini"><tr><th>File</th><th class="r">+</th><th class="r">−</th><th></th><th class="r">Edits</th></tr>${sel.top
+    h += `<div class="chg-drill"><h2>${esc(titleOf(sel.s).slice(0, 80))} · ${sel.files} file(s) ${lines(sel)}${sel.diff ? ` <span class="muted" title="${esc(EV.lines)}">${esc(sel.diff.from.slice(0, 7))}..${esc(sel.diff.to.slice(0, 7))}</span>` : ''}${sb(sel.s)}</h2><table class="chg-t chg-mini"><tr><th>File</th><th class="r">+</th><th class="r">−</th><th></th><th class="r">Edits</th></tr>${sel.top
       .slice(0, 60)
       .map(f => `<tr><td>${fileName(f.path)}</td><td class="r chg-a">${sel.diff ? compact(f.added) : ''}</td><td class="r chg-r">${sel.diff ? compact(f.removed) : ''}</td><td class="chg-dc">${sel.diff ? divBar(f.added, f.removed, maxL) : ''}</td><td class="r">${f.edits || ''}</td></tr>`)
       .join('')}</table>${sel.top.length > 60 ? `<div class="muted">… ${sel.top.length - 60} more</div>` : ''}</div>`;
@@ -448,6 +462,7 @@ export const changesView: ExtraView = {
 .chg .chg-kr b, .chg .chg-r { color: var(--bad); }
 .chg .chg-a, .chg .chg-r { font-variant-numeric: tabular-nums; }
 .chg .chg-warn { color: var(--warn); cursor: help; }
+.chg .chg-shared { color: var(--warn); border: 1px dashed var(--warn); border-radius: 3px; padding: 0 3px; font-size: 0.85em; white-space: nowrap; cursor: help; }
 .chg .chg-off { color: var(--quiet); }
 .chg .chg-bin { font-size: 10px; color: var(--vscode-descriptionForeground); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; }
 .chg .chg-sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
