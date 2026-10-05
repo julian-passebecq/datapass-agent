@@ -17,9 +17,10 @@ import { ago, bytes, kpi, titleOf, WsData, WsState } from '../workspace';
 import { actBtn, ActCtx, ExtraView, opt, seg, toolbar } from './kit';
 import { Feed, FeedCtx, feedValue } from './feeds';
 
-const FEED_ID = 'backlog.plans';
+export const BACKLOG_FEED = 'backlog.plans';
+const FEED_ID = BACKLOG_FEED;
 
-interface FeedOut {
+export interface BacklogFeedOut {
   report: BacklogReport;
   extra: string[];
 }
@@ -42,7 +43,7 @@ function rootsOf(sessions: AgentSessionSnapshot[]): string[] {
   return [...seen.values()].sort((a, b) => b.t - a.t).map(x => x.p);
 }
 
-const backlogFeed: Feed<FeedOut> = {
+export const backlogFeed: Feed<BacklogFeedOut> = {
   id: FEED_ID,
   intervalMs: 60_000,
   async load(ctx) {
@@ -73,10 +74,11 @@ const nk = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase(
 
 let memo: { sig: string; links: Map<string, Link[]> } | undefined;
 
-function links(report: BacklogReport, sessions: AgentSessionSnapshot[]): Map<string, Link[]> {
+/** Item → sessions links for a report, memoised on (report time, session count, last activity). Shared with Scope map. */
+export function backlogLinks(report: BacklogReport, sessions: AgentSessionSnapshot[]): Map<string, Link[]> {
   let last = 0;
   for (const s of sessions) last = Math.max(last, s.lastActivityAt ?? 0);
-  const sig = `${report.at}|${sessions.length}|${last}`;
+  const sig = `${report.at}|${report.files.length}|${sessions.length}|${last}`;
   if (memo?.sig !== sig) memo = { sig, links: linkSessions(report.files, sessions) };
   return memo.links;
 }
@@ -305,7 +307,7 @@ function archivedRows(av: ArchiveView | undefined, files: PlanFile[], inScope: (
 // ---------------------------------------------------------------- render
 
 function render(d: WsData, st: WsState): string {
-  const fs = feedValue<FeedOut>(FEED_ID);
+  const fs = feedValue<BacklogFeedOut>(FEED_ID);
   const out = fs.value;
   if (!out) return fs.error ? `<div class="empty bl-bad">Could not read plan files: ${esc(fs.error)}</div>` : '<div class="empty">Reading plan files…</div>';
   const { report } = out;
@@ -315,7 +317,7 @@ function render(d: WsData, st: WsState): string {
   const extra = new Set(out.extra.map(nk));
   const allFiles = report.files.filter(f => inScope.has(nk(f.root)) || extra.has(nk(f.root)));
   const byKey = new Map(d.sessions.map(s => [s.key, s]));
-  const lk = links({ ...report, files: allFiles }, d.sessions);
+  const lk = backlogLinks({ ...report, files: allFiles }, d.sessions);
   const liveFiles = allFiles.filter(f => !f.archive || c.archive);
   const fileSel = c.file ? liveFiles.filter(f => fileKey(f.file) === c.file) : liveFiles;
   const files = fileSel.length ? fileSel : liveFiles;
@@ -373,7 +375,7 @@ function render(d: WsData, st: WsState): string {
 }
 
 function checkPath(arg: string): string {
-  const files = feedValue<FeedOut>(FEED_ID).value?.report.files ?? [];
+  const files = feedValue<BacklogFeedOut>(FEED_ID).value?.report.files ?? [];
   const f = files.find(x => x.file === arg);
   if (!f) throw new Error('Unknown plan file.');
   return f.file;
@@ -388,7 +390,7 @@ export const backlogView: ExtraView = {
   feeds: [backlogFeed as Feed, archiveFeed as Feed],
   render,
   badge: () => {
-    const out = feedValue<FeedOut>(FEED_ID).value;
+    const out = feedValue<BacklogFeedOut>(FEED_ID).value;
     if (!out) return '';
     const b = out.report.files.filter(f => !f.archive).reduce((a, f) => a + f.items.filter(i => i.state === 'blocked').length, 0);
     return b ? String(b) : '';

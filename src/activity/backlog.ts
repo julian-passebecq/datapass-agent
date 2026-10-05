@@ -36,6 +36,8 @@ export interface BacklogItem {
   datedOwn?: boolean;
   /** Indentation depth for checklists (0 = top). */
   depth: number;
+  /** Headings above the item, level 2 and deeper, outermost first (≤ 4, a heading item includes itself). */
+  trail?: string[];
 }
 
 export interface PlanFile {
@@ -172,7 +174,8 @@ export function parsePlan(text: string, max = 1500): BacklogItem[] {
   const push = (it: Omit<BacklogItem, 'section' | 'dated' | 'datedOwn'>, raw: string) => {
     if (items.length >= max) return;
     const own = dateIn(raw);
-    items.push({ ...it, section: bounded(section(), 120), dated: own ?? inherited(), datedOwn: own !== undefined });
+    const trail = heads.filter(h => h.level >= 2).map(h => h.text).slice(-4);
+    items.push({ ...it, section: bounded(section(), 120), dated: own ?? inherited(), datedOwn: own !== undefined, ...(trail.length ? { trail } : {}) });
   };
 
   for (let i = 0; i < lines.length; i++) {
