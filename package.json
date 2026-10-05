@@ -205,6 +205,78 @@
           "default": 30,
           "minimum": 5,
           "description": "Minutes an IDLE session waits before it appears in the Attention queue."
+        },
+        "agent.projects": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "properties": {
+              "match": {
+                "type": "string"
+              },
+              "company": {
+                "type": "string"
+              },
+              "project": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "description": "Maps sessions to company / project for the Projects screen. match is a path prefix, a glob (* ? **) or a bare repository folder name; the most specific rule wins. Unmatched sessions are inferred from the path."
+        },
+        "agent.repos.maxRepos": {
+          "type": "number",
+          "default": 20,
+          "minimum": 1,
+          "description": "Repositories screen: most repositories read (live first, then most recent session activity)."
+        },
+        "agent.repos.maxWorktrees": {
+          "type": "number",
+          "default": 24,
+          "minimum": 1,
+          "description": "Repositories screen: most worktrees per repository whose git status is read (worktrees with live sessions first)."
+        },
+        "agent.repos.commits": {
+          "type": "number",
+          "default": 8,
+          "minimum": 0,
+          "description": "Repositories screen: recent commits listed per repository (0 = off)."
+        },
+        "agent.repos.untracked": {
+          "type": "boolean",
+          "default": true,
+          "description": "Repositories screen: count untracked files (false is faster)."
+        },
+        "agent.repos.extra": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Repositories screen: extra repository paths always shown, even without a session."
+        },
+        "agent.settings.extraRoots": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Settings screen: extra folders scanned for .claude/settings*.json, agents, skills and CLAUDE.md."
+        },
+        "agent.settings.maxRepos": {
+          "type": "number",
+          "default": 40,
+          "minimum": 1,
+          "description": "Settings screen: most repositories (most recent first) read for project settings layers."
+        },
+        "agent.settings.managed": {
+          "type": "boolean",
+          "default": true,
+          "description": "Settings screen: also read the machine managed-settings.json (admin policy layer) if present."
         }
       }
     }
