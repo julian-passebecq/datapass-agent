@@ -5,10 +5,11 @@
 //   subagents/workflows/<runId>/agent-<id>.meta.json   {agentType, description, workflowPhase, worktreePath, spawnDepth}
 //   workflows/scripts/<name>-<runId>.js                the script; only its `export const meta = {...}` literal is parsed (never evaluated)
 //   subagents/agent-<id>.jsonl + .meta.json            background subagents (Agent tool)
-// Transcripts are tail-read incrementally (byte cursor). Results are never kept raw: only a short redacted summary.
+// Transcripts are tail-read (last 2 MB at first, then incrementally by byte cursor), all through fs.promises with
+// regular yields so the extension host never blocks. Results are never kept raw: only a short redacted summary.
 import * as fs from 'fs';
 import * as path from 'path';
-import { readNewLines, safeParse, toMs, Cursor } from '../../util/jsonl';
+import { readNewLinesAsync, safeParse, toMs, Cursor, yielder } from '../../util/jsonl';
 import { isInside } from '../../util/paths';
 import { bounded } from '../../util/redact';
 
@@ -27,9 +28,15 @@ export interface WfAgent {
   model?: string;
   firstAt?: number;
   lastAt?: number;
-  /** Sum over unique message ids of prompt (incl. cache) + output tokens, as recorded. */
+  /**
+   * DERIVED: sum over unique message ids of input + cache read + cache creation + output tokens. Cache reads
+   * are re-counted on every call, so this is far above the new tokens processed; show outputTokens next to it.
+   */
   tokens: number;
+  /** OBSERVED output tokens, summed over unique message ids. */
   outputTokens: number;
+  /** Only the transcript tail was read (file > TAIL_BYTES): tokens, calls and tools cover that tail only. */
+  tokensPartial?: boolean;
   calls: number;
   tools: number;
   toolErrors: number;
@@ -96,6 +103,11 @@ export interface WorkflowsSnapshot {
 
 export const LIVE_WINDOW_MS = 10 * 60_000;
 export const HISTORY_MS = 7 * 86400_000;
+/** Feed cadence: a full scan every 3 s while a run is live, else every 30 s (the cached snapshot is returned in between). */
+export const LIVE_SCAN_MS = 3000;
+export const IDLE_SCAN_MS = 30_000;
+/** First read of an agent transcript covers at most its last 2 MB; later reads are incremental (by size). */
+export const TAIL_BYTES = 2 << 20;
 const DISCOVER_EVERY_MS = 30_000;
 const MAX_PARSE_LINE = 256 * 1024;
 const MAX_JOURNAL_BYTES = 8 << 20;
@@ -109,6 +121,8 @@ export interface TranscriptState {
   model?: string;
   firstAt?: number;
   lastAt?: number;
+  /** File creation time: the start time when only the tail was read. */
+  birthMs?: number;
   usage: Map<string, number>;
   output: Map<string, number>;
   open: Map<string, { name: string; at?: number }>;
@@ -127,83 +141,155 @@ interface RunDir {
   sessionDir: string;
 }
 
+interface BgFile {
+  sessionId: string;
+  mtimeMs: number;
+  size: number;
+  birthMs?: number;
+}
+
+interface Entry {
+  name: string;
+  dir: boolean;
+  file: boolean;
+}
+
 const AGENT_FILE = /^agent-([A-Za-z0-9_-]{1,80})\.jsonl$/;
 
+/** Cadence for the next scan: 3 s while a run is live, else 30 s. */
+export function scanIntervalMs(snap: WorkflowsSnapshot): number {
+  return snap.runs.some(r => r.status === 'running') ? LIVE_SCAN_MS : IDLE_SCAN_MS;
+}
+
+/**
+ * Async, incremental scanner. All file access goes through fs.promises and the loops yield to the event
+ * loop every ~12 ms, so the extension host is never blocked by a scan (first scan included).
+ */
 export class WorkflowScanner {
   private runDirs: RunDir[] = [];
-  private bgFiles: { file: string; sessionId: string; sessionDir: string }[] = [];
+  private bgFiles = new Map<string, BgFile>();
   private discoveredAt = -Infinity;
   private transcripts = new Map<string, TranscriptState>();
   private journals = new Map<string, { size: number; mtimeMs: number; recs: JournalRecs }>();
   private metas = new Map<string, { mtimeMs: number; meta: AgentMeta }>();
   private scripts = new Map<string, { file?: string; mtimeMs: number; meta?: ScriptMeta }>();
   private states = new Map<string, { mtimeMs: number; state?: RunState }>();
+  /** Directory listings, re-read only when the directory mtime changes. */
+  private dirs = new Map<string, { mtimeMs: number; entries: Entry[]; usedAt: number }>();
+  /** Finished runs (final state written): reused while journal and state file are unchanged. */
+  private finished = new Map<string, { key: string; run: WfRun }>();
   private diags: string[] = [];
+  private inflight?: Promise<WorkflowsSnapshot>;
+  private last?: WorkflowsSnapshot;
+  private pause = yielder();
 
   constructor(private readonly projectsDir: string) {}
 
-  scan(now = Date.now()): WorkflowsSnapshot {
+  /** The cached snapshot while it is fresher than its cadence (scanIntervalMs), else a new scan. */
+  scanIfDue(now = Date.now()): Promise<WorkflowsSnapshot> {
+    const l = this.last;
+    if (l && now >= l.scannedAt && now - l.scannedAt < scanIntervalMs(l)) return Promise.resolve(l);
+    return this.scan(now);
+  }
+
+  /** One scan at a time: a call during a scan gets that scan's result. */
+  scan(now = Date.now()): Promise<WorkflowsSnapshot> {
+    if (!this.inflight) {
+      this.inflight = this.doScan(now).finally(() => {
+        this.inflight = undefined;
+      });
+    }
+    return this.inflight;
+  }
+
+  private async doScan(now: number): Promise<WorkflowsSnapshot> {
     const t0 = Date.now();
     this.diags = [];
-    if (now - this.discoveredAt >= DISCOVER_EVERY_MS) this.discover(now);
+    this.pause = yielder();
+    if (now - this.discoveredAt >= DISCOVER_EVERY_MS) await this.discover(now);
     const runs: WfRun[] = [];
     for (const rd of this.runDirs) {
-      const run = this.readRun(rd, now);
+      const run = await this.readRun(rd, now);
       if (run) runs.push(run);
+      await this.pause();
     }
     runs.sort((a, b) => (b.startedAt ?? b.lastAt ?? 0) - (a.startedAt ?? a.lastAt ?? 0));
-    const background: BgAgent[] = [];
-    for (const f of this.bgFiles) {
-      let st: fs.Stats;
-      try {
-        st = fs.statSync(f.file);
-      } catch {
-        continue;
+    const background = await this.background(now);
+    const snap: WorkflowsSnapshot = { runs, background, scannedAt: now, scanMs: Date.now() - t0, diagnostics: this.diags.slice(0, 20) };
+    this.last = snap;
+    return snap;
+  }
+
+  /** Background subagents: files that may still be written (< 10 min) are re-statted; the rest keep their discovery stat. */
+  private async background(now: number): Promise<BgAgent[]> {
+    const list: { file: string; f: BgFile }[] = [];
+    for (const [file, f] of this.bgFiles) {
+      if (now - f.mtimeMs < LIVE_WINDOW_MS) {
+        const st = await statA(file);
+        if (!st) {
+          this.bgFiles.delete(file);
+          continue;
+        }
+        f.mtimeMs = st.mtimeMs;
+        f.size = st.size;
       }
-      if (now - st.mtimeMs > HISTORY_MS || st.size === 0) continue;
-      const id = AGENT_FILE.exec(path.basename(f.file))?.[1] ?? '';
-      const meta = this.meta(f.file.replace(/\.jsonl$/, '.meta.json'));
-      background.push({
+      if (now - f.mtimeMs > HISTORY_MS || f.size === 0) continue;
+      list.push({ file, f });
+    }
+    list.sort((a, b) => b.f.mtimeMs - a.f.mtimeMs);
+    const out: BgAgent[] = [];
+    for (const { file, f } of list.slice(0, MAX_BG)) {
+      const id = AGENT_FILE.exec(path.basename(file))?.[1] ?? '';
+      const meta = await this.meta(file.replace(/\.jsonl$/, '.meta.json'));
+      out.push({
         agentId: id,
         sessionId: f.sessionId,
         parentKey: `claude:${f.sessionId}`,
         sessionKey: `claude:${f.sessionId}/agent-${id}`,
         agentType: meta.agentType,
         description: meta.description,
-        transcript: f.file,
-        bytes: st.size,
-        mtimeMs: st.mtimeMs,
-        birthMs: st.birthtimeMs > 0 ? st.birthtimeMs : undefined,
+        transcript: file,
+        bytes: f.size,
+        mtimeMs: f.mtimeMs,
+        birthMs: f.birthMs,
       });
     }
-    background.sort((a, b) => b.mtimeMs - a.mtimeMs);
-    return { runs, background: background.slice(0, MAX_BG), scannedAt: now, scanMs: Date.now() - t0, diagnostics: this.diags.slice(0, 20) };
+    return out;
   }
 
-  /** Walks projects/<slug>/<session>/subagents once every 30 s; per-tick work only stats known dirs. */
-  private discover(now: number): void {
+  /**
+   * Walks projects/<slug>/<session>/subagents once every 30 s with cached listings. Sessions idle for 7 days
+   * are skipped, background files are kept only when written in the last 7 days, and caches of runs and
+   * transcripts that left the window are dropped.
+   */
+  private async discover(now: number): Promise<void> {
     this.discoveredAt = now;
+    const cutoff = now - HISTORY_MS;
     const runDirs: RunDir[] = [];
-    const bg: { file: string; sessionId: string; sessionDir: string }[] = [];
-    for (const slug of listDirs(this.projectsDir)) {
+    const bg = new Map<string, BgFile>();
+    for (const slug of dirNames(await this.list(this.projectsDir, now))) {
       const pdir = path.join(this.projectsDir, slug);
-      for (const sid of listDirs(pdir)) {
+      for (const sid of dirNames(await this.list(pdir, now))) {
+        await this.pause();
         const sdir = path.join(pdir, sid);
         const sub = path.join(sdir, 'subagents');
-        let entries: fs.Dirent[];
-        try {
-          entries = fs.readdirSync(sub, { withFileTypes: true });
-        } catch {
-          continue;
-        }
-        for (const e of entries) {
-          if (e.isFile() && AGENT_FILE.test(e.name)) bg.push({ file: path.join(sub, e.name), sessionId: sid, sessionDir: sdir });
-          else if (e.isDirectory() && e.name === 'workflows') {
-            for (const runId of listDirs(path.join(sub, 'workflows'))) {
-              const dir = path.join(sub, 'workflows', runId);
-              const mt = mtime(dir);
-              const jt = mtime(path.join(dir, 'journal.jsonl'));
-              if (Math.max(mt ?? 0, jt ?? 0) < now - HISTORY_MS) continue;
+        const subMt = await mtimeA(sub);
+        if (subMt === undefined) continue;
+        const wfDir = path.join(sub, 'workflows');
+        const lastWrite = Math.max(subMt, (await mtimeA(path.join(pdir, `${sid}.jsonl`))) ?? 0, (await mtimeA(wfDir)) ?? 0);
+        if (lastWrite < cutoff) continue;
+        for (const e of (await this.list(sub, now)) ?? []) {
+          if (e.file && AGENT_FILE.test(e.name)) {
+            const file = path.join(sub, e.name);
+            const st = await statA(file);
+            if (!st || st.mtimeMs < cutoff) continue;
+            bg.set(file, { sessionId: sid, mtimeMs: st.mtimeMs, size: st.size, birthMs: st.birthtimeMs > 0 ? st.birthtimeMs : undefined });
+          } else if (e.dir && e.name === 'workflows') {
+            for (const runId of dirNames(await this.list(wfDir, now))) {
+              const dir = path.join(wfDir, runId);
+              const mt = await mtimeA(dir);
+              const jt = await mtimeA(path.join(dir, 'journal.jsonl'));
+              if (Math.max(mt ?? 0, jt ?? 0) < cutoff) continue;
               runDirs.push({ dir, runId, sessionId: sid, slug, sessionDir: sdir });
             }
           }
@@ -212,24 +298,60 @@ export class WorkflowScanner {
     }
     this.runDirs = runDirs;
     this.bgFiles = bg;
+    const runSet = new Set(runDirs.map(r => r.dir));
+    const stateFiles = new Set(runDirs.map(r => stateFileOf(r)));
+    const inRun = (f: string) => runSet.has(path.dirname(f));
+    prune(this.transcripts, (f, t) => inRun(f) && t.mtimeMs >= cutoff);
+    prune(this.journals, f => inRun(f));
+    prune(this.metas, f => inRun(f) || bg.has(f.replace(/\.meta\.json$/, '.jsonl')));
+    prune(this.states, f => stateFiles.has(f));
+    prune(this.scripts, d => runSet.has(d));
+    prune(this.finished, d => runSet.has(d));
+    prune(this.dirs, (_, v) => now - v.usedAt <= 2 * DISCOVER_EVERY_MS);
   }
 
-  private readRun(rd: RunDir, now: number): WfRun | undefined {
-    if (!isInside(this.projectsDir, rd.dir)) return undefined;
-    const recs = this.journal(path.join(rd.dir, 'journal.jsonl'));
-    let files: string[] = [];
-    try {
-      files = fs.readdirSync(rd.dir).filter(f => AGENT_FILE.test(f));
-    } catch {
+  /** readdir, cached by directory mtime (an added or removed entry changes it). Recently changed dirs are always re-read. */
+  private async list(dir: string, now: number): Promise<Entry[] | undefined> {
+    const st = await statA(dir);
+    if (!st || !st.isDirectory()) {
+      this.dirs.delete(dir);
       return undefined;
     }
-    const ids = new Set<string>([...recs.started.keys(), ...files.map(f => AGENT_FILE.exec(f)![1])]);
+    const c = this.dirs.get(dir);
+    if (c && c.mtimeMs === st.mtimeMs && Date.now() - st.mtimeMs > 2000) {
+      c.usedAt = now;
+      return c.entries;
+    }
+    try {
+      const entries = (await fs.promises.readdir(dir, { withFileTypes: true })).map(e => ({ name: e.name, dir: e.isDirectory(), file: e.isFile() }));
+      this.dirs.set(dir, { mtimeMs: st.mtimeMs, entries, usedAt: now });
+      return entries;
+    } catch {
+      this.dirs.delete(dir);
+      return undefined;
+    }
+  }
+
+  private async readRun(rd: RunDir, now: number): Promise<WfRun | undefined> {
+    if (!isInside(this.projectsDir, rd.dir)) return undefined;
+    const jFile = path.join(rd.dir, 'journal.jsonl');
+    const stateFile = stateFileOf(rd);
+    const jStat = await statA(jFile);
+    const sStat = await statA(stateFile);
+    const key = `${jStat?.size}:${jStat?.mtimeMs}:${sStat?.mtimeMs}`;
+    const done = this.finished.get(rd.dir);
+    if (done && done.key === key) return done.run;
+    const recs = await this.journal(jFile, jStat);
+    const entries = await this.list(rd.dir, now);
+    if (!entries) return undefined;
+    const files = new Set(entries.filter(e => e.file && AGENT_FILE.test(e.name)).map(e => e.name));
+    const ids = new Set<string>([...recs.started.keys(), ...[...files].map(f => AGENT_FILE.exec(f)![1])]);
     const agents: WfAgent[] = [];
     for (const id of ids) {
       const file = path.join(rd.dir, `agent-${id}.jsonl`);
       const started = recs.started.get(id);
-      const meta = this.meta(path.join(rd.dir, `agent-${id}.meta.json`));
-      const tr = files.includes(`agent-${id}.jsonl`) ? this.transcript(file) : undefined;
+      const meta = await this.meta(path.join(rd.dir, `agent-${id}.meta.json`));
+      const tr = files.has(`agent-${id}.jsonl`) ? await this.transcript(file) : undefined;
       const res = recs.results.get(id);
       let status: WfAgentStatus;
       let basis: string;
@@ -250,6 +372,7 @@ export class WorkflowScanner {
         for (const v of tr.output.values()) out += v;
       }
       const open = tr ? [...tr.open.values()].pop() : undefined;
+      const partial = !!tr?.cursor?.from;
       agents.push({
         agentId: id,
         label: started?.label ?? meta.description ?? id,
@@ -259,10 +382,11 @@ export class WorkflowScanner {
         worktree: meta.worktreePath,
         spawnDepth: meta.spawnDepth,
         model: tr?.model,
-        firstAt: tr?.firstAt,
+        firstAt: partial ? (tr?.birthMs ?? tr?.firstAt) : tr?.firstAt,
         lastAt: tr?.lastAt,
         tokens,
         outputTokens: out,
+        tokensPartial: partial || undefined,
         calls: tr?.usage.size ?? 0,
         tools: tr?.tools ?? 0,
         toolErrors: tr?.toolErrors ?? 0,
@@ -276,13 +400,14 @@ export class WorkflowScanner {
         transcriptBytes: tr?.cursor?.size,
         sessionKey: `claude:${rd.sessionId}/agent-${id}`,
       });
+      await this.pause();
     }
     // Journal order first (started order), unknown agents after.
     const order = [...recs.started.keys()];
     agents.sort((a, b) => idx(order, a.agentId) - idx(order, b.agentId) || (a.firstAt ?? 0) - (b.firstAt ?? 0));
-    const st0 = this.runState(path.join(rd.sessionDir, "workflows", `${rd.runId}.json`));
+    const st0 = await this.runState(stateFile, sStat);
     const fin = st0?.status && !/^(running|pending|queued|in_progress|started)$/i.test(st0.status) ? st0 : st0 ? { ...st0, status: undefined } : undefined;
-    const script = this.script(rd) ?? fin?.meta;
+    const script = (await this.script(rd, now)) ?? fin?.meta;
     if (fin?.status) {
       for (const a of agents) if (a.status === 'running') {
         a.status = 'stale';
@@ -292,7 +417,6 @@ export class WorkflowScanner {
     }
     const firsts = agents.map(a => a.firstAt).filter((x): x is number => x !== undefined);
     const lasts = agents.map(a => a.lastAt).filter((x): x is number => x !== undefined);
-    const jStat = stat(path.join(rd.dir, 'journal.jsonl'));
     const startedAt = fin?.startTime ?? (firsts.length ? Math.min(...firsts) : jStat && jStat.birthtimeMs > 0 ? jStat.birthtimeMs : undefined);
     const lastAt = (fin?.startTime && fin.durationMs !== undefined ? fin.startTime + fin.durationMs : undefined) ?? (Math.max(...lasts, jStat?.mtimeMs ?? 0) || undefined);
     let status: WfRunStatus;
@@ -303,7 +427,7 @@ export class WorkflowScanner {
     else status = 'stale';
     const phases = script?.phases.length ? script.phases.slice() : [];
     for (const a of agents) if (a.phase && !phases.some(p => p.title === a.phase)) phases.push({ title: a.phase });
-    return {
+    const run: WfRun = {
       runId: rd.runId,
       sessionId: rd.sessionId,
       parentKey: `claude:${rd.sessionId}`,
@@ -319,10 +443,12 @@ export class WorkflowScanner {
       status,
       agents,
     };
+    // Once the final state is written nothing in the run depends on `now` any more.
+    if (fin?.status) this.finished.set(rd.dir, { key, run });
+    return run;
   }
 
-  private journal(file: string): JournalRecs {
-    const st = stat(file);
+  private async journal(file: string, st: fs.Stats | undefined): Promise<JournalRecs> {
     const empty: JournalRecs = { launched: false, started: new Map(), results: new Map() };
     if (!st) return empty;
     const c = this.journals.get(file);
@@ -333,7 +459,7 @@ export class WorkflowScanner {
     }
     let text = '';
     try {
-      text = fs.readFileSync(file, 'utf8');
+      text = await fs.promises.readFile(file, 'utf8');
     } catch {
       return c?.recs ?? empty;
     }
@@ -343,15 +469,14 @@ export class WorkflowScanner {
   }
 
   /** workflows/<runId>.json, written when a run ends. Only small fields are kept (never result / logs). */
-  private runState(file: string): RunState | undefined {
-    const st = stat(file);
+  private async runState(file: string, st: fs.Stats | undefined): Promise<RunState | undefined> {
     if (!st) return undefined;
     const c = this.states.get(file);
     if (c && c.mtimeMs === st.mtimeMs) return c.state;
     let state: RunState | undefined;
     if (st.size <= MAX_STATE_BYTES) {
       try {
-        state = parseRunState(fs.readFileSync(file, 'utf8'));
+        state = parseRunState(await fs.promises.readFile(file, 'utf8'));
       } catch {
         this.diags.push(`run state unreadable: ${path.basename(file)}`);
       }
@@ -360,14 +485,14 @@ export class WorkflowScanner {
     return state;
   }
 
-  private meta(file: string): AgentMeta {
-    const st = stat(file);
+  private async meta(file: string): Promise<AgentMeta> {
+    const st = await statA(file);
     if (!st || st.size > MAX_META_BYTES) return {};
     const c = this.metas.get(file);
     if (c && c.mtimeMs === st.mtimeMs) return c.meta;
     let meta: AgentMeta = {};
     try {
-      meta = parseAgentMeta(fs.readFileSync(file, 'utf8'));
+      meta = parseAgentMeta(await fs.promises.readFile(file, 'utf8'));
     } catch {
       /* unreadable */
     }
@@ -375,28 +500,23 @@ export class WorkflowScanner {
     return meta;
   }
 
-  private script(rd: RunDir): ScriptMeta | undefined {
+  private async script(rd: RunDir, now: number): Promise<ScriptMeta | undefined> {
     const dir = path.join(rd.sessionDir, 'workflows', 'scripts');
     const c = this.scripts.get(rd.dir);
-    const dm = mtime(dir) ?? 0;
+    const dm = (await mtimeA(dir)) ?? 0;
     if (c && c.mtimeMs === dm) return c.meta;
-    let file: string | undefined;
-    try {
-      const f = fs.readdirSync(dir).find(n => n.endsWith(`-${rd.runId}.js`) || n === `${rd.runId}.js`);
-      if (f) file = path.join(dir, f);
-    } catch {
-      /* no scripts dir */
-    }
+    const f = ((await this.list(dir, now)) ?? []).find(e => e.file && (e.name.endsWith(`-${rd.runId}.js`) || e.name === `${rd.runId}.js`));
+    const file = f ? path.join(dir, f.name) : undefined;
     let meta: ScriptMeta | undefined;
     if (file) {
       try {
-        const fd = fs.openSync(file, 'r');
+        const fh = await fs.promises.open(file, 'r');
         try {
           const buf = Buffer.alloc(MAX_SCRIPT_BYTES);
-          const n = fs.readSync(fd, buf, 0, MAX_SCRIPT_BYTES, 0);
-          meta = parseScriptMeta(buf.subarray(0, n).toString('utf8'));
+          const { bytesRead } = await fh.read(buf, 0, MAX_SCRIPT_BYTES, 0);
+          meta = parseScriptMeta(buf.subarray(0, bytesRead).toString('utf8'));
         } finally {
-          fs.closeSync(fd);
+          await fh.close();
         }
       } catch {
         this.diags.push(`script unreadable: ${path.basename(file)}`);
@@ -406,8 +526,9 @@ export class WorkflowScanner {
     return meta;
   }
 
-  private transcript(file: string): TranscriptState | undefined {
-    const st = stat(file);
+  /** First read: the last TAIL_BYTES only; then only appended bytes. A replaced or shrunk file starts over. */
+  private async transcript(file: string): Promise<TranscriptState | undefined> {
+    const st = await statA(file);
     if (!st) return this.transcripts.get(file);
     let t = this.transcripts.get(file);
     if (t && t.cursor && t.cursor.size === st.size && t.cursor.mtimeMs === st.mtimeMs) return t;
@@ -415,22 +536,25 @@ export class WorkflowScanner {
       t = newTranscript();
       this.transcripts.set(file, t);
     }
+    if (t.birthMs === undefined && st.birthtimeMs > 0) t.birthMs = st.birthtimeMs;
     const cur = t;
     try {
-      const res = readNewLines(file, cur.cursor, line => transcriptLine(cur, line));
+      const res = await readNewLinesAsync(file, cur.cursor, line => transcriptLine(cur, line), { maxInitialBytes: TAIL_BYTES });
       if (res.reset) {
         const fresh = newTranscript();
+        fresh.birthMs = st.birthtimeMs > 0 ? st.birthtimeMs : undefined;
         this.transcripts.set(file, fresh);
-        readNewLines(file, undefined, line => transcriptLine(fresh, line));
-        fresh.cursor = { ...res.cursor };
-        fresh.mtimeMs = st.mtimeMs;
+        const again = await readNewLinesAsync(file, undefined, line => transcriptLine(fresh, line), { maxInitialBytes: TAIL_BYTES });
+        fresh.cursor = again.cursor;
+        fresh.mtimeMs = again.cursor.mtimeMs;
         return fresh;
       }
       cur.cursor = res.cursor;
+      cur.mtimeMs = res.cursor.mtimeMs;
     } catch {
       this.diags.push(`transcript unreadable: ${path.basename(file)}`);
+      cur.mtimeMs = st.mtimeMs;
     }
-    cur.mtimeMs = st.mtimeMs;
     return cur;
   }
 }
@@ -691,24 +815,28 @@ function idx(order: string[], id: string): number {
   return i < 0 ? 1e9 : i;
 }
 
-function listDirs(dir: string): string[] {
-  try {
-    return fs.readdirSync(dir, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name);
-  } catch {
-    return [];
-  }
+function dirNames(entries: Entry[] | undefined): string[] {
+  return (entries ?? []).filter(e => e.dir).map(e => e.name);
 }
 
-function stat(p: string): fs.Stats | undefined {
+function stateFileOf(rd: RunDir): string {
+  return path.join(rd.sessionDir, 'workflows', `${rd.runId}.json`);
+}
+
+function prune<V>(m: Map<string, V>, keep: (k: string, v: V) => boolean): void {
+  for (const [k, v] of m) if (!keep(k, v)) m.delete(k);
+}
+
+async function statA(p: string): Promise<fs.Stats | undefined> {
   try {
-    return fs.statSync(p);
+    return await fs.promises.stat(p);
   } catch {
     return undefined;
   }
 }
 
-function mtime(p: string): number | undefined {
-  return stat(p)?.mtimeMs;
+async function mtimeA(p: string): Promise<number | undefined> {
+  return (await statA(p))?.mtimeMs;
 }
 
 const scanners = new Map<string, WorkflowScanner>();

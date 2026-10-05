@@ -1,11 +1,13 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { FIXTURES } from './helpers';
+import { readNewLinesAsync } from '../src/util/jsonl';
 import '../src/render/workspace'; // load order as in the extension (workspace → extra/index → screens)
 import { AgentSessionSnapshot } from '../src/model';
-import { newTranscript, parseJournal, parseRunState, parseScriptMeta, summarizeResult, transcriptLine, WorkflowScanner } from '../src/providers/claude/workflows';
+import { newTranscript, parseJournal, parseRunState, parseScriptMeta, scanIntervalMs, summarizeResult, transcriptLine, WorkflowScanner } from '../src/providers/claude/workflows';
 import { renderWorkflows, runKey } from '../src/render/extra/workflows';
 import { WsData } from '../src/render/workspace';
 
@@ -14,13 +16,13 @@ const SID = '11111111-2222-3333-4444-555555555555';
 const RUN_DIR = path.join(PROJECTS, 'D--PROJ-demo', SID, 'subagents', 'workflows', 'wf_test0001-abc');
 const mtimeOf = (f: string) => fs.statSync(path.join(RUN_DIR, f)).mtimeMs;
 
-function scanAt(offsetMs: number) {
+async function scanAt(offsetMs: number) {
   const now = Math.max(mtimeOf('agent-a0001.jsonl'), mtimeOf('agent-a0002.jsonl')) + offsetMs;
-  return { now, snap: new WorkflowScanner(PROJECTS).scan(now) };
+  return { now, snap: await new WorkflowScanner(PROJECTS).scan(now) };
 }
 
-test('scanner reads runs, agents, phases, tokens and tools from fixtures', () => {
-  const { snap } = scanAt(60_000);
+test('scanner reads runs, agents, phases, tokens and tools from fixtures', async () => {
+  const { snap } = await scanAt(60_000);
   assert.equal(snap.runs.length, 1);
   const run = snap.runs[0];
   assert.equal(run.runId, 'wf_test0001-abc');
@@ -56,21 +58,21 @@ test('scanner reads runs, agents, phases, tokens and tools from fixtures', () =>
   assert.equal(snap.background[0].sessionKey, `claude:${SID}/agent-bg001`);
 });
 
-test('agent without result turns stale after 10 min of silence', () => {
-  const { snap } = scanAt(11 * 60_000);
+test('agent without result turns stale after 10 min of silence', async () => {
+  const { snap } = await scanAt(11 * 60_000);
   const run = snap.runs[0];
   assert.equal(run.agents[1].status, 'stale');
   assert.equal(run.agents[1].currentTool, undefined);
   assert.equal(run.status, 'stale');
 });
 
-test('runs older than 7 days are not listed', () => {
-  const { snap } = scanAt(8 * 86400_000);
+test('runs older than 7 days are not listed', async () => {
+  const { snap } = await scanAt(8 * 86400_000);
   assert.equal(snap.runs.length, 0);
   assert.equal(snap.background.length, 0);
 });
 
-test('journal parsing and result summaries', () => {
+test('journal parsing and result summaries', async () => {
   const r = parseJournal('{"type":"launched"}\nnot json\n{"type":"started","agentId":"x","label":"L","phase":"P"}\n{"type":"result","agentId":"x","result":"Error: boom\\nmore"}\n');
   assert.equal(r.launched, true);
   assert.deepEqual(r.started.get('x'), { label: 'L', phase: 'P' });
@@ -83,7 +85,7 @@ test('journal parsing and result summaries', () => {
   assert.equal(summarizeResult(null).summary, '(no result)');
 });
 
-test('script meta is parsed without evaluation', () => {
+test('script meta is parsed without evaluation', async () => {
   assert.equal(parseScriptMeta('const x = 1'), undefined);
   const m = parseScriptMeta("export const meta = { name: \"n\", phases: ['A', 'B'], description: `d` }\nprocess.exit(1)")!;
   assert.equal(m.name, 'n');
@@ -91,7 +93,7 @@ test('script meta is parsed without evaluation', () => {
   assert.deepEqual(m.phases.map(p => p.title), ['A', 'B']);
 });
 
-test('final run state keeps only small fields', () => {
+test('final run state keeps only small fields', async () => {
   const s = parseRunState(JSON.stringify({ workflowName: 'w', status: 'killed', startTime: '2026-10-04T10:00:00Z', durationMs: 5000, error: 'token=abcdefghijklmnop', result: 'big', logs: ['x'], script: "export const meta = { name: 'm', phases: [{ title: 'P' }] }" }))!;
   assert.equal(s.name, 'w');
   assert.equal(s.status, 'killed');
@@ -102,7 +104,7 @@ test('final run state keeps only small fields', () => {
   assert.equal((s as any).result, undefined);
 });
 
-test('huge transcript lines still close tool calls', () => {
+test('huge transcript lines still close tool calls', async () => {
   const t = newTranscript();
   transcriptLine(t, JSON.stringify({ type: 'assistant', timestamp: '2026-10-04T10:00:00Z', message: { id: 'm', model: 'claude-x', content: [{ type: 'tool_use', id: 'toolu_x', name: 'Bash', input: { command: 'ls' } }] } }));
   assert.equal(t.open.size, 1);
@@ -115,8 +117,8 @@ function snap(p: Partial<AgentSessionSnapshot>): AgentSessionSnapshot {
   return { key: 'codex:w', provider: 'codex', sessionId: 'w', status: 'RUNNING', statusReason: 'r', commits: [], changedFiles: [], tests: [], isWorker: true, counts: { tools: 0, commands: 0, fileEdits: 0, turns: 0 }, evidence: [], artifactPath: 'x', diagnostics: [], ...p };
 }
 
-test('screen renders runs, agents, timeline and Codex workers, escaped', () => {
-  const { now, snap: ws } = scanAt(60_000);
+test('screen renders runs, agents, timeline and Codex workers, escaped', async () => {
+  const { now, snap: ws } = await scanAt(60_000);
   const d: WsData = { sessions: [snap({ workerLabel: 'Hume <b>', startedAt: now - 60_000, lastActivityAt: now, usage: { totalTokens: 1234, outputTokens: 1, cachedInputTokens: 0 } })], providers: [], events: [], now, ternAvailable: false };
   for (const mode of ['runs', 'agents', 'timeline']) {
     for (const group of ['run', 'phase', 'parent']) {
@@ -132,4 +134,52 @@ test('screen renders runs, agents, timeline and Codex workers, escaped', () => {
   assert.ok(runs.includes(`data-val="none"`), 'open run header collapses it');
   assert.equal(runKey('wf_test0001-abc'), 'wftest0001-abc');
   assert.ok(renderWorkflows(d, { view: 'workflows' }, undefined).includes('Scanning'));
+  assert.ok(runs.includes('DERIVED sum incl. cache reads') && runs.includes('output tokens'), 'token totals labelled, output shown');
+});
+
+test('async reader: first read covers only the tail, then reads appended bytes only', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-tail-'));
+  try {
+    const file = path.join(dir, 'agent-x.jsonl');
+    const line = (i: number) => JSON.stringify({ i, pad: 'p'.repeat(90) }) + '\n';
+    let text = '';
+    for (let i = 0; i < 100; i++) text += line(i);
+    fs.writeFileSync(file, text);
+    const seen: number[] = [];
+    const r1 = await readNewLinesAsync(file, undefined, l => seen.push(JSON.parse(l).i), { maxInitialBytes: 1000 });
+    assert.equal(r1.cursor.from, text.length - 1000, 'tail window recorded');
+    assert.ok(r1.bytesRead <= 1000, 'never reads more than the tail');
+    assert.ok(seen.length > 0 && seen.length < 12, 'only the last lines, the cut first line dropped');
+    assert.deepEqual(seen, Array.from({ length: seen.length }, (_, k) => 100 - seen.length + k), 'contiguous up to the last line');
+    const half = '{"i":101,"pa';
+    fs.appendFileSync(file, line(100) + half);
+    const more: number[] = [];
+    const r2 = await readNewLinesAsync(file, r1.cursor, l => more.push(JSON.parse(l).i), { maxInitialBytes: 1000 });
+    assert.deepEqual(more, [100], 'appended complete line only');
+    assert.equal(r2.cursor.from, r1.cursor.from, 'still flagged as a tail read');
+    assert.equal(r2.bytesRead, Buffer.byteLength(line(100) + half), 'reads appended bytes only');
+    fs.appendFileSync(file, 'd":1}\n');
+    const last: number[] = [];
+    await readNewLinesAsync(file, r2.cursor, l => last.push(JSON.parse(l).i));
+    assert.deepEqual(last, [101], 'partial line finished on the next read');
+    const all: number[] = [];
+    const full = await readNewLinesAsync(file, undefined, l => all.push(JSON.parse(l).i), { maxInitialBytes: 1 << 20 });
+    assert.equal(all.length, 102);
+    assert.equal(full.cursor.from, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('scanIfDue reuses the snapshot for 30 s when no run is live, 3 s when one is', async () => {
+  const now = Math.max(mtimeOf('agent-a0001.jsonl'), mtimeOf('agent-a0002.jsonl')) + 60_000;
+  const sc = new WorkflowScanner(PROJECTS);
+  const live = await sc.scanIfDue(now);
+  assert.equal(scanIntervalMs(live), 3000);
+  assert.equal(await sc.scanIfDue(now + 2000), live, 'cached within 3 s');
+  assert.notEqual(await sc.scanIfDue(now + 3000), live, 'rescanned after 3 s');
+  const idle = await sc.scanIfDue(now + 11 * 60_000);
+  assert.equal(scanIntervalMs(idle), 30_000);
+  assert.equal(await sc.scanIfDue(now + 11 * 60_000 + 20_000), idle, 'cached within 30 s');
+  assert.notEqual(await sc.scanIfDue(now + 11 * 60_000 + 30_000), idle);
 });
