@@ -3,6 +3,8 @@
 // memory file names, Codex skills / plugins / rules / prompts / config, and the CLI options parsed from --help.
 // Pure fs reads with size caps (plus `<cli> --help` / `--version` when trusted). Never returns env values, args,
 // headers, URLs, auth files or anything key / token-like: values pass an allow-list, then redact().
+// All file I/O is async (fs.promises), one file at a time, so a scan of a large ~/.claude never holds the extension
+// host for more than a few ms at once (it was 0.7-2 s of sync I/O per 5-minute refresh).
 import { execFile } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -176,18 +178,19 @@ const SECRET_NAME = /(token|secret|passw|api_?key|apikey|access_?key|private|cre
 /** Never descended into: secrets, credentials, dependency trees. */
 const SKIP_DIR = /^(secrets?|node_modules|\.git|credentials?)$/i;
 
-function stat(file: string): fs.Stats | undefined {
+const fsp = fs.promises;
+
+async function stat(file: string): Promise<fs.Stats | undefined> {
   try {
-    return fs.statSync(file);
+    return await fsp.stat(file);
   } catch {
     return undefined;
   }
 }
 
-function dirs(dir: string): string[] {
+async function dirs(dir: string): Promise<string[]> {
   try {
-    return fs
-      .readdirSync(dir, { withFileTypes: true })
+    return (await fsp.readdir(dir, { withFileTypes: true }))
       .filter(e => (e.isDirectory() || e.isSymbolicLink()) && !SKIP_DIR.test(e.name))
       .map(e => e.name)
       .sort();
@@ -196,10 +199,9 @@ function dirs(dir: string): string[] {
   }
 }
 
-function filesIn(dir: string, re: RegExp): string[] {
+async function filesIn(dir: string, re: RegExp): Promise<string[]> {
   try {
-    return fs
-      .readdirSync(dir, { withFileTypes: true })
+    return (await fsp.readdir(dir, { withFileTypes: true }))
       .filter(e => e.isFile() && re.test(e.name))
       .map(e => e.name)
       .sort();
@@ -208,36 +210,34 @@ function filesIn(dir: string, re: RegExp): string[] {
   }
 }
 
-function readText(file: string, max = MAX_BYTES): string | undefined {
+async function readText(file: string, max = MAX_BYTES): Promise<string | undefined> {
   if (isForbidden(file)) return undefined;
-  const st = stat(file);
+  const st = await stat(file);
   if (!st || !st.isFile() || st.size > max) return undefined;
   try {
-    return fs.readFileSync(file, 'utf8');
+    return await fsp.readFile(file, 'utf8');
   } catch {
     return undefined;
   }
 }
 
 /** First 16 KB of a file (enough for YAML front matter) without reading large skill bodies. */
-function readHead(file: string, max = 16_384): string | undefined {
+async function readHead(file: string, max = 16_384): Promise<string | undefined> {
   if (isForbidden(file)) return undefined;
-  let fd: number | undefined;
+  let fh: fs.promises.FileHandle | undefined;
   try {
-    fd = fs.openSync(file, 'r');
+    fh = await fsp.open(file, 'r');
     const buf = Buffer.alloc(max);
-    const n = fs.readSync(fd, buf, 0, max, 0);
-    return buf.subarray(0, n).toString('utf8');
+    const { bytesRead } = await fh.read(buf, 0, max, 0);
+    return buf.subarray(0, bytesRead).toString('utf8');
   } catch {
     return undefined;
   } finally {
-    if (fd !== undefined) fs.closeSync(fd);
+    if (fh) await fh.close().catch(() => undefined);
   }
 }
 
-function readJson(file: string, max = MAX_BYTES): Record<string, unknown> | undefined {
-  const t = readText(file, max);
-  if (t === undefined) return undefined;
+function parseJsonObject(t: string): Record<string, unknown> | undefined {
   try {
     const j = JSON.parse(t.replace(/^\uFEFF/, ''));
     return j && typeof j === 'object' && !Array.isArray(j) ? (j as Record<string, unknown>) : undefined;
@@ -252,26 +252,31 @@ function readJson(file: string, max = MAX_BYTES): Record<string, unknown> | unde
   }
 }
 
+async function readJson(file: string, max = MAX_BYTES): Promise<Record<string, unknown> | undefined> {
+  const t = await readText(file, max);
+  return t === undefined ? undefined : parseJsonObject(t);
+}
+
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const s = (v: unknown, max = 80): string | undefined => (typeof v === 'string' && v.trim() ? bounded(v, max) : undefined);
 
 /** Counts files under a folder (depth ≤ 4, cap 500). DERIVED. */
-export function countFiles(dir: string, depth = 4, cap = 500): number {
+export async function countFiles(dir: string, depth = 4, cap = 500): Promise<number> {
   let n = 0;
-  const walk = (d: string, left: number) => {
+  const walk = async (d: string, left: number): Promise<void> => {
     let es: fs.Dirent[];
     try {
-      es = fs.readdirSync(d, { withFileTypes: true });
+      es = await fsp.readdir(d, { withFileTypes: true });
     } catch {
       return;
     }
     for (const e of es) {
       if (n >= cap) return;
       if (e.isFile()) n++;
-      else if (e.isDirectory() && left > 0 && !SKIP_DIR.test(e.name)) walk(path.join(d, e.name), left - 1);
+      else if (e.isDirectory() && left > 0 && !SKIP_DIR.test(e.name)) await walk(path.join(d, e.name), left - 1);
     }
   };
-  walk(dir, depth);
+  await walk(dir, depth);
   return n;
 }
 
@@ -314,9 +319,9 @@ interface ItemCtx {
   active: boolean;
 }
 
-function pushItem(out: CatItem[], file: string, kind: ItemKind, c: ItemCtx, fallback: string, files?: number): void {
+async function pushItem(out: CatItem[], file: string, kind: ItemKind, c: ItemCtx, fallback: string, files?: number): Promise<void> {
   if (out.length >= MAX_ITEMS) return;
-  const text = readHead(file);
+  const text = await readHead(file);
   const fm = text ? frontMatter(text) : {};
   out.push({
     provider: c.provider,
@@ -337,20 +342,20 @@ function pushItem(out: CatItem[], file: string, kind: ItemKind, c: ItemCtx, fall
 }
 
 /** skills/<name>/SKILL.md (and one nested level for grouped skills). */
-export function scanSkills(dir: string, c: ItemCtx, out: CatItem[]): number {
+export async function scanSkills(dir: string, c: ItemCtx, out: CatItem[]): Promise<number> {
   let n = 0;
-  for (const d of dirs(dir)) {
+  for (const d of await dirs(dir)) {
     if (d.startsWith('.')) continue;
     const f = path.join(dir, d, 'SKILL.md');
-    if (stat(f)?.isFile()) {
-      pushItem(out, f, 'skill', c, d, c.active ? countFiles(path.join(dir, d)) : undefined);
+    if ((await stat(f))?.isFile()) {
+      await pushItem(out, f, 'skill', c, d, c.active ? await countFiles(path.join(dir, d)) : undefined);
       n++;
       continue;
     }
-    for (const sub of dirs(path.join(dir, d)).slice(0, 60)) {
+    for (const sub of (await dirs(path.join(dir, d))).slice(0, 60)) {
       const g = path.join(dir, d, sub, 'SKILL.md');
-      if (stat(g)?.isFile()) {
-        pushItem(out, g, 'skill', c, `${d}/${sub}`, c.active ? countFiles(path.join(dir, d, sub)) : undefined);
+      if ((await stat(g))?.isFile()) {
+        await pushItem(out, g, 'skill', c, `${d}/${sub}`, c.active ? await countFiles(path.join(dir, d, sub)) : undefined);
         n++;
       }
     }
@@ -359,25 +364,25 @@ export function scanSkills(dir: string, c: ItemCtx, out: CatItem[]): number {
 }
 
 /** <dir>/*.md, with sub-folders as namespaces (commands/ns/x.md → ns:x), depth ≤ 3. */
-export function scanMd(dir: string, kind: ItemKind, c: ItemCtx, out: CatItem[], ns = '', depth = 3): number {
+export async function scanMd(dir: string, kind: ItemKind, c: ItemCtx, out: CatItem[], ns = '', depth = 3): Promise<number> {
   let n = 0;
-  for (const f of filesIn(dir, /\.md$/i)) {
+  for (const f of await filesIn(dir, /\.md$/i)) {
     if (/^readme\.md$/i.test(f)) continue;
     const base = f.replace(/\.md$/i, '');
-    pushItem(out, path.join(dir, f), kind, c, ns ? `${ns}:${base}` : base);
+    await pushItem(out, path.join(dir, f), kind, c, ns ? `${ns}:${base}` : base);
     n++;
   }
-  if (depth > 0) for (const d of dirs(dir).slice(0, 80)) n += scanMd(path.join(dir, d), kind, c, out, ns ? `${ns}:${d}` : d, depth - 1);
+  if (depth > 0) for (const d of (await dirs(dir)).slice(0, 80)) n += await scanMd(path.join(dir, d), kind, c, out, ns ? `${ns}:${d}` : d, depth - 1);
   return n;
 }
 
-function scanClaudeDir(base: string, c: ItemCtx, out: CatItem[]): { skills: number; agents: number; commands: number; styles: number } {
-  return {
-    skills: scanSkills(path.join(base, 'skills'), c, out),
-    agents: scanMd(path.join(base, 'agents'), 'agent', c, out, '', 1),
-    commands: scanMd(path.join(base, 'commands'), 'command', c, out),
-    styles: scanMd(path.join(base, 'output-styles'), 'output-style', c, out, '', 0),
-  };
+async function scanClaudeDir(base: string, c: ItemCtx, out: CatItem[]): Promise<{ skills: number; agents: number; commands: number; styles: number }> {
+  // sequential: item order stays the same as the former sync scan
+  const skills = await scanSkills(path.join(base, 'skills'), c, out);
+  const agents = await scanMd(path.join(base, 'agents'), 'agent', c, out, '', 1);
+  const commands = await scanMd(path.join(base, 'commands'), 'command', c, out);
+  const styles = await scanMd(path.join(base, 'output-styles'), 'output-style', c, out, '', 0);
+  return { skills, agents, commands, styles };
 }
 
 // ---------------------------------------------------------------- hooks and MCP
@@ -469,10 +474,10 @@ interface PluginRef {
 }
 
 /** Plugins known to Claude Code: installed_plugins.json, marketplace catalogs, enabledPlugins of every layer. */
-function claudePluginRefs(home: string, enabledIds: Set<string>, errors: string[]): PluginRef[] {
+async function claudePluginRefs(home: string, enabledIds: Set<string>, errors: string[]): Promise<PluginRef[]> {
   const refs = new Map<string, PluginRef>();
   const pdir = path.join(home, 'plugins');
-  const inst = readJson(path.join(pdir, 'installed_plugins.json'));
+  const inst = await readJson(path.join(pdir, 'installed_plugins.json'));
   const ip = obj(inst?.plugins);
   for (const [id, raw] of Object.entries(ip).slice(0, MAX_PLUGINS)) {
     const e = obj(Array.isArray(raw) ? raw[0] : raw);
@@ -480,15 +485,15 @@ function claudePluginRefs(home: string, enabledIds: Set<string>, errors: string[
     const dir = typeof e.installPath === 'string' ? e.installPath : '';
     if (dir) refs.set(id, { name, marketplace, dir, installed: true, version: s(e.version, 30) });
   }
-  const known = readJson(path.join(pdir, 'known_marketplaces.json'));
+  const known = await readJson(path.join(pdir, 'known_marketplaces.json'));
   const mks = new Map<string, string>();
   for (const [m, e] of Object.entries(obj(known))) if (typeof obj(e).installLocation === 'string') mks.set(m, obj(e).installLocation as string);
-  for (const m of dirs(path.join(pdir, 'marketplaces'))) if (!mks.has(m)) mks.set(m, path.join(pdir, 'marketplaces', m));
+  for (const m of await dirs(path.join(pdir, 'marketplaces'))) if (!mks.has(m)) mks.set(m, path.join(pdir, 'marketplaces', m));
   for (const [m, loc] of mks) {
     if (!isPlausibleLocalPath(loc)) continue;
-    const cat = readJson(path.join(loc, '.claude-plugin', 'marketplace.json'), 4_000_000);
+    const cat = await readJson(path.join(loc, '.claude-plugin', 'marketplace.json'), 4_000_000);
     const list = Array.isArray(cat?.plugins) ? (cat!.plugins as unknown[]) : [];
-    if (!cat && stat(loc)) errors.push(`marketplace ${bounded(m, 40)}: no readable .claude-plugin/marketplace.json`);
+    if (!cat && (await stat(loc))) errors.push(`marketplace ${bounded(m, 40)}: no readable .claude-plugin/marketplace.json`);
     for (const p of list.slice(0, MAX_PLUGINS)) {
       const o = obj(p);
       const name = s(o.name, 60);
@@ -501,10 +506,10 @@ function claudePluginRefs(home: string, enabledIds: Set<string>, errors: string[
     }
   }
   // install cache: plugins/cache/<marketplace>/<plugin>/<version>
-  for (const m of dirs(path.join(pdir, 'cache'))) {
-    for (const p of dirs(path.join(pdir, 'cache', m))) {
+  for (const m of await dirs(path.join(pdir, 'cache'))) {
+    for (const p of await dirs(path.join(pdir, 'cache', m))) {
       const id = `${p}@${m}`;
-      const vs = dirs(path.join(pdir, 'cache', m, p));
+      const vs = await dirs(path.join(pdir, 'cache', m, p));
       const v = vs.includes('latest') ? 'latest' : vs[vs.length - 1];
       const dir = v ? path.join(pdir, 'cache', m, p, v) : path.join(pdir, 'cache', m, p);
       const prev = refs.get(id);
@@ -518,14 +523,20 @@ function claudePluginRefs(home: string, enabledIds: Set<string>, errors: string[
   return [...refs.values()].slice(0, MAX_PLUGINS);
 }
 
-function scanPlugin(ref: PluginRef, provider: Provider, enabled: boolean | undefined, items: CatItem[], hooks: HookRow[], mcp: McpRow[], files: string[]): PluginInfo {
+async function scanPlugin(ref: PluginRef, provider: Provider, enabled: boolean | undefined, items: CatItem[], hooks: HookRow[], mcp: McpRow[], files: string[]): Promise<PluginInfo> {
   const id = ref.marketplace ? `${ref.name}@${ref.marketplace}` : ref.name;
   const active = ref.installed || enabled === true;
   const info: PluginInfo = { provider, id, name: ref.name, marketplace: ref.marketplace, version: ref.version, enabled, installed: ref.installed, dir: ref.dir, skills: 0, agents: 0, commands: 0, hooks: 0, mcp: 0, projects: [] };
-  if (!ref.dir || !stat(ref.dir)?.isDirectory()) return info;
-  const manifest = [path.join(ref.dir, provider === 'codex' ? '.codex-plugin' : '.claude-plugin', 'plugin.json'), path.join(ref.dir, 'plugin.json')].find(f => stat(f)?.isFile());
+  if (!ref.dir || !(await stat(ref.dir))?.isDirectory()) return info;
+  let manifest: string | undefined;
+  for (const f of [path.join(ref.dir, provider === 'codex' ? '.codex-plugin' : '.claude-plugin', 'plugin.json'), path.join(ref.dir, 'plugin.json')]) {
+    if ((await stat(f))?.isFile()) {
+      manifest = f;
+      break;
+    }
+  }
   if (manifest) {
-    const m = readJson(manifest);
+    const m = await readJson(manifest);
     info.manifest = manifest;
     files.push(manifest);
     info.version = s(m?.version, 30) ?? info.version;
@@ -533,30 +544,30 @@ function scanPlugin(ref: PluginRef, provider: Provider, enabled: boolean | undef
   }
   if (!active) {
     // available only: count from directory listings, read nothing else (marketplaces list hundreds)
-    info.skills = dirs(path.join(ref.dir, 'skills')).filter(d => !d.startsWith('.')).length;
-    info.agents = filesIn(path.join(ref.dir, 'agents'), /\.md$/i).length;
-    info.commands = filesIn(path.join(ref.dir, provider === 'claude' ? 'commands' : 'prompts'), /\.md$/i).length;
-    info.hooks = stat(path.join(ref.dir, 'hooks', 'hooks.json')) ? 1 : 0;
-    info.mcp = stat(path.join(ref.dir, '.mcp.json')) ? 1 : 0;
+    info.skills = (await dirs(path.join(ref.dir, 'skills'))).filter(d => !d.startsWith('.')).length;
+    info.agents = (await filesIn(path.join(ref.dir, 'agents'), /\.md$/i)).length;
+    info.commands = (await filesIn(path.join(ref.dir, provider === 'claude' ? 'commands' : 'prompts'), /\.md$/i)).length;
+    info.hooks = (await stat(path.join(ref.dir, 'hooks', 'hooks.json'))) ? 1 : 0;
+    info.mcp = (await stat(path.join(ref.dir, '.mcp.json'))) ? 1 : 0;
     return info;
   }
   const c: ItemCtx = { provider, source: 'plugin', plugin: id, active };
   const before = items.length;
-  info.skills = scanSkills(path.join(ref.dir, 'skills'), c, items);
+  info.skills = await scanSkills(path.join(ref.dir, 'skills'), c, items);
   if (provider === 'claude') {
-    info.agents = scanMd(path.join(ref.dir, 'agents'), 'agent', c, items, '', 1);
-    info.commands = scanMd(path.join(ref.dir, 'commands'), 'command', c, items);
-    scanMd(path.join(ref.dir, 'output-styles'), 'output-style', c, items, '', 0);
-  } else info.commands = scanMd(path.join(ref.dir, 'prompts'), 'prompt', c, items, '', 0);
+    info.agents = await scanMd(path.join(ref.dir, 'agents'), 'agent', c, items, '', 1);
+    info.commands = await scanMd(path.join(ref.dir, 'commands'), 'command', c, items);
+    await scanMd(path.join(ref.dir, 'output-styles'), 'output-style', c, items, '', 0);
+  } else info.commands = await scanMd(path.join(ref.dir, 'prompts'), 'prompt', c, items, '', 0);
   for (const it of items.slice(before)) files.push(it.file);
   const hf = path.join(ref.dir, 'hooks', 'hooks.json');
-  const hj = readJson(hf);
+  const hj = await readJson(hf);
   if (hj) {
     info.hooks = hooksFrom(hj.hooks ?? hj, { source: 'plugin', plugin: id, file: hf }, hooks);
     files.push(hf);
   }
   const mf = path.join(ref.dir, '.mcp.json');
-  const mj = readJson(mf);
+  const mj = await readJson(mf);
   if (mj) {
     info.mcp = mcpFrom(mj.mcpServers ?? mj, { provider, source: 'plugin', plugin: id, file: mf }, mcp);
     files.push(mf);
@@ -566,19 +577,19 @@ function scanPlugin(ref: PluginRef, provider: Provider, enabled: boolean | undef
 
 // ---------------------------------------------------------------- instructions and memory
 
-function instr(file: string, provider: Provider, source: Source, root: string | undefined, out: InstrFile[]): void {
-  const st = stat(file);
+async function instr(file: string, provider: Provider, source: Source, root: string | undefined, out: InstrFile[]): Promise<void> {
+  const st = await stat(file);
   if (!st || !st.isFile()) return;
-  const text = readText(file) ?? '';
+  const text = (await readText(file)) ?? '';
   out.push({ provider, source, root, file, bytes: st.size, lines: text ? text.split('\n').length : 0, headings: headingsOf(text) });
 }
 
-function memoryDirs(home: string): MemoryDir[] {
+async function memoryDirs(home: string): Promise<MemoryDir[]> {
   const out: MemoryDir[] = [];
   const base = path.join(home, 'projects');
-  for (const p of dirs(base)) {
+  for (const p of await dirs(base)) {
     const dir = path.join(base, p, 'memory');
-    const names = filesIn(dir, /\.md$/i);
+    const names = await filesIn(dir, /\.md$/i);
     if (!names.length) continue;
     out.push({ project: bounded(p, 120), dir, count: names.length, names: names.slice(0, 100).map(n => bounded(n, 80)) });
     if (out.length >= 500) break;
@@ -588,7 +599,7 @@ function memoryDirs(home: string): MemoryDir[] {
 
 // ---------------------------------------------------------------- collection
 
-export function collectCatalog(input: CatalogInput): CatalogReport {
+export async function collectCatalog(input: CatalogInput): Promise<CatalogReport> {
   const errors: string[] = [];
   const homeParent = normalizeCase(path.dirname(input.claudeHome));
   const roots: string[] = [];
@@ -598,7 +609,7 @@ export function collectCatalog(input: CatalogInput): CatalogReport {
     const k = normalizeCase(path.resolve(r));
     if (seen.has(k) || k === homeParent) continue;
     seen.add(k);
-    if (stat(r)?.isDirectory()) roots.push(r);
+    if ((await stat(r))?.isDirectory()) roots.push(r);
     if (roots.length >= 80) break;
   }
   const items: CatItem[] = [];
@@ -619,9 +630,9 @@ export function collectCatalog(input: CatalogInput): CatalogReport {
   const enabled = new Map<string, boolean>();
   const enabledBy = new Map<string, Set<string>>();
   for (const l of layers) {
-    const j = readJson(l.file);
+    const j = await readJson(l.file);
     if (!j) {
-      if (stat(l.file)?.isFile()) errors.push(`${bounded(l.file, 120)}: unreadable or too large`);
+      if ((await stat(l.file))?.isFile()) errors.push(`${bounded(l.file, 120)}: unreadable or too large`);
       continue;
     }
     files.push(l.file);
@@ -637,24 +648,24 @@ export function collectCatalog(input: CatalogInput): CatalogReport {
   }
   // user / project markdown items
   const mark = items.length;
-  scanClaudeDir(input.claudeHome, { provider: 'claude', source: 'user', active: true }, items);
-  for (const r of roots) scanClaudeDir(path.join(r, '.claude'), { provider: 'claude', source: 'project', root: r, active: true }, items);
+  await scanClaudeDir(input.claudeHome, { provider: 'claude', source: 'user', active: true }, items);
+  for (const r of roots) await scanClaudeDir(path.join(r, '.claude'), { provider: 'claude', source: 'project', root: r, active: true }, items);
   for (const it of items.slice(mark)) files.push(it.file);
 
   // plugins
   const plugins: PluginInfo[] = [];
   const enabledIds = new Set([...enabled.keys(), ...enabledBy.keys()]);
-  for (const ref of claudePluginRefs(input.claudeHome, enabledIds, errors)) {
+  for (const ref of await claudePluginRefs(input.claudeHome, enabledIds, errors)) {
     const id = ref.marketplace ? `${ref.name}@${ref.marketplace}` : ref.name;
     const userOn = enabled.has(id) ? enabled.get(id) : undefined;
-    const p = scanPlugin(ref, 'claude', userOn, items, hooks, mcp, files);
+    const p = await scanPlugin(ref, 'claude', userOn, items, hooks, mcp, files);
     p.projects = [...(enabledBy.get(id) ?? [])].sort();
     plugins.push(p);
   }
 
   // MCP: ~/.claude.json (user + per-project local), project .mcp.json
   if (input.claudeJson) {
-    const cj = readJson(input.claudeJson, MAX_JSON_BYTES);
+    const cj = await readJson(input.claudeJson, MAX_JSON_BYTES);
     if (cj) {
       mcpFrom(cj.mcpServers, { provider: 'claude', source: 'user', file: input.claudeJson }, mcp);
       for (const [p, e] of Object.entries(obj(cj.projects)).slice(0, 2000)) {
@@ -665,20 +676,20 @@ export function collectCatalog(input: CatalogInput): CatalogReport {
   }
   for (const r of roots) {
     const f = path.join(r, '.mcp.json');
-    const j = readJson(f);
+    const j = await readJson(f);
     if (!j) continue;
     files.push(f);
     mcpFrom(j.mcpServers ?? j, { provider: 'claude', source: 'project', root: r, file: f }, mcp);
   }
 
   // instruction files
-  instr(path.join(input.claudeHome, 'CLAUDE.md'), 'claude', 'user', undefined, instructions);
-  instr(path.join(input.codexHome, 'AGENTS.md'), 'codex', 'user', undefined, instructions);
+  await instr(path.join(input.claudeHome, 'CLAUDE.md'), 'claude', 'user', undefined, instructions);
+  await instr(path.join(input.codexHome, 'AGENTS.md'), 'codex', 'user', undefined, instructions);
   for (const r of roots) {
-    instr(path.join(r, 'CLAUDE.md'), 'claude', 'project', r, instructions);
-    instr(path.join(r, '.claude', 'CLAUDE.md'), 'claude', 'project', r, instructions);
-    instr(path.join(r, 'CLAUDE.local.md'), 'claude', 'local', r, instructions);
-    instr(path.join(r, 'AGENTS.md'), 'codex', 'project', r, instructions);
+    await instr(path.join(r, 'CLAUDE.md'), 'claude', 'project', r, instructions);
+    await instr(path.join(r, '.claude', 'CLAUDE.md'), 'claude', 'project', r, instructions);
+    await instr(path.join(r, 'CLAUDE.local.md'), 'claude', 'local', r, instructions);
+    await instr(path.join(r, 'AGENTS.md'), 'codex', 'project', r, instructions);
   }
   for (const i of instructions) files.push(i.file);
 
@@ -686,10 +697,10 @@ export function collectCatalog(input: CatalogInput): CatalogReport {
   const cx = input.codexHome;
   let codexConfig: CodexConfig | undefined;
   const cfgFile = path.join(cx, 'config.toml');
-  if (stat(cfgFile)?.isFile()) {
+  if ((await stat(cfgFile))?.isFile()) {
     codexConfig = readCodexConfig(cfgFile, 'user');
     files.push(cfgFile);
-    const t = readText(cfgFile);
+    const t = await readText(cfgFile);
     if (t) {
       let toml: { [k: string]: TomlValue } = {};
       try {
@@ -702,28 +713,28 @@ export function collectCatalog(input: CatalogInput): CatalogReport {
   }
   const cmark = items.length;
   const userSkills = path.join(cx, 'skills');
-  scanSkills(userSkills, { provider: 'codex', source: 'user', active: true }, items);
+  await scanSkills(userSkills, { provider: 'codex', source: 'user', active: true }, items);
   // .system skills ship with Codex
-  scanSkills(path.join(userSkills, '.system'), { provider: 'codex', source: 'system', active: true }, items);
-  scanMd(path.join(cx, 'prompts'), 'prompt', { provider: 'codex', source: 'user', active: true }, items, '', 0);
-  for (const r of roots) scanSkills(path.join(r, '.codex', 'skills'), { provider: 'codex', source: 'project', root: r, active: true }, items);
+  await scanSkills(path.join(userSkills, '.system'), { provider: 'codex', source: 'system', active: true }, items);
+  await scanMd(path.join(cx, 'prompts'), 'prompt', { provider: 'codex', source: 'user', active: true }, items, '', 0);
+  for (const r of roots) await scanSkills(path.join(r, '.codex', 'skills'), { provider: 'codex', source: 'project', root: r, active: true }, items);
   for (const it of items.slice(cmark)) files.push(it.file);
   const codexOn = new Map((codexConfig?.plugins ?? []).map(p => [p.name, p.on] as const));
-  for (const m of dirs(path.join(cx, 'plugins', 'cache'))) {
-    for (const p of dirs(path.join(cx, 'plugins', 'cache', m))) {
+  for (const m of await dirs(path.join(cx, 'plugins', 'cache'))) {
+    for (const p of await dirs(path.join(cx, 'plugins', 'cache', m))) {
       if (plugins.length >= MAX_PLUGINS * 2) break;
-      const vs = dirs(path.join(cx, 'plugins', 'cache', m, p));
+      const vs = await dirs(path.join(cx, 'plugins', 'cache', m, p));
       const v = vs.includes('latest') ? 'latest' : vs[vs.length - 1];
       const dir = v ? path.join(cx, 'plugins', 'cache', m, p, v) : path.join(cx, 'plugins', 'cache', m, p);
       const id = `${p}@${m}`;
       const on = codexOn.has(id) ? codexOn.get(id) : codexOn.has(p) ? codexOn.get(p) : undefined;
-      plugins.push(scanPlugin({ name: p, marketplace: m, dir, installed: true, version: v && v !== 'latest' ? bounded(v, 30) : vs.filter(x => x !== 'latest').pop() }, 'codex', on, items, hooks, mcp, files));
+      plugins.push(await scanPlugin({ name: p, marketplace: m, dir, installed: true, version: v && v !== 'latest' ? bounded(v, 30) : vs.filter(x => x !== 'latest').pop() }, 'codex', on, items, hooks, mcp, files));
     }
   }
   const codexRules: CodexRules[] = [];
-  for (const f of filesIn(path.join(cx, 'rules'), /\.rules$/i).slice(0, 50)) {
+  for (const f of (await filesIn(path.join(cx, 'rules'), /\.rules$/i)).slice(0, 50)) {
     const file = path.join(cx, 'rules', f);
-    const t = readText(file) ?? '';
+    const t = (await readText(file)) ?? '';
     codexRules.push({ file, rules: (t.match(/^\s*prefix_rule\s*\(/gm) ?? []).length });
     files.push(file);
   }
@@ -739,7 +750,7 @@ export function collectCatalog(input: CatalogInput): CatalogReport {
     mcp,
     settings,
     instructions,
-    memory: memoryDirs(input.claudeHome),
+    memory: await memoryDirs(input.claudeHome),
     codexConfig,
     codexRules,
     files: [...new Set(files)].filter(f => !isForbidden(f) && (!input.claudeJson || normalizeCase(f) !== normalizeCase(input.claudeJson))),

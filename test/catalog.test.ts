@@ -18,7 +18,7 @@ function w(file: string, text: string): void {
 
 const SECRETS = ['fake-env-secret-value', 'fake-mcp-arg-secret', 'fake-header-secret', 'fake-auth-json-secret', 'fake-hook-arg-secret', 'fake-codex-secret'];
 
-function fixture() {
+async function fixture() {
   const base = tmpDir('catalog');
   const home = path.join(base, 'home');
   const ch = path.join(home, '.claude');
@@ -61,12 +61,12 @@ function fixture() {
   w(path.join(cx, 'rules', 'default.rules'), 'prefix_rule(pattern=["git"])\nprefix_rule(pattern=["ls"])\n');
   w(path.join(cx, 'plugins', 'cache', 'bundled', 'browser', '1.0.0', '.codex-plugin', 'plugin.json'), JSON.stringify({ version: '1.0.0', description: 'Browser' }));
   w(path.join(cx, 'plugins', 'cache', 'bundled', 'browser', '1.0.0', 'skills', 'b', 'SKILL.md'), '---\nname: browse\n---\n');
-  const r = collectCatalog({ claudeHome: ch, codexHome: cx, claudeJson: path.join(home, '.claude.json'), roots: [repo, home, repo, 'rel/x'], now: 1 });
+  const r = await collectCatalog({ claudeHome: ch, codexHome: cx, claudeJson: path.join(home, '.claude.json'), roots: [repo, home, repo, 'rel/x'], now: 1 });
   return { r, ch, cx, repo, home };
 }
 
-test('catalog: skills, agents, commands with sources', () => {
-  const { r, repo } = fixture();
+test('catalog: skills, agents, commands with sources', async () => {
+  const { r, repo } = await fixture();
   assert.deepEqual(r.roots, [repo]);
   const skill = r.items.find(i => i.name === 'alpha')!;
   assert.equal(skill.source, 'user');
@@ -84,8 +84,8 @@ test('catalog: skills, agents, commands with sources', () => {
   assert.equal(r.plugins.find(p => p.id === 'other@mkt')!.skills, 1);
 });
 
-test('catalog: plugins, hooks, MCP and settings are redacted', () => {
-  const { r, ch } = fixture();
+test('catalog: plugins, hooks, MCP and settings are redacted', async () => {
+  const { r, ch } = await fixture();
   const demo = r.plugins.find(p => p.id === 'demo@mkt')!;
   assert.deepEqual([demo.enabled, demo.version, demo.skills, demo.commands, demo.hooks, demo.mcp], [true, '1.2.3', 1, 1, 1, 1]);
   assert.deepEqual(demo.projects, ['repo (off)']);
@@ -111,8 +111,8 @@ test('catalog: plugins, hooks, MCP and settings are redacted', () => {
   assert.ok(r.files.includes(path.join(ch, 'settings.json')));
 });
 
-test('catalog: instructions, memory names and Codex inventory', () => {
-  const { r } = fixture();
+test('catalog: instructions, memory names and Codex inventory', async () => {
+  const { r } = await fixture();
   const u = r.instructions.find(i => i.provider === 'claude' && i.source === 'user')!;
   assert.deepEqual(u.headings, ['Rules', '  One', '    Two']);
   assert.ok(r.instructions.some(i => i.provider === 'codex' && i.headings[0] === 'Codex rules'));
@@ -132,6 +132,71 @@ test('catalog: helpers', () => {
   assert.equal(programOf('bash ./hooks/check.sh arg'), 'bash check.sh');
   assert.equal(programOf(''), '');
   assert.deepEqual(headingsOf('text\n#nope\n# Yes #\n'), ['Yes']);
+});
+
+/** Longest gap between two event-loop turns while `fn` runs (a setImmediate chain keeps ticking). */
+async function longestBlock(fn: () => Promise<unknown>): Promise<{ max: number; total: number }> {
+  let last = performance.now();
+  let max = 0;
+  let on = true;
+  const tick = () => {
+    const t = performance.now();
+    max = Math.max(max, t - last);
+    last = t;
+    if (on) setImmediate(tick);
+  };
+  setImmediate(tick);
+  const t0 = performance.now();
+  await fn();
+  const total = performance.now() - t0;
+  on = false;
+  max = Math.max(max, performance.now() - last);
+  return { max, total };
+}
+
+test('catalog: a large tree never blocks the event loop for long', async () => {
+  const base = tmpDir('catalog-big');
+  const ch = path.join(base, 'home', '.claude');
+  const cx = path.join(base, 'home', '.codex');
+  const fm = (n: string) => `---\nname: ${n}\ndescription: ${'d'.repeat(120)}\n---\n${'body\n'.repeat(200)}`;
+  for (let i = 0; i < 120; i++) {
+    w(path.join(ch, 'skills', `s${i}`, 'SKILL.md'), fm(`s${i}`));
+    for (let j = 0; j < 6; j++) w(path.join(ch, 'skills', `s${i}`, 'ref', `r${j}.md`), 'x');
+  }
+  for (let i = 0; i < 80; i++) w(path.join(ch, 'agents', `a${i}.md`), fm(`a${i}`));
+  for (let i = 0; i < 80; i++) w(path.join(ch, 'commands', `ns${i % 8}`, `c${i}.md`), fm(`c${i}`));
+  const installed: Record<string, unknown> = {};
+  for (let p = 0; p < 30; p++) {
+    const dir = path.join(ch, 'plugins', 'cache', 'mkt', `p${p}`, '1.0.0');
+    installed[`p${p}@mkt`] = [{ installPath: dir, version: '1.0.0' }];
+    w(path.join(dir, '.claude-plugin', 'plugin.json'), JSON.stringify({ name: `p${p}`, version: '1.0.0' }));
+    for (let i = 0; i < 6; i++) w(path.join(dir, 'skills', `k${i}`, 'SKILL.md'), fm(`p${p}-k${i}`));
+    w(path.join(dir, 'commands', 'go.md'), fm(`p${p}-go`));
+  }
+  w(path.join(ch, 'plugins', 'installed_plugins.json'), JSON.stringify({ plugins: installed }));
+  for (let i = 0; i < 40; i++) w(path.join(ch, 'projects', `D--p${i}`, 'memory', 'MEMORY.md'), 'x');
+  for (let i = 0; i < 40; i++) w(path.join(cx, 'skills', `c${i}`, 'SKILL.md'), fm(`c${i}`));
+  const roots: string[] = [];
+  for (let i = 0; i < 20; i++) {
+    const r = path.join(base, `repo${i}`);
+    roots.push(r);
+    w(path.join(r, 'CLAUDE.md'), '# Repo\n## Part\n'.repeat(50));
+    w(path.join(r, '.claude', 'settings.json'), JSON.stringify({ model: 'sonnet', permissions: { allow: ['Read'] } }));
+    for (let j = 0; j < 4; j++) w(path.join(r, '.claude', 'agents', `x${j}.md`), fm(`r${i}x${j}`));
+  }
+  let r: Awaited<ReturnType<typeof collectCatalog>> | undefined;
+  const { max, total } = await longestBlock(async () => {
+    r = await collectCatalog({ claudeHome: ch, codexHome: cx, roots, now: 1 });
+  });
+  assert.equal(r!.items.filter(i => i.provider === 'claude' && i.kind === 'skill' && i.source === 'user').length, 120);
+  assert.equal(r!.items.find(i => i.name === 's0')!.files, 7);
+  assert.equal(r!.plugins.length, 30);
+  assert.equal(r!.items.filter(i => i.source === 'plugin').length, 30 * 7);
+  assert.equal(r!.memory.length, 40);
+  assert.equal(r!.instructions.length, 20);
+  // eslint-disable-next-line no-console
+  if (process.env.CATALOG_BLOCK_LOG) console.log(`catalog scan: total ${total.toFixed(0)} ms, longest block ${max.toFixed(1)} ms`);
+  assert.ok(max < 50, `longest synchronous block ${max.toFixed(1)} ms (total ${total.toFixed(0)} ms)`);
 });
 
 const CLAUDE_HELP = `Usage: claude [options] [command] [prompt]
@@ -221,7 +286,7 @@ function data(): WsData {
 
 test('catalog: screen renders every tab, escaped, and validates actions', async () => {
   clearFeeds();
-  const { r } = fixture();
+  const { r } = await fixture();
   r.items.push({ provider: 'claude', kind: 'skill', source: 'user', active: true, file: '/x/<b>.md', name: '<script>x</script>' });
   setFeedValue('catalog.scan', r);
   setFeedValue('catalog.cli', [{ tool: 'claude', status: 'ok', version: '9.9.9', flags: parseHelp(CLAUDE_HELP).flags, commands: [], at: 1 }, { tool: 'codex', status: 'missing', flags: [], commands: [], at: 1, error: 'codex not found' }]);
