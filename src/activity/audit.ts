@@ -3,6 +3,7 @@
 // or ended, a status it is in now, a commit, a test outcome, a failed command, a provider error, a
 // compaction. Each one carries the evidence kind and the record it comes from. No message text is read.
 import { AgentSessionSnapshot, EvidenceKind, Provider, TimelineEvent } from '../model';
+import { statusEvidenceOf } from '../sessions/classify';
 import { bounded } from '../util/redact';
 import { base } from './insights';
 
@@ -70,9 +71,17 @@ function exitOf(label: string): number | undefined {
   return m ? Number(m[1]) : undefined;
 }
 
-function statusEvidence(s: AgentSessionSnapshot): { kind: EvidenceKind; source: string } {
+const STRENGTH: Record<EvidenceKind, number> = { OBSERVED: 3, DERIVED: 2, INFERRED: 1, UNKNOWN: 0 };
+
+/**
+ * Evidence kind of the current status, from statusEvidenceOf (an end only inferred from a gone registry entry
+ * stays INFERRED). A weaker kind recorded by the provider adapter for the status field wins.
+ */
+export function statusEvidence(s: AgentSessionSnapshot): { kind: EvidenceKind; source: string } {
+  const v = statusEvidenceOf(s);
   const e = s.evidence.find(x => x.field === 'status');
-  return e ? { kind: e.kind === 'OBSERVED' ? 'OBSERVED' : e.kind === 'DERIVED' ? 'DERIVED' : 'INFERRED', source: `${e.source}; ${s.statusReason}` } : { kind: 'INFERRED', source: s.statusReason };
+  const kind = e && STRENGTH[e.kind] < STRENGTH[v.kind] ? e.kind : v.kind;
+  return { kind, source: e ? `${e.source}; ${v.basis}` : v.basis };
 }
 
 /**

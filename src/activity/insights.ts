@@ -1,5 +1,6 @@
 // Derived, factual projections over snapshots. Every item states the observation it comes from; nothing is scored.
 import { AgentSessionSnapshot, TimelineEvent } from '../model';
+import { testVerdict } from '../sessions/classify';
 
 export type Severity = 'high' | 'medium' | 'low';
 
@@ -30,7 +31,7 @@ export function attention(sessions: AgentSessionSnapshot[], now: number, opts: {
     const at = s.lastActivityAt ?? s.startedAt ?? 0;
     const lastTest = s.tests[s.tests.length - 1];
     if (s.status === 'NEEDS_INPUT') out.push({ key: s.key, severity: 'high', reason: 'Waiting for input', basis: s.statusReason, at });
-    if (isLive(s) && lastTest?.outcome === 'FAIL') out.push({ key: s.key, severity: 'high', reason: `Last test failed: ${lastTest.command.length > 70 ? lastTest.command.slice(0, 69) + "…" : lastTest.command}`, basis: lastTest.exitCode !== undefined ? `exit code ${lastTest.exitCode}` : 'provider tool error flag', at: lastTest.at });
+    if (isLive(s) && lastTest && testVerdict(lastTest).outcome === 'FAIL') out.push({ key: s.key, severity: 'high', reason: `Last test failed: ${lastTest.command.length > 70 ? lastTest.command.slice(0, 69) + "…" : lastTest.command}`, basis: lastTest.exitCode !== undefined ? `exit code ${lastTest.exitCode}` : 'provider tool error flag', at: lastTest.at });
     const u = s.usage;
     if (isLive(s) && u?.contextTokens && u.contextWindow && u.contextTokens / u.contextWindow >= 0.8)
       out.push({ key: s.key, severity: 'medium', reason: `Context ${Math.round((100 * u.contextTokens) / u.contextWindow)}% full`, basis: 'provider token_count', at });
@@ -55,11 +56,12 @@ export interface Stage {
 export function stages(s: AgentSessionSnapshot): Stage[] {
   const files = s.changedFiles.length;
   const last = s.tests[s.tests.length - 1];
+  const lv = last ? testVerdict(last) : undefined;
   const live = isLive(s);
   return [
     { id: 'start', label: 'Start', state: 'done', detail: s.startedAt ? new Date(s.startedAt).toLocaleTimeString() : 'start time not exposed' },
     { id: 'edit', label: 'Edit', state: files ? 'done' : 'none', detail: files ? `${files} file(s)` : 'no file edit observed' },
-    { id: 'verify', label: 'Verify', state: !last ? 'none' : last.outcome === 'FAIL' ? 'fail' : last.outcome === 'PASS' ? 'done' : 'none', detail: last ? `${s.tests.length} run(s), last ${last.outcome}` : 'no test/build command observed' },
+    { id: 'verify', label: 'Verify', state: !lv ? 'none' : lv.outcome === 'FAIL' ? 'fail' : lv.outcome === 'PASS' ? 'done' : 'none', detail: lv ? `${s.tests.length} run(s), last ${lv.outcome} (${lv.basis})` : 'no test/build command observed' },
     { id: 'commit', label: 'Commit', state: s.commits.length ? 'done' : 'none', detail: s.commits.length ? `${s.commits.length} commit(s) observed` : 'no commit observed' },
     { id: 'end', label: live ? 'Live' : 'End', state: live ? 'live' : s.status === 'ENDED' ? 'done' : 'none', detail: live ? s.status : s.status === 'ENDED' ? 'ended' : 'status unknown' },
   ];
@@ -88,7 +90,8 @@ export const VERIFY_LABEL: Record<Verification, string> = { pass: 'last test pas
 /** Last observed test of a session (and its workers' are not merged: per session). */
 export function verification(s: AgentSessionSnapshot): Verification {
   const t = s.tests[s.tests.length - 1];
-  return !t ? 'none' : t.outcome === 'PASS' ? 'pass' : t.outcome === 'FAIL' ? 'fail' : 'none';
+  const o = t ? testVerdict(t).outcome : undefined;
+  return o === 'PASS' ? 'pass' : o === 'FAIL' ? 'fail' : 'none';
 }
 
 /** provider → repository → outcome → verification, for top-level sessions. */
