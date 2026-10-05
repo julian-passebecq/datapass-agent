@@ -138,6 +138,7 @@ export class SessionAccumulator {
   toolResult(id: string, chars: number, at: number | undefined): void {
     if (!Number.isFinite(chars) || chars < 0 || this.seenIds.has(`res:${id}`)) return;
     this.seenIds.add(`res:${id}`);
+    if (this.seenIds.size > 5000) this.seenIds = new Set([...this.seenIds].slice(-2500));
     const fx = this.fx;
     const known = fx.resultNames.get(id);
     fx.resultNames.delete(id);

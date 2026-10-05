@@ -93,6 +93,8 @@ test('ctxcost parser: content size helpers and bounded samples', () => {
   assert.equal(r.samples.length, 200);
   assert.deepEqual(r.samples[199], [499, 499], 'newest samples kept');
   assert.equal(r.max, 499);
+  for (let i = 500; i < 7000; i++) acc.toolResult(`c${i}`, 1, i);
+  assert.ok(acc.seenIds.size <= 5000, 'result dedupe ids stay bounded');
 });
 
 // ---------------------------------------------------------------- aggregation + screen
