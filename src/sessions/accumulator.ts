@@ -116,6 +116,10 @@ export class SessionAccumulator {
     fx.v++;
     const key = fx.toolCounts.has(name) || fx.toolCounts.size < MAX_TOOL_KEYS ? name : 'other';
     fx.toolCounts.set(key, (fx.toolCounts.get(key) ?? 0) + 1);
+    if (id) {
+      fx.resultNames.set(id, key);
+      if (fx.resultNames.size > MAX_RESULT_NAMES) fx.resultNames.delete(fx.resultNames.keys().next().value!);
+    }
     if (id && at !== undefined) {
       fx.pending.set(id, { name, detail, startedAt: at });
       if (fx.pending.size > 50) fx.pending.delete(fx.pending.keys().next().value!);
@@ -127,6 +131,26 @@ export class SessionAccumulator {
     const fx = this.fx;
     if (fx.pending.delete(id)) fx.v++;
     if (isError) this.toolError();
+  }
+
+  /** Size (characters) of the result of tool call `id`, as put back into the model context. Never the content.
+   *  A result whose call was not seen is counted under 'unknown'; a repeated result id is counted once. */
+  toolResult(id: string, chars: number, at: number | undefined): void {
+    if (!Number.isFinite(chars) || chars < 0 || this.seenIds.has(`res:${id}`)) return;
+    this.seenIds.add(`res:${id}`);
+    const fx = this.fx;
+    const known = fx.resultNames.get(id);
+    fx.resultNames.delete(id);
+    const name = known ?? 'unknown';
+    const key = fx.results.has(name) || fx.results.size < MAX_TOOL_KEYS ? name : 'other';
+    let r = fx.results.get(key);
+    if (!r) fx.results.set(key, (r = { calls: 0, chars: 0, max: 0, samples: [] }));
+    r.calls++;
+    r.chars += chars;
+    if (chars > r.max) r.max = chars;
+    r.samples.push([at ?? 0, chars]);
+    if (r.samples.length > MAX_RESULT_SAMPLES * 1.25) r.samples = r.samples.slice(-MAX_RESULT_SAMPLES);
+    fx.v++;
   }
 
   toolError(): void {
@@ -293,6 +317,9 @@ export class SessionAccumulator {
       activeMs: fx.lastTick !== undefined ? fx.activeMs : undefined,
       entrypoint: fx.strings.entrypoint,
       rateLimits: fx.rate && { ...fx.rate, history: fx.rate.history?.slice(-300) },
+      toolResultChars: fx.results.size
+        ? Object.fromEntries([...fx.results].map(([k, r]) => [k, { calls: r.calls, chars: r.chars, max: r.max, samples: r.samples.slice(-MAX_RESULT_SAMPLES) }]))
+        : undefined,
     };
     for (const k of Object.keys(facts) as (keyof SessionFacts)[]) if (facts[k] === undefined) delete facts[k];
     this.factsCache = { v: fx.v, cwd, facts };
@@ -346,6 +373,8 @@ export const MAX_FACT_FILES = 300;
 export const ACTIVE_GAP_MS = 5 * 60_000;
 const MAX_TOOL_KEYS = 80;
 const MAX_SPAWNS = 200;
+export const MAX_RESULT_SAMPLES = 200;
+const MAX_RESULT_NAMES = 500;
 
 type AltField = 'prompts' | 'replies' | 'compactions' | 'web';
 
@@ -369,6 +398,9 @@ class FactsState {
   activeMs = 0;
   lastTick?: number;
   rate?: RateLimits;
+  /** tool call id → tool name, until its result is seen (bounded). */
+  resultNames = new Map<string, string>();
+  results = new Map<string, { calls: number; chars: number; max: number; samples: [number, number][] }>();
 }
 
 /** Evidence for the facts block: what is read vs computed. */
@@ -376,6 +408,7 @@ const FACT_EVIDENCE: Evidence[] = [
   { field: 'facts', kind: 'OBSERVED', source: 'tool calls, prompts, tokens, modes as recorded in the transcript / rollout' },
   { field: 'facts.activeMs', kind: 'DERIVED', source: 'sum of gaps < 5 min between recorded events' },
   { field: 'facts.waitMs', kind: 'DERIVED', source: 'gaps between the agent finishing a turn and the next human prompt' },
+  { field: 'facts.toolResultChars', kind: 'OBSERVED', source: 'character length of tool_result / function_call_output content (content never kept)' },
 ];
 
 /** Cwd-relative display path (no filesystem access), forward slashes. */

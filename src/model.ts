@@ -145,6 +145,18 @@ export interface SessionFacts {
   entrypoint?: string;
   /** Codex only: latest `token_count.rate_limits` (used %, window, reset) plus a short used-% history. */
   rateLimits?: RateLimits;
+  /** Tool name → size of the tool results put back into the model context (characters only, never content). */
+  toolResultChars?: Record<string, ToolResultSize>;
+}
+
+/** Sizes of one tool's results (OBSERVED character counts; tokens are only estimated from them, ≈ chars / 4). */
+export interface ToolResultSize {
+  calls: number;
+  /** Sum and largest result, in characters. */
+  chars: number;
+  max: number;
+  /** [at, chars] of the latest results (capped at 200 per tool) for medians and period filters. */
+  samples: [number, number][];
 }
 
 /** One provider rate-limit window as recorded. resetsAt in epoch ms. */
