@@ -263,6 +263,25 @@
           },
           "description": "Repositories screen: extra repository paths always shown, even without a session."
         },
+        "agent.catalog.extraRoots": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Catalog screen: extra repository folders to scan for project-level .claude / .codex configuration."
+        },
+        "agent.catalog.maxRepos": {
+          "type": "number",
+          "default": 40,
+          "minimum": 1,
+          "description": "Catalog screen: most repositories (most recent first) scanned for project-level configuration."
+        },
+        "agent.catalog.runCli": {
+          "type": "boolean",
+          "default": true,
+          "description": "Catalog screen: run `claude --help` / `--version` and `codex --help` (trusted workspaces only, 5 s timeout, cached one day) to list CLI options."
+        },
         "agent.settings.extraRoots": {
           "type": "array",
           "default": [],
