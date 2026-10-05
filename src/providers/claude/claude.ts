@@ -215,7 +215,10 @@ export class ClaudeAdapter implements ProviderAdapter {
     if (typeof o.gitBranch === 'string' && o.gitBranch && o.gitBranch !== 'HEAD') {
       acc.branch = bounded(o.gitBranch, 120);
       acc.ev('branch', 'OBSERVED', 'transcript record .gitBranch');
+      acc.setFact('recordedBranch', o.gitBranch, 120);
     }
+    if (typeof o.entrypoint === 'string') acc.setFact('entrypoint', o.entrypoint, 30);
+    if (typeof o.permissionMode === 'string') acc.setFact('permissionMode', o.permissionMode, 30);
     if (typeof o.agentId === 'string' && acc.isWorker && !acc.workerLabel) acc.workerLabel = bounded(o.agentId, 40);
 
     switch (type) {
@@ -261,7 +264,10 @@ export class ClaudeAdapter implements ProviderAdapter {
         return;
       case 'system':
         acc.touch(at);
-        if (o.subtype === 'compact_boundary') acc.event(at, 'SESSION_ACTIVITY', 'context compacted', 'OBSERVED', o.uuid);
+        if (o.subtype === 'compact_boundary') {
+          acc.event(at, 'SESSION_ACTIVITY', 'context compacted', 'OBSERVED', o.uuid);
+          acc.bump('compactions');
+        }
         if (o.subtype === 'api_error') acc.event(at, 'SESSION_ACTIVITY', 'provider API error (retrying)', 'OBSERVED', o.uuid);
         return;
       default:
@@ -271,8 +277,17 @@ export class ClaudeAdapter implements ProviderAdapter {
 
   private userRecord(acc: SessionAccumulator, o: Record<string, any>, at?: number): void {
     const content = o.message?.content;
+    let prompted = false;
     const prompt = (text: string) => {
       if (o.isMeta || text.startsWith('<')) return;
+      if (text.startsWith('[Request interrupted')) {
+        acc.clearPendingTools();
+        return;
+      }
+      if (!prompted) {
+        prompted = true;
+        acc.humanPrompt(at);
+      }
       if (!acc.firstPrompt) acc.firstPrompt = bounded(text, 80);
       acc.counts.turns++;
       if (!acc.flags.has('start') && at !== undefined) {
@@ -289,6 +304,7 @@ export class ClaudeAdapter implements ProviderAdapter {
     for (const c of content) {
       if (c?.type === 'text' && typeof c.text === 'string') prompt(c.text);
       if (c?.type !== 'tool_result' || typeof c.tool_use_id !== 'string') continue;
+      acc.toolEnd(c.tool_use_id, c.is_error === true);
       const t = this.pendingTests.get(c.tool_use_id);
       if (t) {
         this.pendingTests.delete(c.tool_use_id);
@@ -330,15 +346,25 @@ export class ClaudeAdapter implements ProviderAdapter {
     if (u && typeof u === 'object' && typeof msg.id === 'string') {
       const n = (x: unknown) => (typeof x === 'number' && x >= 0 ? x : 0);
       const cached = n(u.cache_read_input_tokens);
-      acc.addCallUsage(msg.id, n(u.input_tokens) + cached + n(u.cache_creation_input_tokens), n(u.output_tokens), cached);
+      const prompt = n(u.input_tokens) + cached + n(u.cache_creation_input_tokens);
+      acc.addCallUsage(msg.id, prompt, n(u.output_tokens), cached);
+      acc.modelCall(msg.id, at, prompt, n(u.output_tokens), typeof msg.model === 'string' && msg.model !== '<synthetic>' ? bounded(msg.model, 60) : undefined);
       acc.ev('usage', 'OBSERVED', 'assistant message .usage, one count per message id');
     }
+    if (msg?.model !== '<synthetic>') acc.agentDone(at);
     if (!Array.isArray(msg?.content)) return;
     for (const c of msg.content) {
+      if (c?.type === 'text' && typeof c.text === 'string' && c.text.trim() && typeof msg.id === 'string' && !acc.seenIds.has(`r:${msg.id}`)) {
+        acc.seenIds.add(`r:${msg.id}`);
+        acc.bump('replies');
+      }
       if (c?.type !== 'tool_use' || typeof c.name !== 'string') continue;
       acc.counts.tools++;
       const id = typeof c.id === 'string' ? c.id : undefined;
       const input = c.input ?? {};
+      acc.toolStart(bounded(c.name, 60), toolDetail(c.name, input), at, id);
+      if (c.name.startsWith('mcp__')) acc.mcp(bounded(c.name.split('__')[1] || 'mcp', 60));
+      else if (c.name === 'WebFetch' || c.name === 'WebSearch') acc.bump('web');
       if (SHELL_TOOLS.has(c.name)) {
         acc.counts.commands++;
         const cmd = commandText(input.command);
@@ -356,10 +382,12 @@ export class ClaudeAdapter implements ProviderAdapter {
         if (isPlausibleLocalPath(fp)) {
           acc.counts.fileEdits++;
           acc.file(fp);
+          acc.editedFile(fp, at);
           acc.event(at, 'FILE_CHANGE', `${c.name === 'Write' ? 'wrote' : 'edited'} ${path.basename(fp)}`, 'OBSERVED', id);
         }
       } else if (AGENT_TOOLS.has(c.name)) {
         const label = bounded([input.subagent_type, input.description].filter(Boolean).join(' · ') || 'subagent', 70);
+        acc.spawn(at, bounded(input.subagent_type, 40) || 'general-purpose', bounded(input.description, 80));
         if (id) {
           this.pendingAgents.set(id, acc);
           this.agentLabels.set(id, label);
@@ -435,6 +463,26 @@ export class ClaudeAdapter implements ProviderAdapter {
   private diag(m: string): void {
     if (this.diagnostics.length < 20 && !this.diagnostics.includes(m)) this.diagnostics.push(m);
   }
+}
+
+/** Short, redacted "what is this call doing" line for the current-tool display. Never the tool input body. */
+export function toolDetail(name: string, input: Record<string, any>): string {
+  if (SHELL_TOOLS.has(name) || name === 'Monitor') return bounded(commandLabel(commandText(input.command)), 80);
+  const fp = input.file_path ?? input.notebook_path;
+  if (typeof fp === 'string') return bounded(path.basename(fp), 80);
+  if (AGENT_TOOLS.has(name)) return bounded([input.subagent_type, input.description].filter(x => typeof x === 'string' && x).join(' · '), 80);
+  if (name === 'WebFetch' && typeof input.url === 'string') {
+    try {
+      return bounded(new URL(input.url).hostname, 80);
+    } catch {
+      return '';
+    }
+  }
+  if (name === 'WebSearch' || name === 'ToolSearch') return bounded(input.query, 80);
+  if (name === 'Grep' || name === 'Glob') return bounded(input.pattern, 80);
+  if (name === 'Skill') return bounded(input.skill, 80);
+  if (name === 'SendMessage') return bounded(input.to ?? input.recipient, 60);
+  return '';
 }
 
 function parentSid(acc: SessionAccumulator): string {

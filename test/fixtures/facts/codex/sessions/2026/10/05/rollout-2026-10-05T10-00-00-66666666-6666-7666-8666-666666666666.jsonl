@@ -1,0 +1,26 @@
+{"timestamp":"2026-10-05T10:00:00.000Z","type":"session_meta","payload":{"id":"66666666-6666-7666-8666-666666666666","timestamp":"2026-10-05T10:00:00.000Z","cwd":"__CWD__","originator":"codex_cli_rs","cli_version":"0.161.0","source":"cli","git":{"branch":"feat/cx"}}}
+{"timestamp":"2026-10-05T10:00:01.000Z","type":"turn_context","payload":{"turn_id":"t1","cwd":"__CWD__","model":"gpt-6.1-sol","effort":"high","approval_policy":"on-request","sandbox_policy":{"type":"workspace-write"}}}
+{"timestamp":"2026-10-05T10:00:01.000Z","type":"event_msg","payload":{"type":"task_started","turn_id":"t1"}}
+{"timestamp":"2026-10-05T10:00:02.000Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"t1","item":{"type":"UserMessage","id":"m1","content":[{"type":"text","text":"Fix the build"}]}}}
+{"timestamp":"2026-10-05T10:00:03.000Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"t1","item":{"type":"UserMessage","id":"m0","content":[{"type":"text","text":"<environment_context>x</environment_context>"}]}}}
+{"timestamp":"2026-10-05T10:00:05.000Z","type":"response_item","payload":{"type":"custom_tool_call","call_id":"c1","name":"exec","status":"completed","input":"const r = await tools.exec_command({cmd: \"npm test\", workdir: \"x\"});"}}
+{"timestamp":"2026-10-05T10:00:20.000Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"c1","output":"failed"}}
+{"timestamp":"2026-10-05T10:00:20.000Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"t1","item":{"type":"CommandExecution","id":"x1","command":["powershell.exe","-Command","npm test"],"status":"failed","exit_code":1,"duration":{"secs":15,"nanos":0}}}}
+{"timestamp":"2026-10-05T10:00:21.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":900,"cached_input_tokens":800,"output_tokens":100,"total_tokens":1000},"last_token_usage":{"input_tokens":900,"cached_input_tokens":800,"output_tokens":100,"total_tokens":1000},"model_context_window":272000}}}
+{"timestamp":"2026-10-05T10:00:22.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":900,"cached_input_tokens":800,"output_tokens":100,"total_tokens":1000},"last_token_usage":{"input_tokens":900,"cached_input_tokens":800,"output_tokens":100,"total_tokens":1000},"model_context_window":272000}}}
+{"timestamp":"2026-10-05T10:00:30.000Z","type":"response_item","payload":{"type":"custom_tool_call","call_id":"c2","name":"apply_patch","status":"completed","input":"*** Begin Patch\n*** Update File: __CWD__\\src\\b.ts\n@@\n-a\n+b\n*** End Patch"}}
+{"timestamp":"2026-10-05T10:00:31.000Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"c2","output":"ok"}}
+{"timestamp":"2026-10-05T10:00:31.000Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"t1","item":{"type":"FileChange","id":"fc1","changes":{"__CWD__\\src\\b.ts":{"type":"update"}},"status":"completed"}}}
+{"timestamp":"2026-10-05T10:00:40.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1450,"cached_input_tokens":1300,"output_tokens":150,"total_tokens":1600},"last_token_usage":{"input_tokens":550,"cached_input_tokens":500,"output_tokens":50,"total_tokens":600},"model_context_window":272000}}}
+{"timestamp":"2026-10-05T10:01:00.000Z","type":"response_item","payload":{"type":"function_call","call_id":"c3","name":"spawn_agent","arguments":"{\"task_name\":\"audit\",\"agent_type\":\"explorer\",\"message\":\"gAAAAopaque\"}"}}
+{"timestamp":"2026-10-05T10:01:01.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c3","output":"spawned"}}
+{"timestamp":"2026-10-05T10:02:00.000Z","type":"response_item","payload":{"type":"web_search_call","status":"completed","action":{"type":"search","query":"codex docs"}}}
+{"timestamp":"2026-10-05T10:02:00.000Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"t1","item":{"type":"WebSearch","id":"ws1","query":"codex docs"}}}
+{"timestamp":"2026-10-05T10:03:00.000Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"t1","item":{"type":"McpToolCall","id":"mcp1","server":"node_repl","tool":"js","status":"completed"}}}
+{"timestamp":"2026-10-05T10:04:00.000Z","type":"compacted","payload":{"message":""}}
+{"timestamp":"2026-10-05T10:04:00.000Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"t1","item":{"type":"ContextCompaction","id":"cc1"}}}
+{"timestamp":"2026-10-05T10:04:30.000Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"t1","item":{"type":"AgentMessage","id":"am1","content":[{"type":"text","text":"Done"}]}}}
+{"timestamp":"2026-10-05T10:05:00.000Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"t1"}}
+{"timestamp":"2026-10-05T10:12:00.000Z","type":"event_msg","payload":{"type":"task_started","turn_id":"t2"}}
+{"timestamp":"2026-10-05T10:12:01.000Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"t2","item":{"type":"UserMessage","id":"m2","content":[{"type":"text","text":"Now the build"}]}}}
+{"timestamp":"2026-10-05T10:12:10.000Z","type":"response_item","payload":{"type":"function_call","call_id":"c4","name":"exec_command","arguments":"{\"cmd\":\"cargo build\",\"workdir\":\"x\"}"}}
