@@ -117,6 +117,18 @@
       {
         "command": "agent.readTranscript",
         "title": "Agent: Read Session Transcript"
+      },
+      {
+        "command": "agent.goToScreen",
+        "title": "Agent: Go to screen…"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "agent.goToScreen",
+        "key": "ctrl+alt+g",
+        "mac": "cmd+alt+g",
+        "when": "activeWebviewPanelId == 'agent.workspace'"
       }
     ],
     "menus": {

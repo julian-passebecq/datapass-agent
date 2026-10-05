@@ -143,6 +143,14 @@ svg .fl { opacity: .4; cursor: pointer; } svg .fl:hover, svg .fl.on { opacity: .
 svg .fn { cursor: pointer; } svg .fn.on rect { stroke: var(--vscode-focusBorder); stroke-width: 2; }
 svg .fh { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; fill: var(--vscode-descriptionForeground); }
 table.ft { width: 100%; border-collapse: collapse; font-size: 12px; } table.ft th { text-align: left; font-weight: 600; color: var(--vscode-descriptionForeground); border-bottom: 1px solid var(--line); padding: 3px 6px; }
+/* Jump-to-screen picker ("g" / Ctrl+K): a small filterable list over the workspace. */
+.gp { position: fixed; inset: 0; z-index: 50; display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; background: color-mix(in srgb, var(--vscode-editor-background, #1f1f1f) 45%, transparent); }
+.gp-box { width: min(440px, calc(100vw - 32px)); max-height: 60vh; display: flex; flex-direction: column; background: var(--vscode-quickInput-background, var(--vscode-editorWidget-background, #252526)); color: var(--vscode-quickInput-foreground, var(--vscode-foreground)); border: 1px solid var(--vscode-widget-border, var(--line)); border-radius: 6px; box-shadow: 0 4px 18px var(--vscode-widget-shadow, #0008); overflow: hidden; }
+.gp-in { margin: 6px; padding: 4px 8px; font: inherit; color: var(--vscode-input-foreground, var(--vscode-foreground)); background: var(--vscode-input-background, transparent); border: 1px solid var(--vscode-input-border, var(--line)); border-radius: 3px; } .gp-in:focus { outline: 2px solid var(--vscode-focusBorder, #0078d4); }
+.gp-list { list-style: none; margin: 0; padding: 0 0 6px; overflow-y: auto; } .gp-opt { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 3px 10px; cursor: pointer; }
+.gp-opt .gp-h { grid-column: 1 / -1; font-size: 11px; color: var(--vscode-descriptionForeground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .gp-opt .gp-g { font-size: 11px; color: var(--vscode-descriptionForeground); }
+.gp-opt:hover { background: var(--vscode-list-hoverBackground); } .gp-opt.on { background: var(--vscode-quickInputList-focusBackground, var(--vscode-list-activeSelectionBackground)); color: var(--vscode-quickInputList-focusForeground, var(--vscode-list-activeSelectionForeground)); outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; } .gp-opt.on .gp-h, .gp-opt.on .gp-g { color: inherit; }
+.gp-none { padding: 4px 10px; color: var(--vscode-descriptionForeground); }
 table.ft td { padding: 3px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; } table.ft tr[data-select] { cursor: pointer; } table.ft tr[data-select]:hover, table.ft tr.sel { background: var(--vscode-list-hoverBackground); }
 `;
 
@@ -228,10 +236,77 @@ function applyFilter() {
 if (q) q.addEventListener('input', applyFilter);
 decorate();
 tickLoading();
+// Jump-to-screen picker: "g" or Ctrl+K opens it over the workspace; type to filter, Up/Down, Enter to go, Esc to close.
+// It lives outside #root so a re-render never closes it; entries come from the hidden .gp-src list in the markup.
+let gp = null;
+function gpEntries() { return [...root.querySelectorAll('.gp-src [data-gp]')].map(li => ({ id: li.dataset.gp, label: li.textContent, group: li.dataset.group || '', hint: li.dataset.hint || '' })); }
+function gpRender() {
+  const t = gp.input.value.trim().toLowerCase();
+  gp.shown = gp.all.filter(x => !t || (x.label + ' ' + x.group + ' ' + x.id + ' ' + x.hint).toLowerCase().includes(t));
+  gp.at = Math.max(0, Math.min(gp.at, gp.shown.length - 1));
+  gp.list.textContent = '';
+  gp.shown.forEach((x, i) => {
+    const li = document.createElement('li');
+    li.className = 'gp-opt' + (i === gp.at ? ' on' : '');
+    li.id = 'gp-o' + i;
+    li.setAttribute('role', 'option');
+    li.setAttribute('aria-selected', i === gp.at ? 'true' : 'false');
+    li.dataset.i = String(i);
+    const b = document.createElement('span'); b.textContent = x.label;
+    const g = document.createElement('span'); g.className = 'gp-g'; g.textContent = x.group;
+    const h = document.createElement('span'); h.className = 'gp-h'; h.textContent = x.hint;
+    li.append(b, g, h);
+    gp.list.append(li);
+  });
+  if (!gp.shown.length) { const li = document.createElement('li'); li.className = 'gp-none'; li.textContent = 'No screen matches.'; gp.list.append(li); }
+  if (gp.shown.length) gp.input.setAttribute('aria-activedescendant', 'gp-o' + gp.at); else gp.input.removeAttribute('aria-activedescendant');
+  const on = gp.list.querySelector('.on'); if (on) on.scrollIntoView({ block: 'nearest' });
+}
+function gpClose() {
+  if (!gp) return;
+  const back = gp.back;
+  gp.el.remove(); gp = null;
+  if (back && back !== document.body && document.contains(back)) back.focus({ preventScroll: true });
+}
+function gpGo(i) {
+  const x = gp && gp.shown[i];
+  if (!x) return;
+  gpClose();
+  vscode.postMessage({ type: 'nav', view: x.id, key: '' });
+}
+function gpOpen() {
+  if (gp) { gp.input.focus(); return; }
+  const all = gpEntries();
+  if (!all.length) return;
+  const el = document.createElement('div');
+  el.className = 'gp';
+  el.innerHTML = '<div class="gp-box" role="dialog" aria-modal="true" aria-label="Go to screen"><input class="gp-in" type="text" role="combobox" aria-expanded="true" aria-controls="gp-list" aria-autocomplete="list" aria-label="Go to screen: type to filter, Enter to go, Esc to close" placeholder="Go to screen…  (Enter to go, Esc to close)" autocomplete="off" spellcheck="false"><ul class="gp-list" id="gp-list" role="listbox" aria-label="Screens"></ul></div>';
+  document.body.append(el);
+  gp = { el, input: el.querySelector('.gp-in'), list: el.querySelector('.gp-list'), all, shown: all, at: 0, back: document.activeElement };
+  const cur = root.querySelector('.nav.on');
+  if (cur) gp.at = Math.max(0, all.findIndex(x => x.id === cur.dataset.nav));
+  gp.input.addEventListener('input', () => { gp.at = 0; gpRender(); });
+  gp.input.addEventListener('keydown', e => {
+    const n = gp.shown.length;
+    if (e.key === 'Escape') gpClose();
+    else if (e.key === 'Enter') gpGo(gp.at);
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (n) { gp.at = (gp.at + (e.key === 'ArrowDown' ? 1 : n - 1)) % n; gpRender(); } }
+    else if (e.key === 'PageDown' || e.key === 'PageUp') { if (n) { gp.at = Math.max(0, Math.min(n - 1, gp.at + (e.key === 'PageDown' ? 8 : -8))); gpRender(); } }
+    else if (e.key !== 'Tab') return; // Tab is swallowed: focus stays in the dialog.
+    e.preventDefault();
+  });
+  gp.list.addEventListener('mousedown', e => e.preventDefault());
+  gp.list.addEventListener('click', e => { const o = e.target.closest('.gp-opt'); if (o) gpGo(+o.dataset.i); });
+  el.addEventListener('mousedown', e => { if (e.target === el) { e.preventDefault(); gpClose(); } });
+  gpRender();
+  gp.input.focus();
+}
 // One entry per session: a session shown in two panes (Panes screen) must not trap j/k between its copies.
 function items() { const seen = new Set(); return [...root.querySelectorAll('main [data-select]')].filter(e => !e.classList.contains('hide') && !seen.has(e.dataset.select) && seen.add(e.dataset.select)); }
 document.addEventListener('keydown', e => {
   if (!root.querySelector('.ws')) return;
+  if (gp && gp.el.contains(e.target)) return;
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'k' || e.key === 'K')) { gpOpen(); e.preventDefault(); return; }
   if (e.target === q) { if (e.key === 'Escape') { q.value = ''; applyFilter(); q.blur(); } return; }
   if (e.ctrlKey || e.metaKey || e.altKey || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
   if (/^[0-9]$/.test(e.key)) {
@@ -241,6 +316,7 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     return;
   }
+  if (e.key === 'g') { gpOpen(); e.preventDefault(); return; }
   if (e.key === '/' && q && !q.classList.contains('q-off')) { q.focus(); e.preventDefault(); return; }
   if (e.key === 'r') { vscode.postMessage({ type: 'cmd', cmd: 'refresh', key: '' }); return; }
   if (e.key === '?') { root.querySelector('.keys')?.scrollIntoView({ block: 'end' }); return; }

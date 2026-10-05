@@ -38,6 +38,11 @@ export class WorkspacePanel implements vscode.Disposable {
     return !!this.panel?.visible;
   }
 
+  /** Whether this panel is the focused editor (the "Go to screen" command navigates that one). */
+  get active(): boolean {
+    return !!this.panel?.active;
+  }
+
   /** Called when the panel shows, hides or closes. */
   onVisibility?: () => void;
 
