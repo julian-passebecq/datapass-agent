@@ -298,6 +298,15 @@ export class SessionStore {
   }
 }
 
+/** Longest time a visible view keeps a page built from an unchanged store (relative times, refresh line). */
+export const VIEW_STALE_MS = 60_000;
+
+/** Whether a view should rebuild after a store notification: the projection moved (`version`), a feed landed, or the
+ *  page is older than VIEW_STALE_MS. An idle refresh (nothing changed) therefore builds no page. */
+export function viewNeedsRender(v: { version: number; renderedVersion: number; renderedAt: number; feedPending: boolean; now: number }): boolean {
+  return v.feedPending || v.version !== v.renderedVersion || v.now - v.renderedAt >= VIEW_STALE_MS;
+}
+
 /** Accumulator projection plus derived status (no git fields). */
 function baseSnapshot(acc: SessionAccumulator, st: { status: AgentSessionSnapshot['status']; reason: string }): AgentSessionSnapshot {
   const s = acc.toSnapshot();
