@@ -6,6 +6,7 @@ import { Feed, FeedCtx, feedValue } from './feeds';
 import { esc } from '../html';
 import { ago, bytes, kpi, prettyModel, repoOf, WsData, WsState } from '../workspace';
 import { isLive } from '../../activity/insights';
+import { modeChip, modeFacts } from './live';
 import { normalizeCase } from '../../util/paths';
 import {
   ClaudeLayer,
@@ -122,8 +123,21 @@ function observed(sc: Scope): string {
     const top = sc.sessions.filter(s => !s.isWorker && s.provider === p);
     if (!top.length) continue;
     const uniq = (xs: (string | undefined)[]) => [...new Set(xs.filter((x): x is string => !!x))].slice(0, 3);
-    const txt = [uniq(top.map(s => prettyModel(s.model))).join(', '), uniq(top.map(s => s.effort)).join('/'), uniq(top.map(s => s.facts?.permissionMode)).join('/')].filter(Boolean).join(' · ');
-    if (txt) parts.push(`<span class="cfg-seen ${p}" title="${esc(`OBSERVED in ${top.length} ${p === 'claude' ? 'Claude Code transcript(s)' : 'Codex rollout(s)'} of this repo (loaded window)`)}">${esc(txt)}</span>`);
+    const facts = top.flatMap(s => modeFacts(s)).filter(x => x.field !== 'sandbox');
+    const modes = (['permissionMode', 'approvalPolicy', 'collaborationMode'] as const)
+      .map(f => {
+        const xs = facts.filter(x => x.field === f);
+        const vals = uniq(xs.map(x => x.value));
+        return vals.length ? `${xs[0].label} ${vals.join('/')}` : '';
+      })
+      .filter(Boolean);
+    const txt = [uniq(top.map(s => prettyModel(s.model))).join(', '), uniq(top.map(s => s.effort)).join('/'), ...modes].filter(Boolean).join(' · ');
+    const kinds = new Set(facts.map(x => x.kind));
+    const kind = kinds.has('UNKNOWN') ? 'UNKNOWN' : kinds.has('INFERRED') ? 'INFERRED' : kinds.has('DERIVED') ? 'DERIVED' : 'OBSERVED';
+    const chip = modes.length
+      ? modeChip(kind, p === 'claude' ? 'transcript permissionMode (latest per session)' : 'rollout turn_context approval_policy / collaboration_mode (latest per session)')
+      : modeChip('UNKNOWN', p === 'claude' ? 'no permissionMode recorded in these transcripts' : 'no approval policy / collaboration mode recorded in these rollouts');
+    if (txt) parts.push(`<span class="cfg-seen ${p}" title="${esc(`OBSERVED in ${top.length} ${p === 'claude' ? 'Claude Code transcript(s)' : 'Codex rollout(s)'} of this repo (loaded window)`)}">${esc(txt)}${chip}</span>`);
   }
   return parts.length ? parts.join(' ') : '<span class="muted">—</span>';
 }

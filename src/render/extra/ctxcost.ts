@@ -5,9 +5,10 @@
 import {
   BIG_RESULT_TOKENS, CtxGroup, ctxCost, CtxMetric, CtxRow, fmt, logAxis, logPos, metricChars, sortRows, timesSmallest, tip, tokensOf,
 } from '../../activity/ctxcost';
-import { isPeriod, Period } from '../../activity/explore';
+import { inPeriod, isPeriod, Period } from '../../activity/explore';
 import { identityColor } from '../../activity/insights';
 import { DEFAULT_WINDOW } from '../../activity/health';
+import type { AgentSessionSnapshot } from '../../model';
 import { esc } from '../html';
 import type { WsData, WsState } from '../workspace';
 import { kpi, repoOf } from '../workspace';
@@ -117,6 +118,112 @@ function table(rows: CtxRow[], c: Cfg): string {
   return h + '</tbody></table>';
 }
 
+// ---------------------------------------------------------------- provider token facts (shared with Health)
+
+type Kind = 'OBSERVED' | 'DERIVED' | 'INFERRED' | 'UNKNOWN';
+
+/** One provider token / compaction fact summed over sessions, with its evidence kind and basis. */
+export interface TokenFact {
+  value?: number;
+  /** Sessions that record the field. */
+  sessions: number;
+  kind: Kind;
+  basis: string;
+}
+
+export interface TokenFacts {
+  sessions: number;
+  /** Compactions: count (facts.compactions, or the recorded compact list when larger) and the latest compact record. */
+  compacts: TokenFact;
+  lastCompact?: { at: number; trigger?: string; preTokens?: number; postTokens?: number; window?: number };
+  lastCompactKind: Kind;
+  cacheRead: TokenFact;
+  cacheWrite: TokenFact;
+  reasoning: TokenFact;
+}
+
+/** Cache reads are OBSERVED when the provider adapter recorded its usage fields as read; otherwise DERIVED. */
+function cacheReadKind(s: AgentSessionSnapshot): Kind {
+  const ev = s.evidence ?? [];
+  if (ev.some(e => e.field === 'usage.fields' && e.kind === 'OBSERVED')) return 'OBSERVED';
+  if (s.provider === 'codex' && ev.some(e => e.field === 'usage' && e.kind === 'OBSERVED')) return 'OBSERVED';
+  return 'DERIVED';
+}
+
+/**
+ * Compactions, prompt-cache reads / writes and reasoning output tokens over a set of sessions, as the providers record
+ * them. Pure. A field no session records stays UNKNOWN (value undefined), never 0.
+ */
+export function tokenFacts(sessions: AgentSessionSnapshot[]): TokenFacts {
+  let compacts = 0, compactSessions = 0, read = 0, readN = 0, readDerived = false, write = 0, writeN = 0, reas = 0, reasN = 0;
+  let last: TokenFacts['lastCompact'];
+  for (const s of sessions) {
+    const list = s.facts?.compacts ?? [];
+    const n = Math.max(s.facts?.compactions ?? 0, list.length);
+    if (s.facts?.compactions !== undefined || list.length) compactSessions++;
+    compacts += n;
+    for (const c of list) if (!last || c.at > last.at) last = { at: c.at, trigger: c.trigger, preTokens: c.preTokens, postTokens: c.postTokens, window: c.window };
+    const u = s.usage;
+    if (!u) continue;
+    if (typeof u.cachedInputTokens === 'number') {
+      read += u.cachedInputTokens;
+      readN++;
+      if (cacheReadKind(s) !== 'OBSERVED') readDerived = true;
+    }
+    if (typeof u.cacheCreationInputTokens === 'number') {
+      write += u.cacheCreationInputTokens;
+      writeN++;
+    }
+    if (typeof u.reasoningOutputTokens === 'number') {
+      reas += u.reasoningOutputTokens;
+      reasN++;
+    }
+  }
+  const fact = (v: number, n: number, kind: Kind, basis: string, none: string): TokenFact =>
+    n ? { value: v, sessions: n, kind, basis } : { sessions: 0, kind: 'UNKNOWN', basis: none };
+  return {
+    sessions: sessions.length,
+    compacts: fact(compacts, compactSessions, 'OBSERVED', 'compaction records (Claude compact_boundary, Codex compacted) summed over sessions', 'no compaction record in these sessions'),
+    lastCompact: last,
+    lastCompactKind: last ? 'OBSERVED' : 'UNKNOWN',
+    cacheRead: fact(read, readN, readDerived ? 'DERIVED' : 'OBSERVED', readDerived ? 'cache reads summed from usage records the adapter did not mark as read field by field' : 'Claude cache_read_input_tokens / Codex cached_input_tokens as recorded, summed over sessions', 'no usage recorded'),
+    cacheWrite: fact(write, writeN, 'OBSERVED', 'Claude cache_creation_input_tokens / Codex cache_write_input_tokens as recorded, summed over sessions that record it', 'no session records cache writes'),
+    reasoning: fact(reas, reasN, 'OBSERVED', 'Codex reasoning_output_tokens as recorded (part of output tokens), summed over sessions that record it', 'no session records reasoning output tokens (Claude Code does not)'),
+  };
+}
+
+function factChip(kind: Kind, basis: string): string {
+  return `<span class="chip ev ${esc(kind)}" title="${esc(`${kind}: ${basis}`)}">${esc(kind)}</span>`;
+}
+
+function agoText(now: number, t: number): string {
+  const m = Math.max(0, Math.round((now - t) / 60_000));
+  return m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
+}
+
+/** A strip of small facts: compactions (count, latest), cache read / write, reasoning tokens, each with its evidence chip. */
+export function tokenFactsStrip(f: TokenFacts, now: number, cls = 'tf'): string {
+  const v = (x: TokenFact) => (x.value === undefined ? '—' : fmt(x.value));
+  const of = (x: TokenFact) => (x.sessions && x.sessions < f.sessions ? ` <span class="muted">(${x.sessions}/${f.sessions} sessions)</span>` : '');
+  const lc = f.lastCompact;
+  const lcText = lc
+    ? `${agoText(now, lc.at)}${lc.trigger ? ` · ${lc.trigger}` : ''}${lc.preTokens !== undefined ? ` · ${fmt(lc.preTokens)}→${lc.postTokens !== undefined ? fmt(lc.postTokens) : '?'}` : ''}${lc.window !== undefined ? ` · window ${lc.window}` : ''}`
+    : '—';
+  const item = (label: string, value: string, chip: string, extra = '') => `<span class="${cls}-i"><span class="muted">${esc(label)}</span> <b>${esc(value)}</b>${extra}${chip}</span>`;
+  return `<div class="${cls}" data-facts="tokens">${[
+    item('Compactions', f.compacts.value === undefined ? '—' : String(f.compacts.value), factChip(f.compacts.kind, f.compacts.basis), of(f.compacts)),
+    item('Last compact', lcText, factChip(f.lastCompactKind, lc ? `latest recorded compact record${lc.trigger ? ' (trigger, pre → post tokens)' : ''}` : 'no compact record with a time (only a count, or none)')),
+    item('Cache read', v(f.cacheRead), factChip(f.cacheRead.kind, f.cacheRead.basis), of(f.cacheRead)),
+    item('Cache write', v(f.cacheWrite), factChip(f.cacheWrite.kind, f.cacheWrite.basis), of(f.cacheWrite)),
+    item('Reasoning out', v(f.reasoning), factChip(f.reasoning.kind, f.reasoning.basis), of(f.reasoning)),
+  ].join('')}</div>`;
+}
+
+export const TOKEN_FACTS_CSS = (cls: string) => `
+.${cls} { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 11px; margin: 4px 0 8px; }
+.${cls}-i { white-space: nowrap; }
+`;
+
 export function renderCtxCost(d: WsData, st: WsState): string {
   const c = cfg(d, st);
   const res = ctxCost(d.sessions, { period: c.period, now: d.now, group: c.group, repoOf });
@@ -132,6 +239,8 @@ export function renderCtxCost(d: WsData, st: WsState): string {
   const largest = rows.length ? sortRows(rows, 'p50')[0] : undefined;
   h += `<div class="kpis">${kpi(`≈${fmt(tokensOf(res.totalChars))}`, 'Tool-result tokens', '', `INFERRED ${T_TOK}; ${res.totalChars.toLocaleString()} characters OBSERVED`)}${kpi(res.totalCalls.toLocaleString(), 'Tool results', '', 'OBSERVED: tool_result / function_call_output records in the period')}${kpi(rows.length, c.group === 'repo' ? 'Repos' : 'Tools')}${largest?.p50Chars ? kpi(`≈${fmt(tokensOf(largest.p50Chars))}`, `Largest median · ${largest.label}`, '', `DERIVED · ${T_SAMPLES}`) : ''}</div>`;
   h += `<div class="cc-note muted">Bars: ${esc(METRIC_LABEL[c.metric])} on a log scale ${ev('OBSERVED', 'character length of the text of each tool_result (Claude) / function_call_output (Codex); content never kept; image results count as calls with no size (their token cost is not chars / 4)')} ${ev('DERIVED', T_SAMPLES)} ${ev('INFERRED', T_TOK)}${res.withoutData ? ` · ${res.withoutData} of ${res.sessions} session${res.sessions > 1 ? 's' : ''} in the period carry no tool-result size ${ev('UNKNOWN', 'no tool result recorded, or loaded before this field existed')}` : ''}${res.partial ? ' · some totals are partial (sessions that started before the period with more than 200 results per tool)' : ''}.</div>`;
+  h += `<h3>Prompt cache, reasoning and compactions <span class="muted cc-sub">sessions active in the period, as the providers record them</span></h3>`;
+  h += tokenFactsStrip(tokenFacts(inPeriod(d.sessions, { period: c.period, now: d.now })), d.now, 'cc-tf');
   h += chart(shown, c);
   if (rows.length > shown.length) h += `<div class="cc-note muted">+${rows.length - shown.length} more not shown (smallest).</div>`;
   const tips = shown.map(r => [r, tip(r, c.window)] as const).filter(([, t]) => t).slice(0, 6);
@@ -140,7 +249,7 @@ export function renderCtxCost(d: WsData, st: WsState): string {
   return h + '</div>';
 }
 
-const CSS = `
+const CSS = TOKEN_FACTS_CSS('cc-tf') + `
 .cc h3 { font-size: 12px; margin: 12px 0 4px; }
 .cc-sub { font-weight: normal; font-size: 11px; }
 .cc-note { font-size: 11px; margin: 4px 0 8px; }
