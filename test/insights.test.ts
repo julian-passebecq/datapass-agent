@@ -93,6 +93,21 @@ test('stages, outcome and flow are factual', () => {
   const total = (stage: number) => f.links.filter(l => l.stage === stage).reduce((a, l) => a + l.value, 0);
   assert.equal(total(0), 2, 'workers excluded');
   assert.equal(total(1), 2);
+  assert.equal(total(2), 2, 'verification column covers every session');
+  assert.deepEqual(f.verifs, ['fail', 'none']);
+});
+
+test('flow drill-down: picking a node lists only matching sessions', () => {
+  const a = mk({ key: 'claude:a', title: 'alpha-one', tests: [{ command: 'npm test', at: NOW, outcome: 'PASS', source: 'provider-exit-code' }] });
+  const b = mk({ key: 'codex:b', title: 'beta-two' });
+  const d: WsData = { sessions: [a, b], providers: [], events: [], now: NOW, ternAvailable: false };
+  const all = renderWorkspace(d, { view: 'flow' });
+  assert.ok(all.includes('alpha-one') && all.includes('beta-two'));
+  const f = flow([a, b]);
+  const i = f.verifs.indexOf('pass');
+  const one = renderWorkspace(d, { view: 'flow', opts: { 'flow.pick': 'c3-' + i } });
+  assert.ok(one.includes('alpha-one') && !one.includes('beta-two'), 'table filtered');
+  assert.ok(one.includes('last test passed · 1 sessions'));
 });
 
 test('hourly heatmap ignores turn/tool chatter; identity colors are stable', () => {

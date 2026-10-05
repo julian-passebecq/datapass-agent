@@ -2,7 +2,7 @@
 // Pure string rendering from snapshots; every value is escaped here.
 import { AgentSessionSnapshot, ProviderState, SourceState, TimelineEvent } from '../model';
 import { duration, weekly } from '../activity/activity';
-import { attention, AttentionItem, base, compact, dayStart, flow, hourly, identityColor, isLive, outcome, Outcome, OUTCOME_LABEL, stages, usageSince, workerRole } from '../activity/insights';
+import { attention, AttentionItem, base, compact, dayStart, flow, hourly, identityColor, isLive, outcome, Outcome, OUTCOME_LABEL, stages, usageSince, verification, Verification, VERIFY_LABEL, workerRole } from '../activity/insights';
 import { esc } from './html';
 import { EXTRA_VIEWS } from './extra';
 import { hhmm, statusText } from './views';
@@ -35,6 +35,8 @@ export interface WsData {
   git?: { enabled: boolean; lastMs?: number; at?: number };
   /** Lazy access to the store's event history for screens that need more than `events`. */
   timeline?: (key?: string, limit?: number) => TimelineEvent[];
+  /** Last refresh pass, for the status strip (host-measured). */
+  stats?: { refreshMs: number; gitMs: number; bytesRead: number; artifacts: number; heapMB: number; at: number };
 }
 
 /** All collectors, providers first, then git. */
@@ -213,14 +215,19 @@ function nested(k: AgentSessionSnapshot, d: WsData): string {
 
 const OUT_COLOR: Record<Outcome, string> = { live: 'var(--ok)', committed: 'var(--accent)', changed: 'var(--warn)', nochange: 'var(--quiet)' };
 
-function flowView(d: WsData): string {
+const VER_COLOR: Record<Verification, string> = { pass: 'var(--ok)', fail: 'var(--bad)', none: 'var(--quiet)' };
+
+/** Sankey provider → repo → outcome → verification. Clicking a node or band filters the table below (flow.pick = "c<col>-<i>" or "l<stage>-<i>-<j>"). */
+function flowView(d: WsData, st: WsState): string {
   const f = flow(d.sessions);
-  const total = d.sessions.filter(s => !s.isWorker).length;
+  const top = d.sessions.filter(s => !s.isWorker);
+  const total = top.length;
   if (!total) return `<div class="empty">No sessions in the loaded history.</div>`;
+  const cols: string[][] = [f.providers, f.repos, f.outcomes, f.verifs];
   const W = 1000, H = Math.max(260, Math.min(560, 40 + f.repos.length * 46)), nodeW = 12, gap = 10;
-  const cols = [f.providers, f.repos, f.outcomes as string[]];
-  const xs = [150, 470, 790];
-  const val = (col: number, n: string) => f.links.filter(l => (col === 0 ? l.stage === 0 && l.from === n : l.stage === col - 1 && l.to === n)).reduce((a, l) => a + l.value, 0);
+  const xs = [120, 390, 650, 880];
+  const keyOf = (ci: number, s: AgentSessionSnapshot) => (ci === 0 ? s.provider : ci === 1 ? f.repoOf(s) : ci === 2 ? outcome(s) : verification(s));
+  const val = (col: number, n: string) => top.filter(s => keyOf(col, s) === n).length;
   const scale = (H - 20 - gap * Math.max(...cols.map(c => c.length))) / total;
   const pos = new Map<string, { x: number; y: number; h: number; out: number; in: number }>();
   cols.forEach((c, ci) => {
@@ -231,29 +238,46 @@ function flowView(d: WsData): string {
       y += h + gap;
     }
   });
+  const pick = st.opts?.['flow.pick'] ?? '';
+  let match: (s: AgentSessionSnapshot) => boolean = () => true;
+  let pickLabel = '';
+  const lab = (ci: number, n: string) => (ci === 0 ? PROV[n] : ci === 2 ? OUTCOME_LABEL[n as Outcome] : ci === 3 ? VERIFY_LABEL[n as Verification] : n);
+  const mc = /^c(\d)-(\d+)$/.exec(pick), ml = /^l(\d)-(\d+)-(\d+)$/.exec(pick);
+  if (mc && cols[+mc[1]]?.[+mc[2]] !== undefined) {
+    const ci = +mc[1], n = cols[ci][+mc[2]];
+    match = s => keyOf(ci, s) === n;
+    pickLabel = lab(ci, n);
+  } else if (ml && cols[+ml[1]]?.[+ml[2]] !== undefined && cols[+ml[1] + 1]?.[+ml[3]] !== undefined) {
+    const ci = +ml[1], n1 = cols[ci][+ml[2]], n2 = cols[ci + 1][+ml[3]];
+    match = s => keyOf(ci, s) === n1 && keyOf(ci + 1, s) === n2;
+    pickLabel = `${lab(ci, n1)} → ${lab(ci + 1, n2)}`;
+  }
+  const colorOf = (ci: number, n: string) => (ci === 0 ? (n === 'claude' ? 'var(--claude)' : 'var(--codex)') : ci === 1 ? identityColor(n) : ci === 2 ? OUT_COLOR[n as Outcome] : VER_COLOR[n as Verification]);
   let paths = '', nodes = '';
   for (const l of f.links) {
-    const fromCol = l.stage;
-    const a = pos.get(`${fromCol}:${l.from}`), b = pos.get(`${fromCol + 1}:${l.to}`);
+    const ci = l.stage;
+    const a = pos.get(`${ci}:${l.from}`), b = pos.get(`${ci + 1}:${l.to}`);
     if (!a || !b) continue;
     const w = Math.max(1, l.value * scale);
     const y1 = a.y + a.out + w / 2, y2 = b.y + b.in + w / 2;
     a.out += w;
     b.in += w;
     const x1 = a.x + nodeW, x2 = b.x, mx = (x1 + x2) / 2;
-    const color = fromCol === 0 ? identityColor(l.to) : OUT_COLOR[l.to as Outcome];
-    paths += `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" stroke="${color}" stroke-width="${w.toFixed(1)}" fill="none" opacity=".45"><title>${esc(`${l.from} → ${fromCol === 0 ? l.to : OUTCOME_LABEL[l.to as Outcome]}: ${l.value}`)}</title></path>`;
+    const id = `l${ci}-${cols[ci].indexOf(l.from)}-${cols[ci + 1].indexOf(l.to)}`;
+    paths += `<path class="fl${pick === id ? ' on' : ''}" data-opt="flow.pick" data-val="${pick === id ? '' : id}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" stroke="${colorOf(ci + 1, l.to)}" stroke-width="${w.toFixed(1)}" fill="none"><title>${esc(`${lab(ci, l.from)} → ${lab(ci + 1, l.to)}: ${l.value} · click to list`)}</title></path>`;
   }
   cols.forEach((c, ci) => {
-    for (const n of c) {
+    c.forEach((n, i) => {
       const p = pos.get(`${ci}:${n}`)!;
-      const fill = ci === 0 ? (n === 'claude' ? 'var(--claude)' : 'var(--codex)') : ci === 1 ? identityColor(n) : OUT_COLOR[n as Outcome];
-      const label = ci === 0 ? PROV[n] : ci === 2 ? OUTCOME_LABEL[n as Outcome] : n;
+      const id = `c${ci}-${i}`;
       const tx = ci === 0 ? p.x - 6 : p.x + nodeW + 6;
-      nodes += `<rect x="${p.x}" y="${p.y}" width="${nodeW}" height="${p.h}" rx="3" fill="${fill}"/><text class="halo" x="${tx}" y="${p.y + p.h / 2 + 4}" text-anchor="${ci === 0 ? 'end' : 'start'}">${esc(label)} <tspan class="muted">${val(ci, n)}</tspan></text>`;
-    }
+      nodes += `<g class="fn${pick === id ? ' on' : ''}" data-opt="flow.pick" data-val="${pick === id ? '' : id}"><rect x="${p.x}" y="${p.y}" width="${nodeW}" height="${p.h}" rx="3" fill="${colorOf(ci, n)}"/><text class="halo" x="${tx}" y="${p.y + p.h / 2 + 4}" text-anchor="${ci === 0 ? 'end' : 'start'}">${esc(lab(ci, n))} <tspan class="muted">${val(ci, n)}</tspan></text><title>${esc(lab(ci, n))}: click to list</title></g>`;
+    });
   });
-  return `<svg class="flow" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMin meet">${paths}${nodes}</svg><div class="foot">${total} top-level sessions. Outcome is factual: live, commit observed in the session window, files edited without a commit, or no file change observed. "No commit" is not a failure.</div>`;
+  const heads = ['Provider', 'Repository', 'Outcome', 'Verification'].map((h, i) => `<text class="fh" x="${xs[i] + (i === 0 ? nodeW : 0)}" y="8" text-anchor="${i === 0 ? 'end' : 'start'}">${h}</text>`).join('');
+  const rows = top.filter(match).sort((x, y) => (y.lastActivityAt ?? 0) - (x.lastActivityAt ?? 0)).slice(0, 200);
+  const table = `<h2>${pick ? `${esc(pickLabel)} · ${top.filter(match).length} sessions <button class="link" data-opt="flow.pick" data-val="">clear</button>` : `All sessions · click a node or band to filter`}</h2><table class="ft"><thead><tr><th>Session</th><th>Provider</th><th>Repository</th><th>Outcome</th><th>Verification</th><th>Last activity</th></tr></thead><tbody>${rows.map(s => `<tr data-select="${esc(s.key)}" class="${s.key === st.selected ? 'sel' : ''}"><td>${esc(titleOf(s))}</td><td>${esc(PROV[s.provider])}</td><td>${esc(f.repoOf(s))}</td><td>${esc(OUTCOME_LABEL[outcome(s)])}</td><td><span class="sd" style="background:${VER_COLOR[verification(s)]}"></span> ${esc(VERIFY_LABEL[verification(s)])}</td><td>${esc(ago(d.now, s.lastActivityAt))}</td></tr>`).join('')}</tbody></table>`;
+  return `<svg class="flow" viewBox="0 -6 ${W} ${H + 6}" preserveAspectRatio="xMidYMin meet">${heads}${paths}${nodes}</svg><div class="foot">${total} top-level sessions. Outcome is factual: live, commit observed in the session window, files edited without a commit, or no file change observed. Verification is the session's last observed test command. "No commit" is not a failure.</div>${table}`;
 }
 
 function worktrees(d: WsData, st: WsState): string {
@@ -443,6 +467,17 @@ function collectorSummary(d: WsData): string {
   return `<button class="link cs" data-nav="providers" title="Collectors">${parts.map(([k, c]) => `<span class="sd ${k}"></span>${c} ${k}`).join(' · ')}</button>`;
 }
 
+/** Bottom strip: refresh cost and a ticker of repositories with live sessions (status dot per session). */
+export function statusStrip(d: WsData): string {
+  const live = d.sessions.filter(s => isLive(s));
+  const byRepo = new Map<string, AgentSessionSnapshot[]>();
+  for (const s of live) byRepo.set(repoOf(s), [...(byRepo.get(repoOf(s)) ?? []), s]);
+  const ticker = [...byRepo].sort((a, b) => b[1].length - a[1].length).map(([r, ss]) => `<span class="tk" title="${esc(`${r}: ${ss.length} live (${ss.filter(x => x.isWorker).length} workers)`)}"><span class="sw" style="background:${identityColor(r)}"></span>${esc(r)} ${ss.map(x => `<span class="sd ${x.status}" title="${esc(`${titleOf(x)} · ${statusText(x)}`)}"></span>`).join('')}</span>`).join('');
+  const st = d.stats;
+  const cost = st ? `<span title="Last refresh pass (DERIVED, host-measured)">refresh ${st.refreshMs} ms · git ${st.gitMs} ms · read ${bytes(st.bytesRead)} of ${st.artifacts} artifacts · heap ${st.heapMB} MB · ${hhmm(st.at)}</span>` : '';
+  return `<footer class="strip"><span class="tkr">${live.length ? `<b>${live.length} live</b> ${ticker}` : '<span class="muted">nothing live</span>'}</span><span class="muted">${cost}</span></footer>`;
+}
+
 export function renderWorkspace(d0: WsData, st0: WsState): string {
   let st = st0;
   const d = scoped(d0, st0.opts?.scope);
@@ -461,12 +496,12 @@ export function renderWorkspace(d0: WsData, st0: WsState): string {
   const groups = ['Now', 'Sessions', 'Time', 'Git', 'Usage', 'Quality', 'System'].map(g => [g, EXTRA_VIEWS.filter(x => x.group === g)] as const).filter(([, xs]) => xs.length);
   const rail = `<nav class="rail"><div class="brand">Agent <button class="link" data-cmd="openWorkspaceNewTab" title="Open another Agent tab (own screen and scope)">+ tab</button></div>${WS_VIEWS.map(navBtn).join('')}${groups.map(([g, xs]) => `<div class="railg">${esc(g)}</div>${xs.map(x => navBtn(x.id)).join('')}`).join('')}<div class="railfoot">${d.providers.map(p => `<div><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span> ${esc(PROV[p.provider])} ${esc(p.version ?? '')}</div>`).join('')}${collectorSummary(d)}<div class="muted">local · read-only</div></div></nav>`;
   const body: Record<string, () => string> = {
-    overview: () => overview(d, st), attention: () => attentionView(d, st), board: () => board(d, st), team: () => team(d, st), flow: () => flowView(d), worktrees: () => worktrees(d, st), gantt: () => gantt(d, st), verify: () => verify(d, st), activity: () => activity(d), providers: () => providersView(d, st),
+    overview: () => overview(d, st), attention: () => attentionView(d, st), board: () => board(d, st), team: () => team(d, st), flow: () => flowView(d, st), worktrees: () => worktrees(d, st), gantt: () => gantt(d, st), verify: () => verify(d, st), activity: () => activity(d), providers: () => providersView(d, st),
   };
   for (const x of EXTRA_VIEWS) body[x.id] = () => x.render(d, st);
   if (!body[st.view]) st = { ...st, view: 'overview' };
   const keys = `<div class="keys"><b>1–0</b> screens <b>j/k</b> move <b>Enter</b> inspect <b>/</b> filter <b>Esc</b> clear <b>r</b> refresh <b>?</b> keys</div>`;
-  const main = `<main class="mainw"><header class="mh"><h1>${esc(label(st.view))}</h1>${st.opts?.scope ? `<button class="link scope" data-opt="scope" data-val="" title="Clear scope">scope: ${esc(st.opts.scope)} ✕</button>` : ""}<span class="muted">${esc(hint(st.view))}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}${keys}</main>`;
+  const main = `<main class="mainw"><header class="mh"><h1>${esc(label(st.view))}</h1>${st.opts?.scope ? `<button class="link scope" data-opt="scope" data-val="" title="Clear scope">scope: ${esc(st.opts.scope)} ✕</button>` : ""}<span class="muted">${esc(hint(st.view))}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}${keys}${statusStrip(d)}</main>`;
   return `<div class="ws">${rail}${main}<aside class="side">${side(d, st.selected)}</aside></div>`;
 }
 

@@ -76,15 +76,23 @@ export function outcome(s: AgentSessionSnapshot): Outcome {
 }
 
 export interface FlowLink {
-  /** 0: provider → repo, 1: repo → outcome. */
-  stage: 0 | 1;
+  /** 0: provider → repo, 1: repo → outcome, 2: outcome → verification. */
+  stage: 0 | 1 | 2;
   from: string;
   to: string;
   value: number;
 }
 
-/** provider → repository → outcome, for top-level sessions. */
-export function flow(sessions: AgentSessionSnapshot[], maxRepos = 8): { providers: string[]; repos: string[]; outcomes: Outcome[]; links: FlowLink[] } {
+export type Verification = 'pass' | 'fail' | 'none';
+export const VERIFY_LABEL: Record<Verification, string> = { pass: 'last test passed', fail: 'last test failed', none: 'no test observed' };
+/** Last observed test of a session (and its workers' are not merged: per session). */
+export function verification(s: AgentSessionSnapshot): Verification {
+  const t = s.tests[s.tests.length - 1];
+  return !t ? 'none' : t.outcome === 'PASS' ? 'pass' : t.outcome === 'FAIL' ? 'fail' : 'none';
+}
+
+/** provider → repository → outcome → verification, for top-level sessions. */
+export function flow(sessions: AgentSessionSnapshot[], maxRepos = 8): { providers: string[]; repos: string[]; outcomes: Outcome[]; verifs: Verification[]; links: FlowLink[]; repoOf: (s: AgentSessionSnapshot) => string } {
   const top = sessions.filter(s => !s.isWorker);
   const repoName = (s: AgentSessionSnapshot) => base(s.repository) || base(s.cwd) || '(no repo)';
   const counts = new Map<string, number>();
@@ -92,17 +100,18 @@ export function flow(sessions: AgentSessionSnapshot[], maxRepos = 8): { provider
   const keep = new Set([...counts].sort((a, b) => b[1] - a[1]).slice(0, maxRepos).map(([r]) => r));
   const name = (s: AgentSessionSnapshot) => (keep.has(repoName(s)) ? repoName(s) : 'other repos');
   const add = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
-  const a = new Map<string, number>(), b = new Map<string, number>();
+  const a = new Map<string, number>(), b = new Map<string, number>(), c = new Map<string, number>();
   for (const s of top) {
     add(a, `${s.provider}\u0000${name(s)}`);
     add(b, `${name(s)}\u0000${outcome(s)}`);
+    add(c, `${outcome(s)}\u0000${verification(s)}`);
   }
-  const links: FlowLink[] = [...[...a].map(e => [0, ...e] as const), ...[...b].map(e => [1, ...e] as const)].map(([stage, k, value]) => {
+  const links: FlowLink[] = [...[...a].map(e => [0, ...e] as const), ...[...b].map(e => [1, ...e] as const), ...[...c].map(e => [2, ...e] as const)].map(([stage, k, value]) => {
     const [from, to] = k.split('\u0000');
     return { stage, from, to, value };
   });
   const repos = [...new Set(top.map(name))].sort((x, y) => (x === 'other repos' ? 1 : y === 'other repos' ? -1 : (counts.get(y) ?? 0) - (counts.get(x) ?? 0)));
-  return { providers: [...new Set(top.map(s => s.provider))].sort(), repos, outcomes: (['live', 'committed', 'changed', 'nochange'] as Outcome[]).filter(o => top.some(s => outcome(s) === o)), links };
+  return { providers: [...new Set(top.map(s => s.provider))].sort(), repos, outcomes: (['live', 'committed', 'changed', 'nochange'] as Outcome[]).filter(o => top.some(s => outcome(s) === o)), verifs: (['pass', 'fail', 'none'] as Verification[]).filter(v => top.some(s => verification(s) === v)), links, repoOf: name };
 }
 
 /** Observed (non-noise) events per local hour for the last `days` days. rows[0] = oldest day. */
