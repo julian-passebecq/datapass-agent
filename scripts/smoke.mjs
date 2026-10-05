@@ -8,7 +8,7 @@ import os from 'os';
 import path from 'path';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
-const vsix = path.join(root, 'agent-vscode-0.6.0.vsix');
+const vsix = path.join(root, `agent-vscode-${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}.vsix`);
 const shots = path.resolve(process.argv[2] ?? path.join(root, '.smoke', 'screenshots'));
 const codeDir = process.env.VSCODE_DIR ?? path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Microsoft VS Code');
 const codeExe = path.join(codeDir, process.platform === 'win32' ? 'Code.exe' : 'code');

@@ -2,7 +2,7 @@
   "name": "agent-vscode",
   "displayName": "Agent",
   "description": "Local observer for Claude Code and Codex sessions: what is running, where, and what changed.",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "publisher": "juliandatapass",
   "private": true,
   "license": "UNLICENSED",
@@ -326,10 +326,22 @@
         "agent.roles.patterns": {
           "type": "array",
           "default": [
-            { "match": "^PM\\b|\\bPM\\b", "role": "PM" },
-            { "match": "coordinat", "role": "coordinator" },
-            { "match": "architect", "role": "architect" },
-            { "match": "review", "role": "reviewer" }
+            {
+              "match": "^PM\\b|\\bPM\\b",
+              "role": "PM"
+            },
+            {
+              "match": "coordinat",
+              "role": "coordinator"
+            },
+            {
+              "match": "architect",
+              "role": "architect"
+            },
+            {
+              "match": "review",
+              "role": "reviewer"
+            }
           ],
           "items": {
             "type": "object",
@@ -449,7 +461,10 @@
         "agent.dispatch.pricePerMTok": {
           "type": "object",
           "default": {},
-          "additionalProperties": { "type": "number", "minimum": 0 },
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          },
           "description": "Dispatches screen: optional price per million tokens by model id (e.g. {\"claude-opus-5-5\": 1.5}). Agent never prices tokens by itself; any $ shown is DERIVED from this setting (tokens incl. cache reads x your price). Empty = no money shown."
         },
         "agent.pipelines.enabled": {
@@ -536,7 +551,7 @@
     "build": "node scripts/build.mjs",
     "compile-tests": "tsc -p tsconfig.test.json",
     "test": "npm run compile-tests && node --test \"out-test/test/*.test.js\"",
-    "package": "npm run build && vsce package --no-dependencies --out agent-vscode-0.6.0.vsix",
+    "package": "npm run build && vsce package --no-dependencies",
     "smoke": "node scripts/smoke.mjs",
     "perf": "npm run compile-tests && node out-test/scripts/perf.js",
     "weekly": "npm run compile-tests && node out-test/scripts/weekly.js",

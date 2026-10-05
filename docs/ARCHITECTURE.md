@@ -1,4 +1,4 @@
-# Agent architecture (0.6.0)
+# Agent architecture (0.7.0)
 
 Agent is a local, read-only observer of Claude Code and Codex sessions inside VS Code. It holds no state of its own that matters: everything on screen is rebuilt from provider artifacts, git, and (opt-in) CI APIs. This page describes the data path, where each outside source enters, who is the authority for what, and the evidence, performance and security models.
 
