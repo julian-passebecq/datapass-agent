@@ -63,3 +63,14 @@ test('resolveExe returns an absolute path for git and caches it', () => {
   assert.equal(resolveExe('git'), g);
   assert.equal(resolveExe('definitely-not-a-tool-xyz'), undefined);
 });
+
+test('findExe resolves an npm .cmd shim to the native exe of a known package (Windows)', () => {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-npm-'));
+  fs.writeFileSync(path.join(bin, 'codex.cmd'), '@echo off\n');
+  assert.equal(findExe('codex', bin, 'win32'), undefined, 'shim alone is never run');
+  const dir = path.join(bin, 'node_modules', '@openai', 'codex', 'node_modules', '@openai', 'codex-win32-x64', 'vendor', 'x86_64-pc-windows-msvc', 'bin');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'codex.exe'), '');
+  assert.equal(findExe('codex', bin, 'win32'), path.win32.join(bin, 'node_modules', '@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe'));
+  assert.equal(findExe('gh', bin, 'win32'), undefined, 'only listed packages');
+});

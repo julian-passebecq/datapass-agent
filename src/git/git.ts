@@ -37,9 +37,25 @@ export function findExe(name: string, pathVar: string | undefined, platform: Nod
         /* not here */
       }
     }
+    // npm global installs put a `name.cmd` shim next to node_modules; the package ships a native exe we can run directly.
+    if (win && NPM_NATIVE[name] && fs.existsSync(p.join(dir, name + '.cmd'))) {
+      for (const rel of NPM_NATIVE[name]) {
+        const f = p.join(dir, 'node_modules', rel);
+        try {
+          if (fs.statSync(f).isFile()) return f;
+        } catch {
+          /* not installed for this arch */
+        }
+      }
+    }
   }
   return undefined;
 }
+
+/** Native executables inside known npm packages (Windows), relative to `<npm prefix>/node_modules`. */
+const NPM_NATIVE: Record<string, string[]> = {
+  codex: [['x64', 'x86_64'], ['arm64', 'aarch64']].map(([a, t]) => `@openai/codex/node_modules/@openai/codex-win32-${a}/vendor/${t}-pc-windows-msvc/bin/codex.exe`),
+};
 
 /** `findExe` on this process's PATH, cached per name. Callers report the tool as unavailable when it returns undefined. */
 export function resolveExe(name: string): string | undefined {
