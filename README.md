@@ -315,7 +315,7 @@ npm ci
 npm run check     # tsc --noEmit
 npm test          # fixtures, git, security, perf (node --test)
 npm run build     # esbuild → dist/extension.js
-npm run package   # agent-vscode-0.7.0.vsix
+npm run package   # agent-vscode-0.7.1.vsix
 npm run smoke     # installs the VSIX into an isolated VS Code profile, drives it with Playwright, takes screenshots
 ```
 

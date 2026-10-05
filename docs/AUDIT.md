@@ -7,9 +7,9 @@ Agent (`agent-vscode`), release 0.7.0. Sources: audits A1-A6 (`AGENT-V04-EVIDENC
 | Item | Baseline | Final |
 |---|---|---|
 | Repository | julian-passebecq/agent-vscode (private); checkout `D:\PROJ\datapass-agent\.claude\worktrees\agent-vscode-v01-d9ca29` | same, branch `release/0.7.0` |
-| SHA | `3833276ac49a546d7af6bad827031def98172484` | main `eba8437` + version bump to 0.7.0 |
-| Version | 0.5.0 | 0.7.0 (0.6.0 shipped in between, PR #54) |
-| Tests | 254/254 | 375/375 locally on eba8437 |
+| SHA | `3833276ac49a546d7af6bad827031def98172484` | main `1f6d02a` + version bump to 0.7.1 (0.7.0 = `f7d9833`, tag v0.7.0) |
+| Version | 0.5.0 | 0.7.1 (0.6.0 via #54, 0.7.0 via #69) |
+| Tests | 254/254 | 401/401 locally on 1f6d02a (375 on 0.7.0) |
 | CI | run 37331851998 | green on merges. #53 was cancelled by a GitHub runner outage (0.6.0 RESULT). #62 repaired a red main after #55 x #61 |
 | VSIX | n/a | `agent-vscode-0.7.0.vsix`, sha256 `2fc29469f942e5d13f5f0765dda448ddc351fc09afa580d12390cf7e362ccf6b` |
 | Screens | n/a | 43 (10 core + 33 add-on), 12 commands in the 0.6.0 audit |
@@ -132,6 +132,15 @@ O = OBSERVED, D = DERIVED, I = INFERRED. "ok" means no finding in A1-A6. Core-sc
 | #66 | Security follow-up | raw-archive warning, atomic archive lock, versions allow-list, Codex temp sweep, `test/xss.test.ts`, `test/sec.test.ts` |
 | #67 | I/O performance | `src/providers/discover.ts` `DirCache`, shared read buffer, chunked reads for files > 4 MB, Codex index byte cursor, `test/io.test.ts` |
 | #68 | Wiring | `endInferred()`, commit caveat, `git n/N` strip, Inspector Replay / HUD buttons, `viewNeedsRender` for sidebars, ENDED-git pause while hidden, Esc clears selection, `test/wiring.test.ts` |
+| #70 | Archive hardening | raw copies and manifest 0600; scan cap keeps the parent of every kept subagent, parents listed first |
+| #71 | Worktree overlap | commits in a window shared with another session marked "shared window (n sessions)", INFERRED; own `git commit` stays OBSERVED |
+| #72 | Jump-to-screen picker | `g` in the workspace, command "Agent: Go to screen…" (`ctrl+alt+g`), all 43 screens |
+| #73 | KPI evidence (add-ons) | Week / Explore / Health KPI titles, "≥" on open-ended durations, "(inferred)" alive transitions in Audit |
+| #74 | Smoke coverage | 600 / 700 / 900 px overflow passes (the old 700 px pass could not fail), Panes 2x2 and 1+2 |
+| #75 | KPI evidence (core) | Overview and Board KPI titles, "≥" on Board / selection durations |
+| #76 | Release gate on CI | `scripts/smoke-fixture.mjs`, `--fixture-home` synthetic history; gate green on GitHub |
+| #77 | Narrow widths | Replay, Health, Run strips no longer overflow at 600-900 px |
+| #69, 0.7.1 | Versions | 0.7.0 release (tag v0.7.0), 0.7.1 release |
 
 ## 7. Correctness fixes (evidence classification)
 
@@ -281,23 +290,18 @@ No P0 remains. Some rows group several audit ids.
 |---|---|---|
 | P1 | Rail groups not renamed to the NOW / AGENTS / WORK / CHANGE / VERIFY / TIME / USAGE / SYSTEM grammar (only tooltips added) | A1 P1-2 |
 | P1 | Galaxy contracts not registered in `galaxy.json`; no export command | A1 P1-8 |
-| P1 | No jump-to-screen picker; digits cover 10 of 43 screens | A1 P1-3, A6 P1-5 |
 | P1 | CSP keeps `style-src 'unsafe-inline'`; XSS safety rests on `esc()` plus the render test | A2 P1-9 |
-| P1 | Overlap badge for two sessions sharing a worktree window not done | A3 P1-9 |
 | P2 | Cold git phase still about 34 s in the background; idle stats the whole history (PR-measured) | A5 P1-4 |
 | P2 | git / gh feeds not behind one cached runner; workflow scan every 3 s | A5 P2-2, P2-3 |
 | P2 | Whether gh / glab / catalog calls honour workspace trust: not verified | A2 P2-12 |
-| P2 | chmod 600 on raw archive copies | A2 P1-6 |
-| P2 | No "≥" on durations ending at last activity; alive-INFERRED suffix in `audit.ts` | A3 P2-11, P2-15 |
-| P2 | Per-KPI evidence titles missing on Overview, Board, Week, Explore, Health | A6 P2-10 |
 | P2 | No paging helper; toolbars inconsistent; Panes toolbars not compact; Health glyphs / colours; Flow tiny-repo merge; empty states in Week / History / Limits | A6 P2-2, 4, 5, 8, 11, P1-7c, P1-8 |
-| P2 | Smoke lacks 600 / 900 px and Panes layouts | A6 P2-7, P2-8 |
-| P2 | Parents not guaranteed listed with subagents under the scan cap | A4 P2-11 |
 | P2 | Archive screen "captured at X" wording; Codex index `updated_at` unused | A4 P2-14 |
 | P2 | `ran` verdict ("test ran, outcome not recorded") in `insights.ts` not explicitly claimed by #64 | A3 P1-4 |
 | P2 | Codex test records have no `kind` | #64 |
 
-Counts: P0 0, P1 5, P2 14 rows.
+Fixed after 0.7.0 and removed from this table: jump-to-screen picker (#72), worktree overlap badge (#71), per-KPI evidence titles (#73, #75), "≥" durations and inferred alive suffix (#73, #75), smoke 600 / 900 px and Panes (#74) with the overflow they found (#77), raw archive 0600 (#70), parents kept with subagents (#70), release gate runnable on GitHub (#76).
+
+Counts: P0 0, P1 3, P2 7 rows.
 
 ## 14. Menu recommendations
 
@@ -364,8 +368,20 @@ Count: CORE 15, MERGE-CANDIDATE 6, SECONDARY 11, ADVANCED 9, EXPERIMENTAL 2, tot
 | Perf run | see section 9 (perf.log, perf-run2.log) |
 | Test caveat | one catalog timing test is load-sensitive (#64, #68 bodies); it passes alone |
 
+### 0.7.1 release evidence
+
+| Item | Value |
+|---|---|
+| Source | main `1f6d02a` + bump to 0.7.1 |
+| Tests | 401 / 401 |
+| VSIX | `agent-vscode-0.7.1.vsix`, sha256 `b4687d17e255d599794e97db8ec4fb1bd40329ee9df8a37738fe9b828b4eda5e` |
+| Release gate on GitHub | run 37389206917 on main: check, test, build, package, installed-VSIX smoke on the synthetic fixture home: **SMOKE PASS** |
+| Local installed-VSIX smoke, real history | **115 / 115 PASS**, 0 FAIL, 43 screens dark + light, 600 / 700 / 900 px, Panes 2x2 and 1+2; 104 screenshots. Audit / Repositories still loading after 20 s during the ~50 s initial discovery (note, not a failure) |
+| Perf (`perf.log`) | git off: cold 8.2 s, idle 0.28 s, idle+1m 0.35 s. git on: first emit 7.2 s, idle+1m 0.43 s with 0 spawns; cold total 41 s (git in background, live sessions writing during the run) |
+| 0.7.0 evidence | `v0.7.0/` (smoke 111/111, perf runs 1-2); the first tag-triggered gate (run 37384357016) failed only on data-dependent checks because GitHub runners had no history; fixed by #76 |
+
 ## 16. Verdict
 
 **PASS WITH NON-BLOCKING LIMITATIONS**
 
-0 P0. All audit P0s fixed and merged with green CI; 375/375 tests; installed-VSIX smoke 111/111; idle cost down from 1.6 s and 38 git spawns/min to ~0.2 s and 0 spawns. Non-blocking limitations: the 5 P1s in section 13 (rail grammar rename, Galaxy registration, jump-to-screen picker, CSP `unsafe-inline` styles, worktree-overlap badge), cold start still ~20 s with git in the background, and some screens show loading during the first ~50 s. Version 0.7.0 (not 1.0). Nothing was removed; the owner decides tiers from section 14.
+0 P0. All audit P0s fixed and merged with green CI; installed-VSIX smoke 115/115 locally and SMOKE PASS on the GitHub release gate; 401/401 tests; idle cost down from 1.6 s and 38 git spawns/min to ~0.2 s and 0 spawns. Non-blocking limitations: the 3 P1s left in section 13 (rail grammar rename and Galaxy registration, both owner decisions; CSP `unsafe-inline` styles), cold start still ~20 s with git in the background, and some screens show loading during the first ~50 s. Version 0.7.1 (not 1.0). The release gate now passes on GitHub as well as locally. Nothing was removed; the owner decides tiers from section 14.
