@@ -1,9 +1,9 @@
 // Add-on screen "Workflows": every Claude Code workflow run and its agents, live, plus background
-// subagents (Agent tool) and Codex worker sessions. Data: src/providers/claude/workflows.ts (feed, 3 s).
+// subagents (Agent tool) and Codex worker sessions. Data: src/providers/claude/workflows.ts (feed: 3 s while a run is live, else 30 s).
 import * as path from 'path';
 import type { AgentSessionSnapshot } from '../../model';
 import { claudeRoot } from '../../providers/claude/claude';
-import { BgAgent, LIVE_WINDOW_MS, WfAgent, WfRun, WorkflowsSnapshot, workflowScanner } from '../../providers/claude/workflows';
+import { BgAgent, LIVE_SCAN_MS, LIVE_WINDOW_MS, scanIntervalMs, WfAgent, WfRun, WorkflowsSnapshot, workflowScanner } from '../../providers/claude/workflows';
 import { compact, identityColor, isLive } from '../../activity/insights';
 import { esc } from '../html';
 import { hhmm } from '../views';
@@ -15,11 +15,16 @@ const FEED = 'workflows.scan';
 
 export const workflowsFeed: Feed<WorkflowsSnapshot> = {
   id: FEED,
-  intervalMs: 3000,
-  load: async ctx => workflowScanner(path.join(claudeRoot(), 'projects')).scan(ctx.now),
+  // Polled every 3 s; the scanner returns its cached snapshot unless a run is live (3 s) or 30 s have passed.
+  intervalMs: LIVE_SCAN_MS,
+  load: ctx => workflowScanner(path.join(claudeRoot(), 'projects')).scanIfDue(ctx.now),
 };
 
-const PERIOD: Record<string, number> = { '1h': 3600_000, '24h': 86400_000, '7d': 7 * 86400_000 };
+/** Token totals re-count the cached prompt on every call: they are a derived sum, not new tokens. */
+const TOK_BASIS = 'DERIVED sum incl. cache reads: input + cache read + cache creation + output, per model call (message id)';
+const partialNote = (a: WfAgent) => (a.tokensPartial ? ' · partial: only the transcript tail (last 2 MB) was read' : '');
+
+const PERIOD: Record<string, number> ={ '1h': 3600_000, '24h': 86400_000, '7d': 7 * 86400_000 };
 
 /** Option values allow [a-z0-9._:-]: run ids carry "_", so the key drops other characters. */
 export const runKey = (runId: string) => runId.toLowerCase().replace(/[^a-z0-9.:-]/g, '').slice(0, 40);
@@ -87,7 +92,7 @@ ${cols.run ? `<td class="muted">${esc(run?.name ?? run?.runId ?? '')}</td>` : ''
 <td>${esc(a.phase ?? '')}</td>
 <td class="num" title="first transcript timestamp (OBSERVED)">${esc(when(d.now, a.firstAt))}</td>
 <td class="num" title="last − first timestamp, or now for running (DERIVED)">${esc(dur(a.firstAt && end ? end - a.firstAt : undefined))}</td>
-<td class="num" title="sum of message .usage per message id (OBSERVED): ${esc(a.tokens.toLocaleString())} total · ${esc(a.outputTokens.toLocaleString())} output · ${a.calls} calls">${esc(a.tokens ? compact(a.tokens) : '—')}</td>
+<td class="num" title="${esc(`${TOK_BASIS}: ${a.tokens.toLocaleString()} total · ${a.outputTokens.toLocaleString()} output (OBSERVED) · ${a.calls} calls${partialNote(a)}`)}">${esc(a.tokens ? `${compact(a.tokens)}${a.tokensPartial ? '+' : ''}` : '—')}${a.outputTokens ? ` <span class="muted">· ${esc(compact(a.outputTokens))} out</span>` : ''}</td>
 <td class="wf-tool" title="${esc(a.currentTool ? 'tool_use without tool_result yet (OBSERVED)' : 'last tool_use (OBSERVED)')}">${esc(tool)}</td>
 <td class="muted" title="${esc(a.worktree ?? '')}">${esc(a.worktree ? path.basename(a.worktree) : '')}</td>
 <td><button class="link" data-opt="workflows.agent" data-val="${esc(sel ? '' : a.agentId.toLowerCase())}" title="details">${sel ? '▾' : '▸'}</button></td></tr>`;
@@ -108,7 +113,7 @@ function detail(a: WfAgent, run: WfRun | undefined, d: WsData): string {
     ['Model', a.model ?? '', 'assistant message .model (OBSERVED)'],
     ['Status', `${STATUS_LABEL[a.status]} — ${a.statusBasis}`, a.statusBasis.split(':')[0]],
     ['Started / last', `${when(d.now, a.firstAt)} → ${when(d.now, a.lastAt)}`, 'transcript timestamps (OBSERVED)'],
-    ['Tokens', `${a.tokens.toLocaleString()} total · ${a.outputTokens.toLocaleString()} output · ${a.calls} model calls`, 'message .usage, one per message id (OBSERVED)'],
+    ['Tokens', `${a.tokens.toLocaleString()} total incl. cache reads · ${a.outputTokens.toLocaleString()} output · ${a.calls} model calls${partialNote(a)}`, `${TOK_BASIS}; output: OBSERVED`],
     ['Tools', `${a.tools} calls · ${a.toolErrors} flagged error`, 'tool_use / tool_result is_error (OBSERVED)'],
     ['Now / last tool', a.currentTool ? `▸ ${a.currentTool}` : `${a.lastTool ?? '—'} ${a.lastToolAt ? `at ${hhmm(a.lastToolAt)}` : ''}`, 'tool_use records (OBSERVED)'],
     ['Result', a.result ?? '—', 'journal result, summarized and redacted (≤ 160 chars)'],
@@ -131,11 +136,12 @@ function runBasis(run: WfRun): string {
   return 'INFERRED: agents without result, quiet ≥ 10 min, no final run state';
 }
 
-function runSummary(run: WfRun, d: WsData): { done: number; total: number; tokens: number; elapsed: number | undefined } {
+function runSummary(run: WfRun, d: WsData): { done: number; total: number; tokens: number; output: number; elapsed: number | undefined } {
   const done = run.agents.filter(a => a.status === 'done' || a.status === 'failed').length;
   const tokens = run.agents.reduce((n, a) => n + a.tokens, 0);
+  const output = run.agents.reduce((n, a) => n + a.outputTokens, 0);
   const end = run.status === 'running' ? d.now : run.lastAt;
-  return { done, total: run.agents.length, tokens, elapsed: run.startedAt && end ? end - run.startedAt : undefined };
+  return { done, total: run.agents.length, tokens, output, elapsed: run.startedAt && end ? end - run.startedAt : undefined };
 }
 
 function runsMode(runs: WfRun[], d: WsData, st: WsState): string {
@@ -151,7 +157,7 @@ function runsMode(runs: WfRun[], d: WsData, st: WsState): string {
 <span class="wf-st wf-${esc(run.status)}" title="${esc(runBasis(run))}">${esc(run.status)}</span>${run.error ? `<span class="wf-err" title="run error (OBSERVED, redacted)">${esc(run.error)}</span>` : ''}
 <b>${esc(run.name ?? run.runId)}</b>${dots(run.agents)}
 <span class="muted">${esc(p.repo)} · ${p.known ? `<span data-select="${esc(run.parentKey)}" class="wf-parent" title="parent session">${esc(p.title)}</span>` : esc(p.title)}</span>
-<span class="right num"><span title="first agent timestamp (OBSERVED)">${esc(when(d.now, run.startedAt))}</span> · <span title="DERIVED">${esc(dur(sm.elapsed))}</span> · <span title="agents with a journal result / started (OBSERVED)">${sm.done}/${sm.total}${failed ? ` <span class="wf-err">${failed} failed</span>` : ''}</span> · <span title="sum of agent tokens (OBSERVED)">${esc(compact(sm.tokens))} tok</span></span></div>`;
+<span class="right num"><span title="first agent timestamp (OBSERVED)">${esc(when(d.now, run.startedAt))}</span> · <span title="DERIVED">${esc(dur(sm.elapsed))}</span> · <span title="agents with a journal result / started (OBSERVED)">${sm.done}/${sm.total}${failed ? ` <span class="wf-err">${failed} failed</span>` : ''}</span> · <span title="${esc(`${TOK_BASIS}, summed over the run's agents`)}">${esc(compact(sm.tokens))} tok</span> · <span title="output tokens, summed over the run's agents (OBSERVED)">${esc(compact(sm.output))} out</span></span></div>`;
     if (!isOpen) return `<div class="wf-run">${head}</div>`;
     const cols = { run: false };
     const sel = run.agents.find(a => a.agentId.toLowerCase() === selAgent);
@@ -211,7 +217,7 @@ function timelineMode(flat: Flat[], d: WsData, st: WsState): string {
     const width = Math.max(0.4, ((end - a.firstAt!) / span) * 100);
     const known = d.sessions.some(s => s.key === a.sessionKey);
     const attr = known ? `data-select="${esc(a.sessionKey)}"` : `data-opt="workflows.agent" data-val="${esc(a.agentId.toLowerCase())}"`;
-    const tip = `${a.label} · ${STATUS_LABEL[a.status]} · ${when(d.now, a.firstAt)} → ${when(d.now, end)} (${dur(end - a.firstAt!)}) · ${compact(a.tokens)} tok · ${prettyModel(a.model)}`;
+    const tip = `${a.label} · ${STATUS_LABEL[a.status]} · ${when(d.now, a.firstAt)} → ${when(d.now, end)} (${dur(end - a.firstAt!)}) · ${compact(a.tokens)} tok incl. cache · ${compact(a.outputTokens)} out · ${prettyModel(a.model)}`;
     return `<div class="wf-gl${selAgent === a.agentId.toLowerCase() ? ' sel' : ''}" ${attr} tabindex="0"><span class="wf-gn" title="${esc(a.label)}">${esc(a.label)}</span><div class="wf-track"><i class="wf-bar wf-${esc(a.status)}" style="left:${left.toFixed(2)}%;width:${width.toFixed(2)}%" title="${esc(tip)}"></i></div></div>`;
   }).join('')).join('');
   return `<div class="wf-gantt">${axis}${body}</div>${sel ? detail(sel.a, sel.run, d) : ''}`;
@@ -268,12 +274,13 @@ export function renderWorkflows(d: WsData, st: WsState, snap: WorkflowsSnapshot 
   const running = flat.filter(f => f.a.status === 'running').length;
   const done = flat.filter(f => f.a.status === 'done' || f.a.status === 'failed').length;
   const tokens = flat.reduce((n, f) => n + f.a.tokens, 0);
+  const output = flat.reduce((n, f) => n + f.a.outputTokens, 0);
   const codexLive = d.sessions.filter(s => s.provider === 'codex' && s.isWorker && isLive(s)).length;
-  const kpis = `<div class="kpis">${kpi(runs.filter(r => r.status === 'running').length, 'runs running', 'k-run', 'INFERRED from journal + transcript recency')}${kpi(runs.length, 'runs')}${kpi(running, 'agents running', 'k-run')}${kpi(`${done}/${flat.length}`, 'agents done', '', 'journal results / started (OBSERVED)')}${kpi(compact(tokens), 'tokens', '', 'sum of message usage per message id (OBSERVED)')}${kpi(bg.filter(b => d.now - b.mtimeMs < LIVE_WINDOW_MS).length, 'background live', '', 'INFERRED: transcript written < 10 min ago')}${kpi(codexLive, 'Codex workers live')}</div>`;
+  const kpis = `<div class="kpis">${kpi(runs.filter(r => r.status === 'running').length, 'runs running', 'k-run', 'INFERRED from journal + transcript recency')}${kpi(runs.length, 'runs')}${kpi(running, 'agents running', 'k-run')}${kpi(`${done}/${flat.length}`, 'agents done', '', 'journal results / started (OBSERVED)')}${kpi(compact(tokens), 'tokens incl. cache', '', TOK_BASIS)}${kpi(compact(output), 'output tokens', '', 'output tokens per model call (OBSERVED)')}${kpi(bg.filter(b => d.now - b.mtimeMs < LIVE_WINDOW_MS).length, 'background live', '', 'INFERRED: transcript written < 10 min ago')}${kpi(codexLive, 'Codex workers live')}</div>`;
   const body = !runs.length
     ? '<div class="empty">No workflow run in this period.</div>'
     : mode === 'agents' ? agentsMode(flat, d, st) : mode === 'timeline' ? timelineMode(flat, d, st) : runsMode(runs, d, st);
-  const legend = `<div class="legend muted wf-legend">${['running', 'done', 'failed', 'stale'].map(s => `<i class="wf-dot wf-${s}"></i> ${STATUS_LABEL[s]}`).join(' ')} · done / failed: OBSERVED journal result · running / no result: INFERRED (transcript written &lt; 10 min ago) · tokens, model, tools: OBSERVED · times: DERIVED · scan ${snap.scanMs} ms${snap.diagnostics.length ? ` · ${esc(snap.diagnostics.join('; '))}` : ''}</div>`;
+  const legend = `<div class="legend muted wf-legend">${['running', 'done', 'failed', 'stale'].map(s => `<i class="wf-dot wf-${s}"></i> ${STATUS_LABEL[s]}`).join(' ')} · done / failed: OBSERVED journal result · running / no result: INFERRED (transcript written &lt; 10 min ago) · tokens: DERIVED sum incl. cache reads (re-counted every call), output tokens shown next to them · model, tools: OBSERVED · times: DERIVED · scan ${snap.scanMs} ms, every ${scanIntervalMs(snap) / 1000} s${snap.diagnostics.length ? ` · ${esc(snap.diagnostics.join('; '))}` : ''}</div>`;
   return `${bar}${kpis}${body}${bgSection(bg, d)}${codexSection(d)}${legend}`;
 }
 
