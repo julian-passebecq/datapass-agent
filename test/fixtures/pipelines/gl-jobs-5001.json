@@ -1,0 +1,4 @@
+[
+  { "id": 6002, "name": "deploy", "stage": "deploy", "status": "manual", "created_at": "2026-10-04T10:30:00.000Z", "started_at": null, "finished_at": null, "allow_failure": false, "web_url": "https://gitlab.com/group/sub/proj/-/jobs/6002", "runner": null, "tag_list": [] },
+  { "id": 6001, "name": "build", "stage": "build", "status": "success", "created_at": "2026-10-04T10:30:00.000Z", "started_at": "2026-10-04T10:31:00.000Z", "finished_at": "2026-10-04T10:39:00.000Z", "allow_failure": false, "web_url": "https://gitlab.com/group/sub/proj/-/jobs/6001", "runner": { "id": 1, "description": "Julian local Windows runner", "is_shared": false, "runner_type": "group_type" }, "tag_list": ["local-windows"] }
+]
