@@ -5,6 +5,7 @@ import { auditView } from './audit';
 import { backlogView } from './backlog';
 import { changesView } from './changes';
 import { exploreView } from './explore';
+import { forecastView } from './forecast';
 import { healthView } from './health';
 import { historyView } from './history';
 import { launcherView } from './launcher';
@@ -32,6 +33,7 @@ export function allExtra(): ExtraView[] {
   backlogView,
   changesView,
   exploreView,
+  forecastView,
   healthView,
   historyView,
   launcherView,
