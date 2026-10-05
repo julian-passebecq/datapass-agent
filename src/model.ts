@@ -143,6 +143,19 @@ export interface SessionFacts {
   activeMs?: number;
   /** CLI entry point / originator (cli, vscode, exec, sdk …). */
   entrypoint?: string;
+  /** Codex only: latest `token_count.rate_limits` (used %, window, reset) plus a short used-% history. */
+  rateLimits?: RateLimits;
+}
+
+/** One provider rate-limit window as recorded. resetsAt in epoch ms. */
+export interface RateWindow { usedPercent: number; windowMinutes?: number; resetsAt?: number }
+export interface RateLimits {
+  at: number;
+  primary?: RateWindow;
+  secondary?: RateWindow;
+  planType?: string;
+  /** [at, 5-hour window used %, weekly window used %] (by recorded window length) when a value changed, capped at the latest 300. */
+  history?: [number, number | null, number | null][];
 }
 
 /** One data source Agent reads. Missing access is shown, never hidden. */
