@@ -73,6 +73,11 @@
         "icon": "$(layout)"
       },
       {
+        "command": "agent.openWorkspaceNewTab",
+        "title": "Agent: Open Workspace in New Tab",
+        "icon": "$(add)"
+      },
+      {
         "command": "agent.openAttention",
         "title": "Agent: Show Attention Queue"
       },

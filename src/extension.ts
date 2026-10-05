@@ -48,13 +48,20 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
   const inspector = new Inspector(store, m => onMessage(m), () => ternAvailable);
   const tree = new SessionsTree(store);
   const workspace = new WorkspacePanel(store, m => onMessage(m), () => ternAvailable);
+  // Extra tabs: each its own screen / scope / options.
+  const tabs = new Set<WorkspacePanel>();
+  const newTab = (view?: string, key?: string) => {
+    const p = new WorkspacePanel(store, m => onMessage(m), () => ternAvailable, x => { tabs.delete(x); x.dispose(); });
+    tabs.add(p);
+    p.open(view ?? (workspace as any).state?.view, key);
+  };
 
   function onMessage(m: WebviewMessage): void {
     if (m.type === 'ready') return; // handled by each view
     if (m.type === 'open') return inspector.open(m.key);
     if (m.type === 'select') return workspace.open(undefined, m.key);
     if (m.type === 'nav') return workspace.open(m.view);
-    if (m.type === 'opt') return; // workspace-only
+    if (m.type === 'opt' || m.type === 'act') return; // workspace-only
     switch (m.cmd) {
       case 'refresh':
         void store.refresh();
@@ -83,6 +90,8 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
     vscode.window.registerTreeDataProvider('agent.sessions', tree),
     vscode.commands.registerCommand('agent.refresh', () => store.refresh()),
     vscode.commands.registerCommand('agent.openWorkspace', (arg?: unknown) => workspace.open(undefined, keyOf(arg))),
+    vscode.commands.registerCommand('agent.openWorkspaceNewTab', (arg?: unknown) => newTab(undefined, keyOf(arg))),
+    { dispose: () => tabs.forEach(t => t.dispose()) },
     vscode.commands.registerCommand('agent.openAttention', () => workspace.open('attention')),
     vscode.commands.registerCommand('agent.openTeam', (arg?: unknown) => workspace.open('team', keyOf(arg))),
     vscode.commands.registerCommand('agent.openSession', async (arg?: unknown) => {

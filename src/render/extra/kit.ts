@@ -2,6 +2,29 @@
 // A screen is a pure function of snapshots; it escapes everything it prints.
 import type { WsData, WsState } from '../workspace';
 import { esc } from '../html';
+import type { Feed } from './feeds';
+
+/** Host services an add-on screen action may use. Implemented by the workspace panel with the VS Code API. */
+export interface ActCtx {
+  /** Opens a file in an editor (read-only preview unless the user edits). */
+  openFile(path: string): Promise<void>;
+  revealInOs(path: string): Promise<void>;
+  openUrl(url: string): Promise<void>;
+  copy(text: string): Promise<void>;
+  info(message: string): void;
+  /** Modal yes / no. Every action that writes or starts something asks first. */
+  confirm(message: string, yes: string): Promise<boolean>;
+  /** Save dialog, then writes text. Returns the path or undefined if cancelled. */
+  saveText(defaultName: string, content: string): Promise<string | undefined>;
+  /** New VS Code terminal owned by Agent; returns an id usable with closeTerminal. */
+  openTerminal(name: string, cwd: string, command: string): string;
+  closeTerminal(id: string): void;
+  runCommand(id: string, ...args: unknown[]): Promise<unknown>;
+  /** Re-pump this screen's feeds now. */
+  refreshFeeds(): void;
+  /** Current sessions (after scope). */
+  sessions(): import('../../model').AgentSessionSnapshot[];
+}
 
 export interface ExtraView {
   /** Stable id: lowercase letters, digits and dashes. Used in data-nav and the message allow-list. */
@@ -16,6 +39,18 @@ export interface ExtraView {
   badge?(d: WsData): string;
   /** false keeps a planned screen out of the rail until its package lands. */
   ready?: boolean;
+  /** Async data loaded while this screen is visible (see feeds.ts). */
+  feeds?: Feed[];
+  /**
+   * Buttons with data-act="<name>" data-arg="<string ≤ 1000>" call actions[name](arg, ctx).
+   * Validate arg inside the action (it comes from the webview).
+   */
+  actions?: Record<string, (arg: string, ctx: ActCtx) => Promise<void> | void>;
+}
+
+/** Button that triggers an action of the current screen. */
+export function actBtn(name: string, arg: string, label: string, title = '', cls = 'link'): string {
+  return `<button class="${esc(cls)}" data-act="${esc(name)}" data-arg="${esc(arg)}"${title ? ` title="${esc(title)}"` : ''}>${esc(label)}</button>`;
 }
 
 /** Current value of a per-screen option (granularity, orientation, chart type …). */

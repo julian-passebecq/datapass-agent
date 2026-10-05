@@ -161,9 +161,10 @@ document.addEventListener('keydown', e => {
 });
 vscode.postMessage({ type: 'ready', key: '' });
 document.addEventListener('click', e => {
-  const el = e.target.closest('[data-open],[data-cmd],[data-nav],[data-select],[data-opt]');
+  const el = e.target.closest('[data-open],[data-cmd],[data-nav],[data-select],[data-opt],[data-act]');
   if (!el) return;
-  if (el.dataset.opt) vscode.postMessage({ type: 'opt', name: el.dataset.opt, value: el.dataset.val || '', key: el.dataset.key || '' });
+  if (el.dataset.act) vscode.postMessage({ type: 'act', name: el.dataset.act, arg: el.dataset.arg || '', key: '' });
+  else if (el.dataset.opt) vscode.postMessage({ type: 'opt', name: el.dataset.opt, value: el.dataset.val || '', key: el.dataset.key || '' });
   else if (el.dataset.nav) vscode.postMessage({ type: 'nav', view: el.dataset.nav, key: '' });
   else if (el.dataset.select) vscode.postMessage({ type: 'select', key: el.dataset.select });
   else if (el.dataset.open) vscode.postMessage({ type: 'open', key: el.dataset.open });
@@ -193,9 +194,10 @@ export type WebviewMessage =
   | { type: 'select'; key: string }
   | { type: 'nav'; view: string; key: '' }
   | { type: 'opt'; name: string; value: string; key: string }
-  | { type: 'cmd'; cmd: 'refresh' | 'timelineAll' | 'revealWorktree' | 'copySessionId' | 'openTimeline' | 'openInTern' | 'openArtifactFolder' | 'openWorkspace'; key: string };
+  | { type: 'act'; name: string; arg: string; key: '' }
+  | { type: 'cmd'; cmd: 'refresh' | 'timelineAll' | 'revealWorktree' | 'copySessionId' | 'openTimeline' | 'openInTern' | 'openArtifactFolder' | 'openWorkspace' | 'openWorkspaceNewTab'; key: string };
 
-const CMDS = new Set(['refresh', 'timelineAll', 'revealWorktree', 'copySessionId', 'openTimeline', 'openInTern', 'openArtifactFolder', 'openWorkspace']);
+const CMDS = new Set(['refresh', 'timelineAll', 'revealWorktree', 'copySessionId', 'openTimeline', 'openInTern', 'openArtifactFolder', 'openWorkspace', 'openWorkspaceNewTab']);
 
 /** Strict validation of anything a webview posts back. Unknown shapes are dropped. */
 export function validateMessage(m: unknown, knownKey: (k: string) => boolean): WebviewMessage | undefined {
@@ -208,6 +210,7 @@ export function validateMessage(m: unknown, knownKey: (k: string) => boolean): W
   if (o.type === 'select' && knownKey(key)) return { type: 'select', key };
   if (o.type === 'nav' && key === '' && typeof o.view === 'string' && ((NAV_VIEWS as readonly string[]).includes(o.view) || EXTRA_NAV.has(o.view))) return { type: 'nav', view: o.view, key: '' };
   if (o.type === 'opt' && typeof o.name === 'string' && /^[a-z0-9.-]{1,40}$/.test(o.name) && typeof o.value === 'string' && /^[a-z0-9._:-]{0,40}$/.test(o.value) && (key === '' || knownKey(key))) return { type: 'opt', name: o.name, value: o.value, key };
+  if (o.type === 'act' && key === '' && typeof o.name === 'string' && /^[a-z0-9.-]{1,40}$/.test(o.name) && typeof o.arg === 'string' && o.arg.length <= 1000) return { type: 'act', name: o.name, arg: o.arg, key: '' };
   if (o.type === 'cmd' && typeof o.cmd === 'string' && CMDS.has(o.cmd) && (key === '' || knownKey(key))) return { type: 'cmd', cmd: o.cmd as any, key };
   return undefined;
 }
