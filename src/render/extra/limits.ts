@@ -148,10 +148,11 @@ function alerts(cx: CodexLimits, cl: ClaudeLimits, t: Thresholds): string {
     if (lv !== 'ok') out.push(`<div class="lm-al ${levelCls(lv)}"><b>${lv === 'alert' ? 'Alert' : 'Warning'}</b> Codex ${esc(KIND_LABEL[g.kind].toLowerCase())} at ${esc(g.usedPercent.toFixed(0))} % (threshold ${lv === 'alert' ? t.alert : t.warn} %) ${ev('OBSERVED', 'token_count.rate_limits')}</div>`);
   }
   const c = cl.current;
-  if (c && cl.past.max) {
+  // Only when the block is settled and there is enough history to compare with (≥ 5 past blocks).
+  if (c && c.settled && cl.past.max && cl.past.n >= 5) {
     const pct = (c.projected / cl.past.max) * 100;
     const lv = level(pct, t);
-    if (lv !== 'ok') out.push(`<div class="lm-al ${levelCls(lv)}"><b>${lv === 'alert' ? 'Alert' : 'Warning'}</b> Claude block projected at ${esc(pct.toFixed(0))} % of your largest past block ${ev('INFERRED', 'projection vs your own history, not an official limit')}</div>`);
+    if (lv !== 'ok') out.push(`<div class="lm-al ${levelCls(lv)}"><b>${lv === 'alert' ? 'Alert' : 'Warning'}</b> Claude block projected at ${esc(pct.toFixed(0))} % of your largest past block ${ev('INFERRED', 'projection (60-min average rate) vs your own past blocks, not an official limit')}</div>`);
   }
   return out.join('');
 }

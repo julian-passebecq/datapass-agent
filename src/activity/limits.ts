@@ -7,6 +7,10 @@ const MIN = 60_000;
 const HOUR = 60 * MIN;
 export const BLOCK_MS = 5 * HOUR;
 export const BURN_WINDOW_MS = 15 * MIN;
+/** Projection uses a longer, smoother rate so a short burst does not dominate (DERIVED). */
+export const PROJ_WINDOW_MS = 60 * MIN;
+/** Alerts on the projection only once the block has this much history. */
+export const SETTLE_MS = 30 * MIN;
 
 // ---------------------------------------------------------------- Codex
 
@@ -184,6 +188,8 @@ export interface BlockNow {
   projected: number;
   projectedOutput: number;
   msLeft: number;
+  /** Block old enough for its projection to be meaningful (≥ 30 min since its first call). */
+  settled: boolean;
 }
 
 export interface ClaudeLimits {
@@ -203,7 +209,15 @@ export function currentBlock(b: Block, calls: Call[], now: number): BlockNow {
   }
   const msLeft = Math.max(0, b.end - now);
   const burn = t / mins, burnO = o / mins;
-  return { block: b, burnPerMin: burn, burnOutputPerMin: burnO, projected: Math.round(b.tokens + burn * (msLeft / MIN)), projectedOutput: Math.round(b.output + burnO * (msLeft / MIN)), msLeft };
+  // Projection rate: average over the last 60 min of the block (at least 15 min of span).
+  const pFrom = Math.max(now - PROJ_WINDOW_MS, b.firstAt);
+  const pMins = Math.max(15, (now - pFrom) / MIN);
+  let pt = 0, po = 0;
+  for (const c of calls) if (c.at >= pFrom && c.at <= now && c.at >= b.start && c.at < b.end) {
+    pt += c.tokens;
+    po += c.output;
+  }
+  return { block: b, burnPerMin: burn, burnOutputPerMin: burnO, projected: Math.round(b.tokens + (pt / pMins) * (msLeft / MIN)), projectedOutput: Math.round(b.output + (po / pMins) * (msLeft / MIN)), msLeft, settled: now - b.firstAt >= SETTLE_MS };
 }
 
 export function claudeLimits(sessions: AgentSessionSnapshot[], now: number): ClaudeLimits {

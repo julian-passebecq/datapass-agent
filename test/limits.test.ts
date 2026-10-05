@@ -55,8 +55,10 @@ test('limits: current block burn (last 15 min), projection, past p90 / max', () 
   assert.equal(now.block.tokens, 4950, 'prompt + output; codex calls never enter Claude blocks');
   assert.equal(now.burnPerMin, 1650 / 15);
   assert.equal(now.msLeft, T('2026-10-05T15:00:00Z') - NOW);
-  assert.equal(now.projected, Math.round(4950 + 110 * 150));
-  assert.equal(now.projectedOutput, Math.round(450 + 10 * 150));
+  // Projection uses the 60-min average (1650 tokens / 60 min), not the 15-min burst.
+  assert.equal(now.projected, Math.round(4950 + (1650 / 60) * 150));
+  assert.equal(now.projectedOutput, Math.round(450 + (150 / 60) * 150));
+  assert.equal(now.settled, true, 'first call 2 h ago');
   assert.equal(now.block.output, 450);
 });
 
