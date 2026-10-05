@@ -4,8 +4,9 @@
 import type { AgentSessionSnapshot, EvidenceKind, TimelineEvent, TodoList } from '../model';
 import type { CiReport, CiStatus } from '../feeds/pipelines';
 import { isLive } from './insights';
+import { testVerdict } from '../sessions/classify';
 
-export type WorkerState = 'run' | 'idle' | 'ended' | 'unknown';
+export type WorkerState = 'run' | 'needs' | 'idle' | 'ended' | 'unknown';
 
 export interface HudWorker {
   s: AgentSessionSnapshot;
@@ -14,7 +15,7 @@ export interface HudWorker {
 
 /** Child sessions of `s` (parentSessionId = s.key), running first, then newest. */
 export function workersOf(s: AgentSessionSnapshot, all: AgentSessionSnapshot[]): HudWorker[] {
-  const order: Record<WorkerState, number> = { run: 0, idle: 1, unknown: 2, ended: 3 };
+  const order: Record<WorkerState, number> = { needs: 0, run: 1, idle: 2, unknown: 3, ended: 4 };
   return all
     .filter(w => w.parentSessionId === s.key && w.key !== s.key)
     .map(w => ({ s: w, state: workerState(w) }))
@@ -25,8 +26,9 @@ export function workerState(w: AgentSessionSnapshot): WorkerState {
   switch (w.status) {
     case 'RUNNING':
       return 'run';
-    case 'IDLE':
     case 'NEEDS_INPUT':
+      return 'needs';
+    case 'IDLE':
       return 'idle';
     case 'ENDED':
       return 'ended';
@@ -68,7 +70,8 @@ export function testSummary(s: AgentSessionSnapshot): TestSummary | undefined {
   if (!s.tests.length) return undefined;
   const latest = new Map<string, AgentSessionSnapshot['tests'][number]>();
   for (const t of [...s.tests].sort((a, b) => a.at - b.at)) latest.set(t.command, t);
-  const v = [...latest.values()];
+  // Trusted outcome per command: a chained / piped test with only a tool error flag counts as no outcome.
+  const v = [...latest.values()].map(t => ({ ...t, outcome: testVerdict(t).outcome }));
   const last = s.tests.reduce((a, b) => (b.at >= a.at ? b : a));
   return {
     passed: v.filter(t => t.outcome === 'PASS').length,
@@ -76,7 +79,7 @@ export function testSummary(s: AgentSessionSnapshot): TestSummary | undefined {
     unknown: v.filter(t => t.outcome === 'UNKNOWN').length,
     total: v.length,
     runs: s.tests.length,
-    last: { command: last.command, outcome: last.outcome, at: last.at, source: last.source },
+    last: { command: last.command, outcome: testVerdict(last).outcome, at: last.at, source: `${last.source}; ${testVerdict(last).basis}` },
   };
 }
 

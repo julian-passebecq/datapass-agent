@@ -120,6 +120,23 @@ test('hud: workers, todo progress, tests, sessions, log tail', () => {
   assert.deepEqual(lessonRoots([OLD, LEAD]), ['D:\\r\\app']);
 });
 
+test('hud: needs-input workers, absences DERIVED, inferred end, untrusted piped outcome', () => {
+  const ask = mk({ key: 'claude:w-ask', isWorker: true, parentSessionId: LEAD.key, status: 'NEEDS_INPUT', statusReason: 'live registry: waiting_for_permission', workerLabel: 'Coder', lastActivityAt: NOW - M });
+  const ws = workersOf(LEAD, [LEAD, W1, ask]);
+  assert.deepEqual(ws.map(w => w.state), ['needs', 'run'], 'needs input first, not idle');
+  const gone = mk({ key: 'claude:gone', title: 'gone one', status: 'ENDED', statusReason: 'no live registry entry: process no longer active (inferred, no end recorded)' });
+  const piped = mk({ key: 'claude:pp', tests: [{ command: 'npm test | tail · piped', at: NOW - M, outcome: 'PASS', source: 'provider-tool-error-flag' }] });
+  const t = testSummary(piped)!;
+  assert.deepEqual([t.passed, t.unknown], [0, 1], 'piped + tool flag: no outcome');
+  const d: WsData = { sessions: [LEAD, W1, ask, gone], providers: [], events: [], now: NOW, ternAvailable: false, config: <T>(_k: string, f: T) => f };
+  const h = renderHud(d, { view: 'hud' });
+  assert.ok(h.includes('1 needs input'), 'needs input counted');
+  const g = renderHud(d, { view: 'hud', opts: { 'hud.pin': sessTok(gone) } });
+  assert.ok(g.includes('no longer active (inferred)'), 'inferred end worded as such');
+  assert.ok(g.includes('none observed') && !g.includes('none run'), 'absence wording');
+  assert.match(g, /class="hud-ev hud-ev-derived" title="DERIVED: no test command/);
+});
+
 test('hud: CI from the pipelines report, branch first, else newest of the repo', () => {
   const run = (id: string, ref: string, status: 'success' | 'failed', at: number) => ({ key: `github:h/o#${id}`, id, provider: 'github' as const, host: 'h', slug: 'o/r', root: 'd:/r/app', repo: 'app', title: `run ${id}`, ref, status, raw: status, createdAt: at });
   const rep: CiReport = { state: 'ok', at: NOW, calls: 1, noRemote: 0, repos: [{ root: 'D:/r/app/', name: 'app', remotes: [], errors: [], ms: 1, runs: [run('1', 'feat/x', 'failed', NOW - 9 * M), run('2', 'main', 'success', NOW - M)] }] };

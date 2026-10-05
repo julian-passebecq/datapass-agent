@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { readNewLines } from '../src/util/jsonl';
 import { bounded, redact, safeEnv } from '../src/util/redact';
-import { deriveStatus, isVerificationCommand, commandText, commandLabel, isGitCommit, testLabel, checkKind, testVerdict, endInferred } from '../src/sessions/classify';
+import { deriveStatus, isVerificationCommand, commandText, commandLabel, isGitCommit, testLabel, checkKind, testVerdict, endInferred, statusEvidenceOf } from '../src/sessions/classify';
 import { isInside, isPlausibleLocalPath } from '../src/util/paths';
 import { tmpDir } from './helpers';
 
@@ -111,6 +111,10 @@ test('status derivation is conservative', () => {
   const gone = deriveStatus({ providerHasRegistry: true, lastActivityAt: now - 3600_000 }, now, idle);
   assert.ok(endInferred({ status: gone.status, statusReason: gone.reason }), 'registry absence = inferred end');
   assert.ok(!endInferred({ status: 'ENDED', statusReason: deriveStatus({ explicitEnded: true }, now, idle).reason }));
+  assert.deepEqual([statusEvidenceOf({ status: gone.status, statusReason: gone.reason }).text, statusEvidenceOf({ status: gone.status, statusReason: gone.reason }).kind], ['no longer active (inferred)', 'INFERRED']);
+  assert.equal(statusEvidenceOf({ status: 'NEEDS_INPUT', statusReason: 'live registry: waiting', provider: 'claude' }).text, 'needs input');
+  assert.match(statusEvidenceOf({ status: 'RUNNING', statusReason: 'live registry: busy', provider: 'claude' }).basis, /pid check/);
+  assert.equal(statusEvidenceOf({ status: 'RUNNING', statusReason: 'turn started, not completed, recent activity' }).kind, 'INFERRED');
 });
 
 test('paths: traversal and injected artifact paths are rejected', () => {

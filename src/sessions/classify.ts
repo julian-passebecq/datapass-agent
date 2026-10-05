@@ -231,3 +231,24 @@ export function testVerdict(t: Pick<TestObservation, 'command' | 'outcome' | 'so
   }
   return { outcome: t.outcome, kind: 'OBSERVED', basis: t.source === 'provider-exit-code' ? 'exit code recorded by the provider' : 'tool error flag recorded by the provider' };
 }
+
+/** Status as display text with its evidence kind: an inferred end reads "no longer active (inferred)". */
+export function statusEvidenceOf(s: { status: SessionStatus; statusReason?: string; provider?: string }): { text: string; kind: EvidenceKind; basis: string } {
+  const r = s.statusReason ?? '';
+  const registry = /^live registry/i.test(r);
+  switch (s.status) {
+    case 'ENDED':
+      return endInferred(s)
+        ? { text: 'no longer active (inferred)', kind: 'INFERRED', basis: r }
+        : { text: 'ended', kind: 'OBSERVED', basis: r || 'provider recorded the end' };
+    case 'RUNNING':
+    case 'IDLE':
+    case 'NEEDS_INPUT': {
+      const text = s.status === 'NEEDS_INPUT' ? 'needs input' : s.status.toLowerCase();
+      if (registry) return { text, kind: 'OBSERVED', basis: `${r}${s.provider === 'claude' ? ' (process alive: inferred from a pid check)' : ''}` };
+      return { text, kind: 'INFERRED', basis: r };
+    }
+    default:
+      return { text: 'unknown', kind: 'UNKNOWN', basis: r };
+  }
+}

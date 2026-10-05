@@ -14,6 +14,7 @@ import { ago, ctxBar, prettyModel, repoOf, titleOf, WsData, WsState } from '../w
 import { ExtraView, opt, seg, toolbar } from './kit';
 import { Feed, feedValue } from './feeds';
 import { sessTok } from './lifecycle';
+import { statusEvidenceOf } from '../../sessions/classify';
 import { pipelinesFeed } from './pipelines';
 
 const LESSONS_FEED = 'hud.lessons';
@@ -69,7 +70,8 @@ function modeRow(s: AgentSessionSnapshot): string {
   return row('mode', parts ? `<span class="hud-tag">${esc(parts)}</span>${ev('OBSERVED', 'rollout turn_context approval_policy / sandbox_policy')} <span class="muted" title="Codex has no plan mode">plan n/a</span>` : `<span class="muted">unknown</span>${ev('UNKNOWN', 'no turn_context recorded')}`);
 }
 
-const W_ICON: Record<HudWorker['state'], string> = { run: '●', idle: '◌', ended: '✓', unknown: '?' };
+const W_ICON: Record<HudWorker['state'], string> = { run: '●', needs: '!', idle: '◌', ended: '✓', unknown: '?' };
+const W_TEXT: Record<HudWorker['state'], string> = { run: 'run', needs: 'needs input', idle: 'idle', ended: 'ended', unknown: 'unknown' };
 
 function workersRow(s: AgentSessionSnapshot, ws: HudWorker[], d: WsData): string {
   const spawns = s.facts?.spawns?.length ?? 0;
@@ -79,10 +81,11 @@ function workersRow(s: AgentSessionSnapshot, ws: HudWorker[], d: WsData): string
   }
   const run = ws.filter(w => w.state === 'run').length;
   const idle = ws.filter(w => w.state === 'idle').length;
-  const head = `<b>${run}</b>/${ws.length} running${idle ? ` · ${idle} idle` : ''}${ev('DERIVED', 'child sessions (parentSessionId); run / idle / ended from each child status')}`;
+  const needs = ws.filter(w => w.state === 'needs').length;
+  const head = `<b>${run}</b>/${ws.length} running${needs ? ` · <span class="hud-need">${needs} needs input</span>` : ''}${idle ? ` · ${idle} idle` : ''}${ev('DERIVED', 'child sessions (parentSessionId); run / needs input / idle / ended from each child status')}`;
   const list = ws
     .slice(0, MAX_WORKERS)
-    .map(w => `<div class="hud-w hud-w-${w.state}" data-select="${esc(w.s.key)}" tabindex="0" title="${esc(`${titleOf(w.s)} · ${w.s.status} · ${w.s.statusReason}`)}"><span class="hud-wi">${W_ICON[w.state]}</span><span class="hud-wn">${esc((w.s.workerLabel ?? titleOf(w.s)).slice(0, 48))}</span><span class="hud-ws">${esc(w.state)}</span><span class="muted">${esc(ago(d.now, w.s.lastActivityAt))}</span></div>`)
+    .map(w => `<div class="hud-w hud-w-${w.state}" data-select="${esc(w.s.key)}" tabindex="0" title="${esc(`${titleOf(w.s)} · ${w.s.status} · ${w.s.statusReason}`)}"><span class="hud-wi">${W_ICON[w.state]}</span><span class="hud-wn">${esc((w.s.workerLabel ?? titleOf(w.s)).slice(0, 48))}</span><span class="hud-ws">${esc(W_TEXT[w.state])}</span><span class="muted">${esc(ago(d.now, w.s.lastActivityAt))}</span></div>`)
     .join('');
   return row('subagents', head, `<div class="hud-sub">${list}${ws.length > MAX_WORKERS ? `<div class="muted">… ${ws.length - MAX_WORKERS} more</div>` : ''}</div>`);
 }
@@ -93,7 +96,8 @@ function todoRow(s: AgentSessionSnapshot, d: WsData, full: boolean): string {
     const why = s.provider === 'claude' ? 'no TodoWrite / TaskCreate call recorded' : 'no update_plan call recorded';
     return row('todo', `<span class="muted">—</span>${ev('UNKNOWN', why)}`);
   }
-  const head = `${bar(tp.total ? tp.done / tp.total : 0, 'ok')} <b>${tp.done}/${tp.total}</b> <span class="muted">${esc(tp.list.source)} · ${esc(ago(d.now, tp.list.at))}</span>${ev('OBSERVED', `latest ${tp.list.source} call input`)}`;
+  const byOrder = /^Task(Create|Update)/i.test(tp.list.source);
+  const head = `${bar(tp.total ? tp.done / tp.total : 0, 'ok')} <b>${tp.done}/${tp.total}</b> <span class="muted">${esc(tp.list.source)} · ${esc(ago(d.now, tp.list.at))}</span>${byOrder ? ev('DERIVED', `${tp.list.source} calls; task ids numbered by creation order (not recorded)`) : ev('OBSERVED', `latest ${tp.list.source} call input`)}`;
   const items = full ? tp.list.items : tp.list.items.filter(i => i.status !== 'completed').slice(0, 6);
   const mark = { completed: '[x]', in_progress: '[>]', pending: '[ ]' } as const;
   const list = items.map(i => `<div class="hud-td hud-td-${i.status}"><span class="hud-tm">${mark[i.status]}</span> ${esc(i.text)}</div>`).join('');
@@ -103,10 +107,10 @@ function todoRow(s: AgentSessionSnapshot, d: WsData, full: boolean): string {
 
 function testsRow(s: AgentSessionSnapshot, d: WsData): string {
   const t = testSummary(s);
-  if (!t) return row('tests', `<span class="muted">none run</span>${ev('OBSERVED', 'no test / build command in the session')}`);
+  if (!t) return row('tests', `<span class="muted">none observed</span>${ev('DERIVED', 'no test command in the loaded records (transcript may be capped; builds, lints and type checks are not tests)')}`);
   const cls = t.failed ? 'bad' : t.unknown ? 'warn' : 'ok';
   const last = t.last ? ` <span class="muted" title="${esc(`last: ${t.last.outcome} ${t.last.command} (${t.last.source})`)}">last ${esc(t.last.outcome)} ${esc(ago(d.now, t.last.at))}</span>` : '';
-  return row('tests', `${bar(t.total ? t.passed / t.total : 0, cls)} <b>${t.passed}/${t.total}</b> passed${t.failed ? ` · <span class="hud-bad">${t.failed} failing</span>` : ''}${t.unknown ? ` · ${t.unknown} no outcome` : ''}${last}${ev('OBSERVED', `distinct test / build commands, latest outcome each (${t.runs} run(s)); outcome from exit code or tool error flag`)}`);
+  return row('tests', `${bar(t.total ? t.passed / t.total : 0, cls)} <b>${t.passed}/${t.total}</b> passed${t.failed ? ` · <span class="hud-bad">${t.failed} failing</span>` : ''}${t.unknown ? ` · ${t.unknown} no outcome` : ''}${last}${ev('OBSERVED', `distinct test commands, latest outcome each (${t.runs} run(s)); outcome from exit code or tool error flag; a chained or piped command with only a tool error flag counts as no outcome`)}`);
 }
 
 const CI_TXT: Record<string, [string, string]> = {
@@ -119,7 +123,7 @@ function ciRow(s: AgentSessionSnapshot, report: CiReport | undefined, enabled: b
   if (c === 'off') return row('CI', `<span class="muted">${report?.state === 'untrusted' ? 'untrusted workspace' : 'loading…'}</span>${ev('UNKNOWN', 'Pipelines feed has no data yet')}`);
   if (c === 'none') return row('CI', `<span class="muted">no run found for this repository</span>${ev('UNKNOWN', 'no CI run in the Pipelines feed for the session repository')}`);
   const [txt, cls] = CI_TXT[c.status] ?? CI_TXT.unknown;
-  return row('CI', `<span class="hud-ci ${cls}">${esc(txt)}</span> <span class="muted">${esc(c.ref)}${c.basis === 'repo' ? ' (latest of repo, none on this branch)' : ''}</span>${ev('OBSERVED', `CI API via the Pipelines feed: ${c.title}`)}`);
+  return row('CI', `<span class="hud-ci ${c.basis === 'repo' ? 'quiet' : cls}">${esc(txt)}</span> <span class="muted">${esc(c.ref)}${c.basis === 'repo' ? ' (latest of repo, none on this branch)' : ''}</span>${c.basis === 'repo' ? ev('INFERRED', `newest run of the repository, not of this branch (CI API via the Pipelines feed: ${c.title})`) : ev('OBSERVED', `CI API via the Pipelines feed: ${c.title}`)}`);
 }
 
 function ctxRow(s: AgentSessionSnapshot, marker: number): string {
@@ -159,10 +163,11 @@ function hudCard(s: AgentSessionSnapshot, d: WsData, st: WsState, pinned: boolea
   const ws = workersOf(s, d.sessions);
   const who = [s.provider, prettyModel(s.model), s.effort].filter(Boolean).join(' · ');
   const where = [repoOf(s), s.branch ?? s.facts?.recordedBranch].filter(Boolean).join(' · ');
+  const stE = statusEvidenceOf(s);
   const cur = s.facts?.currentTool;
   const now = isLive(s) && cur ? `<div class="hud-now">▸ ${esc(cur.name)} ${esc(cur.detail)} <span class="muted">${esc(ago(d.now, cur.startedAt))}</span>${ev('OBSERVED', 'tool call with no recorded result yet')}</div>` : '';
   return `<section class="hud-c${st.selected === s.key ? ' sel' : ''}" style="--id:${identityColor(repoOf(s))};--pv:var(--${esc(s.provider)})">
-<div class="hud-h" data-select="${esc(s.key)}" tabindex="0" title="${esc(`${s.key} · ${s.statusReason}`)}"><span class="dot ${esc(s.status)}"></span><b class="hud-t">${esc(titleOf(s))}</b>${pinned ? '<span class="hud-pin" title="Pinned">📌</span>' : ''}<span class="hud-st">${esc(s.status.toLowerCase())}</span></div>
+<div class="hud-h" data-select="${esc(s.key)}" tabindex="0" title="${esc(`${s.key} · ${s.statusReason}`)}"><span class="dot ${esc(s.status)}"></span><b class="hud-t">${esc(titleOf(s))}</b>${pinned ? '<span class="hud-pin" title="Pinned">📌</span>' : ''}<span class="hud-st hud-st-${esc(stE.kind)}" title="${esc(`${stE.kind}: ${stE.basis}`)}">${esc(stE.text)}${stE.kind === 'OBSERVED' ? '' : ` <span class="hud-ev">${EV_SHORT[stE.kind]}</span>`}</span></div>
 <div class="hud-meta muted">${esc(who)} · ${esc(where)} · ${esc(ago(d.now, s.lastActivityAt))}</div>${now}
 <div class="hud-body">${modeRow(s)}${workersRow(s, ws, d)}${todoRow(s, d, full)}${testsRow(s, d)}${ciRow(s, ci, ciOn)}${ctxRow(s, marker)}${lessonsRow(s, lessons)}</div>
 ${logBlock(s, d)}</section>`;
@@ -251,6 +256,8 @@ export const hudView: ExtraView = {
 .hud .hud-w { display: flex; gap: 6px; cursor: pointer; white-space: nowrap; }
 .hud .hud-w:hover, .hud .hud-h:hover { background: var(--vscode-list-hoverBackground); }
 .hud .hud-wi { width: 12px; text-align: center; }
+.hud .hud-w-needs .hud-wi, .hud .hud-need { color: var(--warn); font-weight: 600; }
+.hud .hud-st-INFERRED, .hud .hud-st-UNKNOWN { border-style: dashed; }
 .hud .hud-w-run .hud-wi { color: var(--ok); } .hud .hud-w-idle .hud-wi { color: var(--warn); } .hud .hud-w-ended .hud-wi { color: var(--quiet); }
 .hud .hud-wn { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
 .hud .hud-ws { color: var(--vscode-descriptionForeground); }
