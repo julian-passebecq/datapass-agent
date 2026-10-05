@@ -46,6 +46,53 @@ function pidAlive(pid: number): boolean {
   }
 }
 
+/** Parent transcript of a subagent transcript (<session>/subagents/agent-*.jsonl → <session>.jsonl), else undefined. */
+export function parentTranscriptOf(p: string): string | undefined {
+  const dir = path.dirname(p);
+  if (path.basename(dir) !== 'subagents') return undefined;
+  return `${path.dirname(dir)}.jsonl`;
+}
+
+/**
+ * Scan cap: keeps at most `max` refs from a newest-first list, never dropping the parent transcript of a kept
+ * subagent transcript (a child is kept only when its listed parent fits too). Output is newest first, except that a
+ * parent always comes before its subagents so parent links resolve.
+ */
+export function capArtifacts(sorted: ArtifactRef[], max: number): ArtifactRef[] {
+  if (sorted.length <= max) return orderParentsFirst(sorted);
+  const byPath = new Map(sorted.map(r => [r.path, r]));
+  const kept = new Set<string>();
+  for (const r of sorted) {
+    if (kept.size >= max) break;
+    if (kept.has(r.path)) continue;
+    const parent = parentTranscriptOf(r.path);
+    if (parent && byPath.has(parent) && !kept.has(parent)) {
+      if (kept.size + 2 > max) continue; // no room for the pair: skip the child, a later parent-less ref may still fit
+      kept.add(parent);
+    }
+    kept.add(r.path);
+  }
+  return orderParentsFirst(sorted.filter(r => kept.has(r.path)));
+}
+
+function orderParentsFirst(list: ArtifactRef[]): ArtifactRef[] {
+  const listed = new Set(list.map(r => r.path));
+  const out: ArtifactRef[] = [];
+  const done = new Set<string>();
+  const byPath = new Map(list.map(r => [r.path, r]));
+  for (const r of list) {
+    if (done.has(r.path)) continue;
+    const parent = parentTranscriptOf(r.path);
+    if (parent && listed.has(parent) && !done.has(parent)) {
+      out.push(byPath.get(parent)!);
+      done.add(parent);
+    }
+    out.push(r);
+    done.add(r.path);
+  }
+  return out;
+}
+
 /** Claude Code adapter. Sources (read-only):
  *  - projects/<slug>/<sessionId>.jsonl            transcript records (sessionId, cwd, gitBranch, version, model, effort, tool_use/tool_result)
  *  - projects/<slug>/<sessionId>/subagents/agent-<id>.jsonl (+ .meta.json)   subagent transcripts → parent/child
@@ -124,9 +171,8 @@ export class ClaudeAdapter implements ProviderAdapter {
       const st = statFile(p); // vanished → undefined
       if (st && st.mtimeMs >= sinceMs && st.size > 0) out.push({ path: p, mtimeMs: st.mtimeMs, size: st.size });
     }
-    // Parents before their subagents so parent links resolve; newest first otherwise.
     out.sort((a, b) => b.mtimeMs - a.mtimeMs);
-    return out.slice(0, max);
+    return capArtifacts(out, max);
   }
 
   ingest(ref: ArtifactRef): SessionAccumulator | undefined {

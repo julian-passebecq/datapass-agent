@@ -428,6 +428,23 @@ export function rawAllowed(src: RawSource): boolean {
   return isInside(src.root, src.file);
 }
 
+/** Raw copies hold whole transcripts: owner read/write only. */
+export const RAW_FILE_MODE = 0o600;
+
+/**
+ * Restricts a raw copy to its owner. POSIX: chmod 0o600 (the create mode is also masked by umask, so set it
+ * explicitly). Windows: chmod only toggles the read-only bit, so it is skipped; the file inherits the ACL of
+ * ~/.agent (by default the user profile, readable by the user, SYSTEM and Administrators) and is left as is.
+ */
+export function ownerOnly(file: string): void {
+  if (process.platform === 'win32') return;
+  try {
+    fs.chmodSync(file, RAW_FILE_MODE);
+  } catch {
+    /* best effort: the copy itself succeeded */
+  }
+}
+
 /** Gzip-copies new or grown transcripts into raw/, oldest first, until the total reaches maxBytes. */
 export async function copyRaw(dir: string, sources: RawSource[], maxBytes: number, now = Date.now()): Promise<RawResult> {
   const rawDir = path.join(dir, 'raw');
@@ -485,7 +502,7 @@ export async function copyRaw(dir: string, sources: RawSource[], maxBytes: numbe
         res.skipped++;
         continue;
       }
-      await pipeline(fs.createReadStream(src.file, { start: 0, end }), zlib.createGzip(), fs.createWriteStream(tmp));
+      await pipeline(fs.createReadStream(src.file, { start: 0, end }), zlib.createGzip(), fs.createWriteStream(tmp, { mode: RAW_FILE_MODE }));
       const gz = fs.statSync(tmp).size;
       if (total - (prev?.gz ?? 0) + gz > maxBytes) {
         fs.rmSync(tmp, { force: true });
@@ -493,6 +510,7 @@ export async function copyRaw(dir: string, sources: RawSource[], maxBytes: numbe
         break;
       }
       fs.renameSync(tmp, dest);
+      ownerOnly(dest);
       total += gz - (prev?.gz ?? 0);
       man.files[rel] = { size: st.size, mtime: st.mtimeMs, gz, at: now };
       res.copied++;
@@ -503,7 +521,10 @@ export async function copyRaw(dir: string, sources: RawSource[], maxBytes: numbe
     }
   }
   res.totalBytes = total;
-  if (res.copied) writeAtomic(manFile, JSON.stringify(man));
+  if (res.copied) {
+    writeAtomic(manFile, JSON.stringify(man));
+    ownerOnly(manFile);
+  }
   return res;
 }
 
