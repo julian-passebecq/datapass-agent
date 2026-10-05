@@ -1,0 +1,6 @@
+{"type":"launched"}
+{"type":"started","key":"v2:k1","agentId":"a0001","label":"code:ONE","phase":"Code"}
+{"type":"started","key":"v2:k2","agentId":"a0002","label":"<img src=x onerror=alert(1)>","phase":"Code"}
+{"type":"result","key":"v2:k1","agentId":"a0001","result":{"line":"ONE !12 done: tests 4/4 api_key=sk-abcdefghijklmnopqrstuv","extra":"x"}}
+{"type":"started","key":"v2:k3","agentId":"a0003","label":"verify:ONE","phase":"Verify"}
+{"type":"result","key":"v2:k3","agentId":"a0003","result":{"status":"failed","notes":"pipeline red"}}
