@@ -1,0 +1,229 @@
+{
+  "name": "agent-vscode",
+  "displayName": "Agent",
+  "description": "Local observer for Claude Code and Codex sessions: what is running, where, and what changed.",
+  "version": "0.3.0",
+  "publisher": "juliandatapass",
+  "private": true,
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/julian-passebecq/datapass-agent.git"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Agent reads only provider artifacts in your user profile. In untrusted workspaces Git correlation is disabled."
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agent",
+          "title": "Agent",
+          "icon": "media/agent.svg"
+        }
+      ]
+    },
+    "views": {
+      "agent": [
+        {
+          "id": "agent.cockpit",
+          "name": "Cockpit",
+          "type": "webview"
+        },
+        {
+          "id": "agent.sessions",
+          "name": "Sessions"
+        },
+        {
+          "id": "agent.timeline",
+          "name": "Timeline",
+          "type": "webview"
+        },
+        {
+          "id": "agent.activity",
+          "name": "Activity",
+          "type": "webview",
+          "visibility": "collapsed"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "agent.refresh",
+        "title": "Agent: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "agent.openWorkspace",
+        "title": "Agent: Open Workspace",
+        "icon": "$(layout)"
+      },
+      {
+        "command": "agent.openWorkspaceNewTab",
+        "title": "Agent: Open Workspace in New Tab",
+        "icon": "$(add)"
+      },
+      {
+        "command": "agent.openAttention",
+        "title": "Agent: Show Attention Queue"
+      },
+      {
+        "command": "agent.openTeam",
+        "title": "Agent: Show Team (workers)"
+      },
+      {
+        "command": "agent.openSession",
+        "title": "Agent: Open Session Inspector"
+      },
+      {
+        "command": "agent.openTimeline",
+        "title": "Agent: Show Session Timeline"
+      },
+      {
+        "command": "agent.revealWorktree",
+        "title": "Agent: Reveal Worktree"
+      },
+      {
+        "command": "agent.copySessionId",
+        "title": "Agent: Copy Session Id"
+      },
+      {
+        "command": "agent.openInTern",
+        "title": "Agent: Open in Tern",
+        "enablement": "agent.ternAvailable"
+      },
+      {
+        "command": "agent.showDiagnostics",
+        "title": "Agent: Show Diagnostics"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "agent.refresh",
+          "when": "view == agent.sessions || view == agent.cockpit",
+          "group": "navigation"
+        },
+        {
+          "command": "agent.openWorkspace",
+          "when": "view == agent.cockpit || view == agent.sessions",
+          "group": "navigation@0"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "agent.openSession",
+          "when": "view == agent.sessions && viewItem =~ /session/",
+          "group": "1_open@1"
+        },
+        {
+          "command": "agent.openTimeline",
+          "when": "view == agent.sessions && viewItem =~ /session/",
+          "group": "1_open@2"
+        },
+        {
+          "command": "agent.revealWorktree",
+          "when": "view == agent.sessions && viewItem =~ /session/",
+          "group": "2_nav@1"
+        },
+        {
+          "command": "agent.openInTern",
+          "when": "view == agent.sessions && viewItem =~ /session/ && agent.ternAvailable",
+          "group": "2_nav@2"
+        },
+        {
+          "command": "agent.copySessionId",
+          "when": "view == agent.sessions && viewItem =~ /session/",
+          "group": "3_copy@1"
+        },
+        {
+          "command": "agent.openTeam",
+          "when": "view == agent.sessions && viewItem =~ /session/",
+          "group": "1_open@3"
+        },
+        {
+          "command": "agent.openWorkspace",
+          "when": "view == agent.sessions && viewItem =~ /session/",
+          "group": "1_open@0"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "agent.openInTern",
+          "when": "agent.ternAvailable"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Agent",
+      "properties": {
+        "agent.historyDays": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 30,
+          "description": "How many days of provider session history to load."
+        },
+        "agent.maxSessions": {
+          "type": "number",
+          "default": 300,
+          "minimum": 10,
+          "maximum": 2000,
+          "description": "Upper bound on session artifacts ingested."
+        },
+        "agent.claude.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Observe Claude Code sessions (~/.claude)."
+        },
+        "agent.codex.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Observe Codex sessions (~/.codex)."
+        },
+        "agent.idleMinutes": {
+          "type": "number",
+          "default": 10,
+          "description": "Minutes without activity before an open session is shown as IDLE rather than RUNNING (Codex)."
+        },
+        "agent.idleAlertMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "description": "Minutes an IDLE session waits before it appears in the Attention queue."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check": "tsc -p . --noEmit",
+    "build": "node scripts/build.mjs",
+    "compile-tests": "tsc -p tsconfig.test.json",
+    "test": "npm run compile-tests && node --test \"out-test/test/*.test.js\"",
+    "package": "npm run build && vsce package --no-dependencies --out agent-vscode-0.3.0.vsix",
+    "smoke": "node scripts/smoke.mjs",
+    "perf": "npm run compile-tests && node out-test/scripts/perf.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.95.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.24.0",
+    "playwright-core": "^1.48.0",
+    "typescript": "^5.6.0"
+  }
+}

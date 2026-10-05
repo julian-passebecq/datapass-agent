@@ -1,0 +1,395 @@
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { ProviderState, SourceState } from '../../model';
+import { SessionAccumulator } from '../../sessions/accumulator';
+import { commandLabel, commandText, isGitCommit, isVerificationCommand, testLabel } from '../../sessions/classify';
+import { readNewLines, safeParse, toMs } from '../../util/jsonl';
+import { isInside, isPlausibleLocalPath } from '../../util/paths';
+import { bounded } from '../../util/redact';
+import { ArtifactRef, ProviderAdapter } from '../types';
+import { cmpVersion } from '../claude/claude';
+
+const MAX_PARSE_LINE = 512 * 1024;
+const ROLLOUT = /^rollout-.*-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
+
+export function codexRoot(env = process.env): string {
+  return env.CODEX_HOME && isPlausibleLocalPath(env.CODEX_HOME) ? env.CODEX_HOME : path.join(os.homedir(), '.codex');
+}
+
+/** Codex adapter. Sources (read-only):
+ *  - sessions/YYYY/MM/DD/rollout-*.jsonl   session_meta (id, cwd, cli_version, git, parent_thread_id, agent_nickname),
+ *                                         turn_context (model, effort), task_started/task_complete/turn_aborted,
+ *                                         item_completed (CommandExecution with exit_code, FileChange, SubAgentActivity)
+ *  - archived_sessions/rollout-*.jsonl    archived threads → ENDED
+ *  - session_index.jsonl                  thread_name per id
+ *  Codex exposes no live process registry; live status is derived from open turns and recency. */
+export class CodexAdapter implements ProviderAdapter {
+  readonly provider = 'codex' as const;
+  private accs = new Map<string, SessionAccumulator>();
+  private openTurns = new Map<SessionAccumulator, Set<string>>();
+  private oneShot = new Set<SessionAccumulator>();
+  private archived = new Set<SessionAccumulator>();
+  private pendingCalls = new Map<string, { acc: SessionAccumulator; cmd: string; at?: number; test: boolean }>();
+  private titles = new Map<string, string>();
+  private indexMtime = 0;
+  private latestCli?: string;
+  diagnostics: string[] = [];
+
+  constructor(readonly root = codexRoot()) {}
+
+  detect(): ProviderState {
+    const detected = fs.existsSync(path.join(this.root, 'sessions'));
+    return {
+      provider: 'codex',
+      detected,
+      version: this.latestCli,
+      versionSource: this.latestCli ? 'newest rollout session_meta.cli_version' : undefined,
+      root: this.root,
+      note: detected ? 'rollout logs; no live process registry exposed' : 'Codex not detected (no ~/.codex/sessions)',
+      artifactsScanned: this.accs.size,
+      diagnostics: [...this.diagnostics],
+      sources: this.sources(detected),
+    };
+  }
+
+  private sources(detected: boolean): SourceState[] {
+    const at = Date.now();
+    const accs = [...this.accs.values()];
+    const has = (p: string) => fs.existsSync(path.join(this.root, p));
+    return [
+      { id: 'codex.rollouts', label: 'Codex rollouts', status: detected ? 'ready' : 'missing', detail: detected ? 'sessions/YYYY/MM/DD/rollout-*.jsonl' : 'no ~/.codex/sessions', count: accs.length - this.archived.size, at },
+      { id: 'codex.archive', label: 'Codex archive', status: has('archived_sessions') ? 'ready' : 'missing', detail: has('archived_sessions') ? 'archived_sessions/ (archived = ENDED)' : 'no archived_sessions/: archived threads not visible', count: this.archived.size, at },
+      { id: 'codex.index', label: 'Codex thread titles', status: has('session_index.jsonl') ? 'ready' : 'partial', detail: has('session_index.jsonl') ? 'session_index.jsonl thread_name' : 'no session_index.jsonl: titles fall back to the first prompt', count: this.titles.size, at },
+      { id: 'codex.live', label: 'Codex live status', status: detected ? 'partial' : 'missing', detail: 'no process registry exposed: open turn + recency (INFERRED)', at },
+      { id: 'codex.usage', label: 'Codex usage', status: detected ? 'ready' : 'missing', detail: 'token_count totals + model_context_window; no cost recorded', count: accs.filter(a => a.usage).length, at },
+    ];
+  }
+
+  watchTargets(): string[] {
+    return [path.join(this.root, 'sessions'), path.join(this.root, 'archived_sessions')];
+  }
+
+  listArtifacts(sinceMs: number, max: number): ArtifactRef[] {
+    const out: ArtifactRef[] = [];
+    const add = (p: string) => {
+      try {
+        const st = fs.statSync(p);
+        if (st.mtimeMs >= sinceMs && st.size > 0) out.push({ path: p, mtimeMs: st.mtimeMs, size: st.size });
+      } catch {
+        /* vanished */
+      }
+    };
+    const sessions = path.join(this.root, 'sessions');
+    // Only walk day folders that can contain files modified since sinceMs (rollouts are filed by start day, may run for days).
+    const cutoff = new Date(sinceMs - 7 * 86400_000);
+    for (const y of safeDir(sessions)) {
+      if (!/^\d{4}$/.test(y) || +y < cutoff.getFullYear()) continue;
+      for (const m of safeDir(path.join(sessions, y))) {
+        if (!/^\d{2}$/.test(m)) continue;
+        for (const d of safeDir(path.join(sessions, y, m))) {
+          if (!/^\d{2}$/.test(d)) continue;
+          if (new Date(+y, +m - 1, +d + 1) < cutoff) continue;
+          for (const f of safeDir(path.join(sessions, y, m, d))) if (ROLLOUT.test(f)) add(path.join(sessions, y, m, d, f));
+        }
+      }
+    }
+    for (const f of safeDir(path.join(this.root, 'archived_sessions'))) if (ROLLOUT.test(f)) add(path.join(this.root, 'archived_sessions', f));
+    out.sort((a, b) => b.mtimeMs - a.mtimeMs);
+    return out.slice(0, max);
+  }
+
+  ingest(ref: ArtifactRef): SessionAccumulator | undefined {
+    if (!isInside(this.root, ref.path)) {
+      this.diag(`rejected artifact outside provider root: ${path.basename(ref.path)}`);
+      return undefined;
+    }
+    let acc = this.accs.get(ref.path);
+    if (acc && acc.cursor && acc.cursor.size === ref.size && acc.cursor.mtimeMs === ref.mtimeMs) return acc;
+    if (!acc) {
+      const id = ROLLOUT.exec(path.basename(ref.path))?.[1] ?? path.basename(ref.path, '.jsonl');
+      acc = new SessionAccumulator('codex', id, ref.path);
+      if (path.basename(path.dirname(ref.path)) === 'archived_sessions') {
+        this.archived.add(acc);
+        acc.ev('status', 'OBSERVED', 'rollout moved to archived_sessions/');
+      }
+      this.accs.set(ref.path, acc);
+    }
+    try {
+      const res = readNewLines(ref.path, acc.cursor, line => this.line(acc!, line));
+      if (res.reset) acc.diag('artifact was truncated or replaced; re-read from start');
+      acc.malformed += res.skippedOversize;
+      acc.cursor = res.cursor;
+    } catch (e: any) {
+      acc.diag(`read failed: ${e?.code ?? 'error'}`);
+    }
+    if (acc.lastActivityAt === undefined) {
+      acc.touch(ref.mtimeMs);
+      acc.ev('lastActivityAt', 'DERIVED', 'artifact mtime');
+    }
+    return acc;
+  }
+
+  private line(acc: SessionAccumulator, line: string): void {
+    if (line.length > MAX_PARSE_LINE) {
+      const m = /^\{"timestamp":"([^"]{10,40})"/.exec(line);
+      acc.touch(toMs(m?.[1]));
+      return;
+    }
+    const o = safeParse(line);
+    if (!o) {
+      acc.malformed++;
+      return;
+    }
+    const at = toMs(o.timestamp);
+    const p = o.payload && typeof o.payload === 'object' ? o.payload : {};
+    switch (o.type) {
+      case 'session_meta':
+        return this.meta(acc, p, at);
+      case 'turn_context':
+        acc.touch(at);
+        if (typeof p.model === 'string') {
+          acc.model = bounded(p.model, 60);
+          acc.ev('model', 'OBSERVED', 'turn_context.model');
+        }
+        {
+          const eff = p.effort ?? p.collaboration_mode?.settings?.reasoning_effort;
+          if (typeof eff === 'string') {
+            acc.effort = bounded(eff, 20);
+            acc.ev('effort', 'OBSERVED', 'turn_context.effort');
+          }
+        }
+        if (isPlausibleLocalPath(p.cwd) && !acc.cwd) {
+          acc.cwd = p.cwd;
+          acc.ev('cwd', 'OBSERVED', 'turn_context.cwd');
+        }
+        return;
+      case 'event_msg':
+        acc.touch(at);
+        return this.eventMsg(acc, p, at);
+      case 'response_item':
+        acc.touch(at);
+        return this.responseItem(acc, p, at);
+      case 'compacted':
+        acc.event(at, 'SESSION_ACTIVITY', 'context compacted', 'OBSERVED');
+        return;
+      default:
+        if (typeof o.type === 'string') acc.touch(at);
+    }
+  }
+
+  private meta(acc: SessionAccumulator, p: Record<string, any>, at?: number): void {
+    // Forked/subagent rollouts can embed further session_meta records; only the first describes this file.
+    if (acc.flags.has('meta')) return;
+    acc.flags.add('meta');
+    const t = toMs(p.timestamp) ?? at;
+    if (typeof p.id === 'string' && /^[0-9a-f-]{36}$/i.test(p.id) && p.id !== acc.sessionId) acc.diag('session_meta id differs from file name id');
+    acc.touch(t);
+    acc.event(t, 'SESSION_STARTED', acc.isWorker ? 'worker started' : 'session started', 'OBSERVED');
+    if (isPlausibleLocalPath(p.cwd)) {
+      acc.cwd = p.cwd;
+      acc.ev('cwd', 'OBSERVED', 'session_meta.cwd');
+    }
+    if (typeof p.cli_version === 'string') {
+      acc.providerVersion = bounded(p.cli_version, 40);
+      acc.ev('providerVersion', 'OBSERVED', 'session_meta.cli_version');
+      if (!this.latestCli || cmpVersion(p.cli_version, this.latestCli) > 0) this.latestCli = p.cli_version;
+    }
+    if (typeof p.git?.commit_hash === 'string' && /^[0-9a-f]{40}$/.test(p.git.commit_hash)) {
+      acc.headBefore = p.git.commit_hash;
+      acc.ev('headBefore', 'OBSERVED', 'session_meta.git.commit_hash');
+    }
+    if (typeof p.git?.branch === 'string') {
+      acc.branch = bounded(p.git.branch, 120);
+      acc.ev('branch', 'OBSERVED', 'session_meta.git.branch');
+    }
+    const spawn = p.source?.subagent?.thread_spawn;
+    const parent = p.parent_thread_id ?? spawn?.parent_thread_id;
+    if (typeof parent === 'string' && /^[0-9a-f-]{36}$/i.test(parent)) {
+      acc.isWorker = true;
+      acc.parentSessionId = `codex:${parent}`;
+      acc.ev('parentSessionId', 'OBSERVED', 'session_meta.parent_thread_id');
+      const nick = p.agent_nickname ?? spawn?.agent_nickname;
+      const role = p.agent_role ?? spawn?.agent_role;
+      const apath = p.agent_path ?? spawn?.agent_path;
+      acc.workerLabel = bounded([nick, role, apath].filter(x => typeof x === 'string' && x).join(' · '), 70) || 'subagent';
+      acc.ev('workerLabel', 'OBSERVED', 'session_meta.agent_nickname/agent_path');
+    }
+    if (p.source === 'exec' || p.originator === 'codex_exec') this.oneShot.add(acc);
+  }
+
+  private eventMsg(acc: SessionAccumulator, p: Record<string, any>, at?: number): void {
+    const turn = typeof p.turn_id === 'string' ? p.turn_id : undefined;
+    switch (p.type) {
+      case 'task_started': {
+        acc.counts.turns++;
+        if (turn) set(this.openTurns, acc).add(turn);
+        acc.event(toMs(p.started_at) ?? at, 'SESSION_ACTIVITY', 'turn started', 'OBSERVED', turn && `ts:${turn}`);
+        return;
+      }
+      case 'task_complete':
+      case 'turn_aborted': {
+        if (turn) set(this.openTurns, acc).delete(turn);
+        const label = p.type === 'turn_aborted' ? `turn aborted (${bounded(p.reason, 20) || 'unknown'})` : p.error ? 'turn completed with error' : 'turn completed';
+        acc.event(toMs(p.completed_at) ?? at, 'SESSION_ACTIVITY', label, 'OBSERVED', turn && `tc:${turn}`);
+        return;
+      }
+      case 'token_count': {
+        const t = p.info?.total_token_usage, l = p.info?.last_token_usage;
+        const n = (x: unknown) => (typeof x === 'number' && x >= 0 ? x : 0);
+        if (!t || typeof t !== 'object') return;
+        const u = (acc.usage ??= { totalTokens: 0, outputTokens: 0, cachedInputTokens: 0 });
+        u.totalTokens = n(t.total_tokens);
+        u.outputTokens = n(t.output_tokens);
+        u.cachedInputTokens = n(t.cached_input_tokens);
+        if (l && typeof l === 'object') u.contextTokens = n(l.input_tokens);
+        if (typeof p.info.model_context_window === 'number') u.contextWindow = p.info.model_context_window;
+        acc.ev('usage', 'OBSERVED', 'event_msg token_count (cumulative)');
+        return;
+      }
+      case 'item_completed':
+        return this.item(acc, p.item, toMs(p.completed_at_ms) ?? at);
+      case 'user_message':
+        if (!acc.firstPrompt && typeof p.message === 'string') acc.firstPrompt = bounded(p.message, 80);
+        return;
+      case 'exec_command_end':
+        // Older rollout format.
+        return this.command(acc, commandText(p.command), typeof p.exit_code === 'number' ? p.exit_code : undefined, at, p.call_id, p.duration);
+    }
+  }
+
+  private item(acc: SessionAccumulator, it: any, at?: number): void {
+    if (!it || typeof it !== 'object') return;
+    const id = typeof it.id === 'string' ? it.id : undefined;
+    switch (it.type) {
+      case 'CommandExecution':
+        return this.command(acc, commandText(it.command), typeof it.exit_code === 'number' ? it.exit_code : undefined, at, id, it.duration, it.status);
+      case 'FileChange': {
+        const changes = it.changes && typeof it.changes === 'object' ? it.changes : {};
+        const files = Object.keys(changes).filter(isPlausibleLocalPath);
+        for (const f of files) acc.file(f);
+        acc.counts.fileEdits += files.length;
+        if (files.length) acc.event(at, 'FILE_CHANGE', files.length === 1 ? `${changes[files[0]]?.type ?? 'changed'} ${path.basename(files[0])}` : `${files.length} files changed`, 'OBSERVED', id);
+        return;
+      }
+      case 'UserMessage': {
+        if (!acc.firstPrompt && Array.isArray(it.content)) {
+          const t = it.content.find((c: any) => typeof c?.text === 'string');
+          if (t && !t.text.startsWith('<')) acc.firstPrompt = bounded(t.text, 80);
+        }
+        return;
+      }
+      case 'CollabAgentToolCall':
+        if (it.tool === 'spawn_agent' || it.tool === 'spawn') acc.event(at, 'WORKER_STARTED', 'subagent spawned', 'OBSERVED', id);
+        else acc.counts.tools++;
+        return;
+      case 'SubAgentActivity':
+        if (it.kind === 'started' || it.kind === 'spawned') acc.event(at, 'WORKER_STARTED', 'subagent started', 'OBSERVED', id);
+        else if (it.kind === 'completed' || it.kind === 'finished' || it.kind === 'closed') acc.event(at, 'WORKER_ENDED', 'subagent finished', 'OBSERVED', id);
+        return;
+      case 'McpToolCall':
+      case 'WebSearch':
+      case 'ImageView':
+      case 'Extension':
+        acc.counts.tools++;
+        acc.event(at, 'TOOL_ACTIVITY', it.type === 'McpToolCall' ? `mcp ${bounded(it.tool ?? it.name ?? '', 40)}`.trim() : it.type, 'OBSERVED', id);
+        return;
+    }
+  }
+
+  private responseItem(acc: SessionAccumulator, p: Record<string, any>, at?: number): void {
+    // Function calls: worker spawn and older shell formats. Newer exec items are taken from item_completed.
+    if (p.type === 'function_call' && typeof p.name === 'string') {
+      if (p.name === 'spawn_agent') {
+        acc.event(at, 'WORKER_STARTED', 'spawn_agent', 'OBSERVED', p.call_id);
+        return;
+      }
+      if (p.name === 'shell' || p.name === 'container.exec' || p.name === 'shell_command') {
+        const args = typeof p.arguments === 'string' ? safeParse(p.arguments) : undefined;
+        const cmd = commandText(args?.command ?? args?.cmd);
+        if (cmd && typeof p.call_id === 'string') this.pendingCalls.set(p.call_id, { acc, cmd, at, test: isVerificationCommand(cmd) });
+      }
+      return;
+    }
+    if (p.type === 'function_call_output' && typeof p.call_id === 'string') {
+      const call = this.pendingCalls.get(p.call_id);
+      if (!call) return;
+      this.pendingCalls.delete(p.call_id);
+      const out = typeof p.output === 'string' ? safeParse(p.output) : p.output;
+      const code = typeof out?.metadata?.exit_code === 'number' ? out.metadata.exit_code : undefined;
+      this.command(call.acc, call.cmd, code, at ?? call.at, p.call_id);
+    }
+  }
+
+  private command(acc: SessionAccumulator, cmd: string, exit: number | undefined, at: number | undefined, id?: string, duration?: any, status?: string): void {
+    if (!cmd || at === undefined) return;
+    if (id && acc.seenIds.has(`cmd:${id}`)) return;
+    if (id) acc.seenIds.add(`cmd:${id}`);
+    acc.counts.commands++;
+    acc.counts.tools++;
+    const label = bounded(commandLabel(cmd), 100);
+    const durMs = typeof duration?.secs === 'number' ? duration.secs * 1000 + Math.round((duration.nanos ?? 0) / 1e6) : undefined;
+    if (isVerificationCommand(cmd)) {
+      const outcome = exit === undefined ? 'UNKNOWN' : exit === 0 ? 'PASS' : 'FAIL';
+      acc.tests.push({ command: testLabel(cmd), at: durMs ? at - durMs : at, outcome, exitCode: exit, durationMs: durMs, source: 'provider-exit-code' });
+      acc.event(at, 'TEST', `${outcome} ${testLabel(cmd)}`, 'OBSERVED');
+    } else acc.event(at, 'PROCESS_ACTIVITY', `$ ${label}${exit !== undefined && exit !== 0 ? `  → exit ${exit}` : status === 'failed' ? '  → failed' : ''}`, 'OBSERVED');
+    if (isGitCommit(cmd) && (exit === undefined || exit === 0)) {
+      acc.ranGitCommit = true;
+      acc.event(at, 'GIT_CHANGE', 'git commit command run', 'OBSERVED');
+    }
+  }
+
+  private loadIndex(): void {
+    const f = path.join(this.root, 'session_index.jsonl');
+    try {
+      const st = fs.statSync(f);
+      if (st.mtimeMs === this.indexMtime || st.size > 16 << 20) return;
+      this.indexMtime = st.mtimeMs;
+      for (const l of fs.readFileSync(f, 'utf8').split('\n')) {
+        const o = l ? safeParse(l) : undefined;
+        if (o && typeof o.id === 'string' && typeof o.thread_name === 'string') this.titles.set(o.id, bounded(o.thread_name, 80));
+      }
+    } catch {
+      /* optional */
+    }
+  }
+
+  refreshLive(accs: Iterable<SessionAccumulator>, _now: number): void {
+    this.loadIndex();
+    for (const acc of accs) {
+      if (acc.provider !== 'codex') continue;
+      const t = this.titles.get(acc.sessionId);
+      if (t) {
+        acc.title = t;
+        acc.ev('title', 'OBSERVED', 'session_index.jsonl thread_name');
+      }
+      const open = (this.openTurns.get(acc)?.size ?? 0) > 0;
+      acc.live = {
+        explicitEnded: this.archived.has(acc),
+        openTurn: open,
+        oneShotDone: this.oneShot.has(acc) && !open && acc.counts.turns > 0,
+        lastActivityAt: acc.lastActivityAt,
+      };
+      if (!this.archived.has(acc)) acc.ev('status', 'INFERRED', 'open turn + recency of rollout writes (Codex exposes no live registry)');
+    }
+  }
+
+  private diag(m: string): void {
+    if (this.diagnostics.length < 20 && !this.diagnostics.includes(m)) this.diagnostics.push(m);
+  }
+}
+
+function set<K, V>(m: Map<K, Set<V>>, k: K): Set<V> {
+  let s = m.get(k);
+  if (!s) m.set(k, (s = new Set()));
+  return s;
+}
+
+function safeDir(d: string): string[] {
+  try {
+    return fs.readdirSync(d);
+  } catch {
+    return [];
+  }
+}
