@@ -20,6 +20,7 @@ import { signalsView } from './signals';
 import { tokensView } from './tokens';
 import { topologyView } from './topology';
 import { weekView } from './week';
+import { workflowsView } from './workflows';
 
 export const ALL_EXTRA: ExtraView[] = [
   auditView,
@@ -41,6 +42,7 @@ export const ALL_EXTRA: ExtraView[] = [
   tokensView,
   topologyView,
   weekView,
+  workflowsView,
 ];
 
 export const EXTRA_VIEWS: ExtraView[] = ALL_EXTRA.filter(v => v.ready !== false);
