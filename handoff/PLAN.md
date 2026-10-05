@@ -1,7 +1,17 @@
 # Agent — plan
 
-State: 0.3.0 on `feat/agent-v01`, PR julian-passebecq/agent-vscode#1 open (merge = Julian's gate). Evidence `D:\PROJ\AGENT-V03-EVIDENCE`.
+State (5 Oct 2026, 07:00): 0.4.1 on `main` (45 PRs merged during the night build, waves 1–4). Evidence `D:\PROJ\AGENT-V04-EVIDENCE` (96/96 VSIX smoke, 36 screens). Julian gave full merge rights on this repo (5 Oct). Wave 5 (dispatch, lifecycle, panes) running.
 Rule for every package: observe only, local only, every value carries its evidence kind; no LLM judgement, no control of sessions.
+
+## Idées de Julian (2026-10-05 morning, via ACC 2: 5 more screenshots)
+
+| Idea | Fit for Agent | Decision |
+|---|---|---|
+| Log every agent dispatch, then its result and actual usage per task ("true cost") | strong: workers + spawns are already recorded | **Wave 5 · dispatch** (Log tab) |
+| Score vs average cost per task curves per model (CursorBench chart) | adapted: success rate vs tokens per dispatch on OUR data, money only from an optional user price table | **Wave 5 · dispatch** (Cost vs outcome tab) |
+| State-machine diagrams of object statuses | strong: session statuses + edit/test/commit loop | **Wave 5 · lifecycle** |
+| Multi-pane dev workspace (git graph, SQL, notebook, TODO, process monitor side by side) | adapted: 2–4 Agent screens side by side in one tab | **Wave 5 · panes** |
+| Harness vs loop vs graph engineering layers | context for the screens above (environment / feedback loop / workflow graph); no separate screen | noted |
 
 ## Idées de Julian (2026-10-05, via ACC 2: 5 screenshots)
 
