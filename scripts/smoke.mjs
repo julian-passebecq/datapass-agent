@@ -1,15 +1,20 @@
 // Installed-VSIX qualification: installs the packaged VSIX into an isolated VS Code profile, launches VS Code with
 // Playwright (_electron), opens every Agent surface, reloads, switches theme, and checks the extension host log.
-// Usage: node scripts/smoke.mjs [screenshotsDir]
+// Usage: node scripts/smoke.mjs [screenshotsDir] [--fixture-home]
+// --fixture-home: run against a synthetic Claude/Codex home built from test/fixtures (scripts/smoke-fixture.mjs) in a
+// temp dir instead of the real ~/.claude and ~/.codex history; CI runners have no agent history of their own.
 import { _electron as electron } from 'playwright-core';
 import { execFileSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { buildFixtureHome } from './smoke-fixture.mjs';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const vsix = path.join(root, `agent-vscode-${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}.vsix`);
-const shots = path.resolve(process.argv[2] ?? path.join(root, '.smoke', 'screenshots'));
+const args = process.argv.slice(2);
+const fixtureHome = args.includes('--fixture-home');
+const shots = path.resolve(args.find(a => !a.startsWith('--')) ?? path.join(root, '.smoke', 'screenshots'));
 const codeDir = process.env.VSCODE_DIR ?? path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Microsoft VS Code');
 const codeExe = path.join(codeDir, process.platform === 'win32' ? 'Code.exe' : 'code');
 const base = path.join(root, '.smoke');
@@ -39,11 +44,16 @@ const install = execFileSync(codeExe, [cliJs, '--extensions-dir', extDir, '--use
 check('VSIX installs into isolated profile', /successfully installed/i.test(install), install.trim().split('\n').pop());
 
 const workspace = root; // trusted folder; Agent only reads ~/.claude and ~/.codex
+// Synthetic home (--fixture-home): rebuilt before each launch so its newest record is always a minute old.
+const homeDir = fixtureHome ? fs.mkdtempSync(path.join(os.tmpdir(), 'agent-smoke-home-')) : undefined;
+const homeEnv = () => (homeDir ? { ...process.env, ...buildFixtureHome(homeDir, { cwd: workspace }) } : undefined);
+if (homeDir) console.log(`Fixture home: ${homeDir}`);
 async function launch() {
   const app = await electron.launch({
     executablePath: codeExe,
     args: ['--extensions-dir', extDir, '--user-data-dir', userData, '--disable-gpu-sandbox', '--skip-release-notes', '--skip-welcome', '--disable-workspace-trust', '--new-window', workspace],
     timeout: 60_000,
+    ...(homeDir ? { env: homeEnv() } : {}),
   });
   const win = await app.firstWindow();
   await win.waitForSelector('.monaco-workbench', { timeout: 60_000 });
@@ -340,6 +350,8 @@ result.agentErrors = agentErrors;
 result.shutdownCancellations = shutdownNoise;
 if (shutdownNoise.length) console.log(`NOTE ${shutdownNoise.length} cancellation(s) logged while the extension host was terminating for reload`);
 if (result.loadingTimeouts?.length) console.log(`NOTE still loading after 20 s: ${result.loadingTimeouts.join(', ')}`);
+result.fixtureHome = !!homeDir;
+if (homeDir) fs.rmSync(homeDir, { recursive: true, force: true, maxRetries: 3 });
 result.passed = result.checks.every(c => c.ok) && result.errors.length === 0;
 fs.writeFileSync(path.join(shots, '..', 'smoke-result.json'), JSON.stringify(result, null, 2));
 console.log(result.passed ? 'SMOKE PASS' : 'SMOKE FAIL');

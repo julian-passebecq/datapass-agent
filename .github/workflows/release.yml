@@ -3,6 +3,7 @@ name: release-qualification
 # Release gate: full qualification of the packaged VSIX, run by hand or on a version tag.
 # ci.yml stays the fast per-push check; this workflow adds the installed-VSIX smoke (scripts/smoke.mjs),
 # which needs a real VS Code: it is downloaded with @vscode/test-electron (no repo dependency change).
+# Runners have no Claude/Codex history, so the smoke runs on a synthetic home built from test/fixtures (--fixture-home).
 # If VS Code cannot be downloaded or launched, the smoke step is skipped with a clear notice unless
 # `require_smoke` is true (the default for tags).
 
@@ -70,10 +71,10 @@ jobs:
           "## Smoke skipped`n$msg" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           if ($env:REQUIRE_SMOKE -eq 'true') { Write-Error 'require_smoke is on: failing the release gate'; exit 1 }
 
-      - name: Installed-VSIX smoke (Playwright _electron, dark + light, every screen)
+      - name: Installed-VSIX smoke (Playwright _electron, dark + light, every screen, synthetic fixture home)
         if: steps.vscode.outputs.available == 'true'
         shell: pwsh
-        run: node scripts/smoke.mjs .smoke/screenshots
+        run: node scripts/smoke.mjs .smoke/screenshots --fixture-home
 
       - name: Smoke summary
         if: always() && steps.vscode.outputs.available == 'true'
