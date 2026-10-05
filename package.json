@@ -442,6 +442,12 @@
           "maximum": 100,
           "description": "Limits screen: alert threshold (%); also drives the rail badge (highest Codex used % at or above the warning threshold)."
         },
+        "agent.dispatch.pricePerMTok": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": { "type": "number", "minimum": 0 },
+          "description": "Dispatches screen: optional price per million tokens by model id (e.g. {\"claude-opus-5-5\": 1.5}). Agent never prices tokens by itself; any $ shown is DERIVED from this setting (tokens incl. cache reads x your price). Empty = no money shown."
+        },
         "agent.pipelines.enabled": {
           "type": "boolean",
           "default": false,
