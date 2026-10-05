@@ -12,6 +12,7 @@ import { exploreView } from './explore';
 import { forecastView } from './forecast';
 import { healthView } from './health';
 import { historyView } from './history';
+import { hudView } from './hud';
 import { launcherView } from './launcher';
 import { lifecycleView } from './lifecycle';
 import { limitsView } from './limits';
@@ -24,6 +25,7 @@ import { reposView } from './repos';
 import { reviewView } from './review';
 import { rolesView } from './roles';
 import { runsView } from './runs';
+import { scopeView } from './scope';
 import { settingsView } from './settings';
 import { signalsView } from './signals';
 import { tokensView } from './tokens';
@@ -48,6 +50,7 @@ export function allExtra(): ExtraView[] {
   forecastView,
   healthView,
   historyView,
+  hudView,
   launcherView,
   lifecycleView,
   limitsView,
@@ -60,6 +63,7 @@ export function allExtra(): ExtraView[] {
   reviewView,
   rolesView,
   runsView,
+  scopeView,
   settingsView,
   signalsView,
   tokensView,

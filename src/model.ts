@@ -145,8 +145,22 @@ export interface SessionFacts {
   entrypoint?: string;
   /** Codex only: latest `token_count.rate_limits` (used %, window, reset) plus a short used-% history. */
   rateLimits?: RateLimits;
+  /** Latest todo / plan list the agent wrote (Claude TodoWrite or TaskCreate / TaskUpdate, Codex update_plan),
+   *  capped at 30 items × 120 chars, redacted. */
+  todos?: TodoList;
   /** Tool name → size of the tool results put back into the model context (characters only, never content). */
   toolResultChars?: Record<string, ToolResultSize>;
+}
+
+export type TodoStatus = 'pending' | 'in_progress' | 'completed';
+export interface TodoList {
+  /** When the list was last written (epoch ms). */
+  at: number;
+  /** Tool that wrote it (TodoWrite, TaskCreate, update_plan …). */
+  source: string;
+  items: { text: string; status: TodoStatus }[];
+  /** Items dropped by the cap. */
+  dropped?: number;
 }
 
 /** Sizes of one tool's results (OBSERVED character counts; tokens are only estimated from them, ≈ chars / 4). */

@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { AgentSessionSnapshot, RateLimits, SessionFacts, SessionUsage, Evidence, EventType, EvidenceKind, Provider, TestObservation, TimelineEvent, sessionKey } from '../model';
+import { AgentSessionSnapshot, RateLimits, TodoList, TodoStatus, SessionFacts, SessionUsage, Evidence, EventType, EvidenceKind, Provider, TestObservation, TimelineEvent, sessionKey } from '../model';
 import { Cursor } from '../util/jsonl';
 import { bounded } from '../util/redact';
 import { LiveSignal } from './classify';
@@ -280,6 +280,60 @@ export class SessionAccumulator {
     fx.v++;
   }
 
+  /** The agent wrote its whole todo / plan list (Claude TodoWrite, Codex update_plan). Replaces the previous list. */
+  setTodos(at: number | undefined, source: string, raw: { text: unknown; status: unknown }[]): void {
+    const items: TodoList['items'] = [];
+    let dropped = 0;
+    for (const r of raw) {
+      const text = bounded(r.text, MAX_TODO_CHARS);
+      if (!text) continue;
+      if (items.length >= MAX_TODOS) dropped++;
+      else items.push({ text, status: todoStatus(r.status) });
+    }
+    this.fx.todos = { at: at ?? this.fx.todos?.at ?? 0, source: bounded(source, 40), items, ...(dropped ? { dropped } : {}) };
+    this.fx.todoIds = undefined;
+    this.fx.v++;
+  }
+
+  /** Claude TaskCreate: one task appended. Claude numbers tasks 1, 2, 3 … per list, so the id is the creation order. */
+  taskCreate(at: number | undefined, subject: unknown): void {
+    const text = bounded(subject, MAX_TODO_CHARS);
+    if (!text) return;
+    const fx = this.fx;
+    if (!fx.todos || !fx.todoIds) {
+      fx.todos = { at: 0, source: 'TaskCreate', items: [] };
+      fx.todoIds = [];
+      fx.todoSeq = 0;
+    }
+    fx.todoSeq = (fx.todoSeq ?? 0) + 1;
+    if (fx.todos.items.length < MAX_TODOS) {
+      fx.todos.items.push({ text, status: 'pending' });
+      fx.todoIds.push(String(fx.todoSeq));
+    } else fx.todos.dropped = (fx.todos.dropped ?? 0) + 1;
+    fx.todos.at = at ?? fx.todos.at;
+    fx.todos.source = 'TaskCreate';
+    fx.v++;
+  }
+
+  /** Claude TaskUpdate: status (or subject) of one task by id; "deleted" removes it. */
+  taskUpdate(at: number | undefined, id: unknown, status: unknown, subject?: unknown): void {
+    const fx = this.fx;
+    if (!fx.todos || !fx.todoIds || (typeof id !== 'string' && typeof id !== 'number')) return;
+    const i = fx.todoIds.indexOf(String(id));
+    if (i < 0) return;
+    if (status === 'deleted') {
+      fx.todos.items.splice(i, 1);
+      fx.todoIds.splice(i, 1);
+    } else {
+      if (status !== undefined) fx.todos.items[i].status = todoStatus(status);
+      const text = bounded(subject, MAX_TODO_CHARS);
+      if (text) fx.todos.items[i].text = text;
+    }
+    fx.todos.at = at ?? fx.todos.at;
+    fx.todos.source = 'TaskUpdate';
+    fx.v++;
+  }
+
   /** Read-only view for tests and adapters. */
   get pendingToolCount(): number {
     return this.fx.pending.size;
@@ -318,6 +372,7 @@ export class SessionAccumulator {
       activeMs: fx.lastTick !== undefined ? fx.activeMs : undefined,
       entrypoint: fx.strings.entrypoint,
       rateLimits: fx.rate && { ...fx.rate, history: fx.rate.history?.slice(-300) },
+      todos: fx.todos && { ...fx.todos, items: fx.todos.items.map(t => ({ ...t })) },
       toolResultChars: fx.results.size
         ? Object.fromEntries([...fx.results].map(([k, r]) => [k, { calls: r.calls, chars: r.chars, max: r.max, samples: r.samples.slice(-MAX_RESULT_SAMPLES) }]))
         : undefined,
@@ -374,6 +429,15 @@ export const MAX_FACT_FILES = 300;
 export const ACTIVE_GAP_MS = 5 * 60_000;
 const MAX_TOOL_KEYS = 80;
 const MAX_SPAWNS = 200;
+export const MAX_TODOS = 30;
+export const MAX_TODO_CHARS = 120;
+
+function todoStatus(v: unknown): TodoStatus {
+  const s = typeof v === 'string' ? v.toLowerCase() : '';
+  if (s === 'completed' || s === 'complete' || s === 'done') return 'completed';
+  if (s === 'in_progress' || s === 'in-progress' || s === 'active' || s === 'running') return 'in_progress';
+  return 'pending';
+}
 export const MAX_RESULT_SAMPLES = 200;
 const MAX_RESULT_NAMES = 500;
 
@@ -399,6 +463,10 @@ class FactsState {
   activeMs = 0;
   lastTick?: number;
   rate?: RateLimits;
+  todos?: TodoList;
+  /** Claude Task tool ids, parallel to todos.items (only while the list comes from TaskCreate). */
+  todoIds?: string[];
+  todoSeq?: number;
   /** tool call id → tool name, until its result is seen (bounded). */
   resultNames = new Map<string, string>();
   results = new Map<string, { calls: number; chars: number; max: number; samples: [number, number][] }>();
@@ -409,6 +477,7 @@ const FACT_EVIDENCE: Evidence[] = [
   { field: 'facts', kind: 'OBSERVED', source: 'tool calls, prompts, tokens, modes as recorded in the transcript / rollout' },
   { field: 'facts.activeMs', kind: 'DERIVED', source: 'sum of gaps < 5 min between recorded events' },
   { field: 'facts.waitMs', kind: 'DERIVED', source: 'gaps between the agent finishing a turn and the next human prompt' },
+  { field: 'facts.todos', kind: 'OBSERVED', source: 'latest TodoWrite / TaskCreate+TaskUpdate (Claude) or update_plan (Codex) call input' },
   { field: 'facts.toolResultChars', kind: 'OBSERVED', source: 'character length of tool_result / function_call_output content (content never kept)' },
 ];
 
