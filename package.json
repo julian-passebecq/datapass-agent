@@ -514,7 +514,8 @@
         "agent.archive.rawTranscripts": {
           "type": "boolean",
           "default": false,
-          "description": "Daily archive: also keep gzip copies of Claude transcripts and Codex rollouts in <archive>/raw (full conversation text, local only; auth and secret files are never copied). Same as npm run archive -- --raw."
+          "description": "Daily archive: also keep gzip copies of Claude transcripts and Codex rollouts in <archive>/raw. These raw copies are NOT redacted: they hold the full conversation text, including any key, token or password pasted in a prompt or printed by a tool. Local only; auth and secret files are never copied. Keep the archive folder private. Same as npm run archive -- --raw.",
+          "markdownDescription": "Daily archive: also keep gzip copies of Claude transcripts and Codex rollouts in `<archive>/raw`.\n\n**Raw copies are NOT redacted**: they hold the full conversation text, including any key, token or password pasted in a prompt or printed by a tool. Local only; auth and secret files are never copied. Keep the archive folder private. Same as `npm run archive -- --raw`."
         },
         "agent.archive.rawMaxGB": {
           "type": "number",
