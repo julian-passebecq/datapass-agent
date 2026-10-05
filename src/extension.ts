@@ -34,6 +34,8 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
     maxSessions: cfg().get<number>('maxSessions', 300),
     idleMinutes: cfg().get<number>('idleMinutes', 10),
     git: vscode.workspace.isTrusted,
+    // Paused until an Agent view shows (see syncGitEnded below).
+    gitEnded: false,
   });
   const api: AgentApi = { store, installed: {}, activationMs: 0, openWorkspace: (v, k) => workspace.open(v as any, k) };
 
@@ -47,7 +49,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
   const timeline = new AgentView('timeline', store, m => onMessage(m));
   const cockpit = new AgentView('cockpit', store, m => onMessage(m));
   const activity = new AgentView('activity', store, m => onMessage(m));
-  const inspector = new Inspector(store, m => onMessage(m), () => ternAvailable);
+  const inspector = new Inspector(store, m => onMessage(m), () => ternAvailable, (view, key) => workspace.open(view, key));
   const tree = new SessionsTree(store);
   const workspace = new WorkspacePanel(store, m => onMessage(m), () => ternAvailable);
   // Extra tabs: each its own screen / scope / options.
@@ -55,15 +57,32 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
   const newTab = (view?: string, key?: string, opts?: Record<string, string>) => {
     const p = new WorkspacePanel(store, m => onMessage(m), () => ternAvailable, x => { tabs.delete(x); x.dispose(); });
     tabs.add(p);
+    p.onVisibility = syncGitEnded;
     p.open(view ?? (workspace as any).state?.view, key, opts);
   };
+
+  // Git correlation of ENDED sessions only feeds what a view shows: paused while no Agent view is visible, resumed
+  // (with a refresh) as soon as one is. Live sessions keep being correlated.
+  let resumeTimer: NodeJS.Timeout | undefined;
+  function syncGitEnded(): void {
+    const on = cockpit.visible || timeline.visible || activity.visible || inspector.visible || workspace.visible || [...tabs].some(t => t.visible);
+    if (on === (store.opts.gitEnded !== false)) return;
+    store.opts.gitEnded = on;
+    out.trace(`git correlation of ended sessions ${on ? 'resumed' : 'paused (no Agent view visible)'}`);
+    if (on && !resumeTimer) resumeTimer = setTimeout(() => {
+      resumeTimer = undefined;
+      void store.refresh();
+    }, 500);
+  }
+  for (const v of [cockpit, timeline, activity, inspector, workspace]) v.onVisibility = syncGitEnded;
+  ctx.subscriptions.push({ dispose: () => resumeTimer && clearTimeout(resumeTimer) });
 
   function onMessage(m: WebviewMessage): void {
     if (m.type === 'ready') return; // handled by each view
     if (m.type === 'open') return inspector.open(m.key);
     if (m.type === 'select') return workspace.open(undefined, m.key);
     if (m.type === 'nav') return workspace.open(m.view);
-    if (m.type === 'opt' || m.type === 'act') return; // workspace-only
+    if (m.type === 'opt' || m.type === 'act' || m.type === 'clear') return; // workspace-only
     switch (m.cmd) {
       case 'refresh':
         void store.refresh();

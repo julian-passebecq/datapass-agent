@@ -10,6 +10,9 @@ export interface StoreOptions {
   idleMinutes: number;
   /** Git correlation is disabled in untrusted workspaces. */
   git: boolean;
+  /** Correlate ENDED sessions (default true). The extension turns it off while no Agent view is visible: their result
+   *  is only needed for display, and they are correlated on the next pass once a view shows. */
+  gitEnded?: boolean;
 }
 
 export interface RefreshStats {
@@ -196,6 +199,7 @@ export class SessionStore {
       const acc = this.accs.get(s.key);
       if (!acc) continue;
       const ended = s.status === 'ENDED';
+      if (ended && this.opts.gitEnded === false) continue; // paused while nothing shows it
       // ENDED sessions are correlated once (their window is closed); others when their git signal or activity moved.
       let sig = 'ENDED|';
       if (!ended) {
