@@ -4,7 +4,7 @@ import { EXTRA_NAV, page, validateMessage, WebviewMessage } from '../render/html
 import { renderWorkspace, scoped, WsState, WsView } from '../render/workspace';
 import { extraViews, extraCss } from '../render/extra';
 import { ActCtx } from '../render/extra/kit';
-import { FeedCtx, pump } from '../render/extra/feeds';
+import { FeedCtx, pump, setFeedScope } from '../render/extra/feeds';
 
 let panelSeq = 0;
 
@@ -79,6 +79,7 @@ export class WorkspacePanel implements vscode.Disposable {
   }
 
   private pumpFeeds(force = false): void {
+    setFeedScope(this.state.opts?.scope);
     const v = extraViews().find(x => x.id === this.state.view);
     if (v?.feeds?.length) pump(v.feeds, this.feedCtx(), () => this.schedule(), force);
   }
@@ -130,6 +131,7 @@ export class WorkspacePanel implements vscode.Disposable {
   }
 
   private body(): string {
+    setFeedScope(this.state.opts?.scope);
     // Full event history only for screens that roll it up; otherwise just the selected session's events.
     const full = this.state.view === 'activity';
     const events = full ? this.store.timeline(undefined, 200_000) : this.state.selected ? this.store.timeline(this.state.selected) : [];

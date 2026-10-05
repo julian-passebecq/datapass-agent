@@ -45,7 +45,7 @@ function liveCell(st: ProjStats): string {
 }
 
 function tokBar(v: number, max: number): string {
-  return `<span class="pj-tok" title="${esc(`${v.toLocaleString()} tokens as recorded by the provider (OBSERVED), summed over sessions in the period`)}"><span class="pj-bar"><i style="width:${max ? Math.max(v ? 2 : 0, (100 * v) / max) : 0}%"></i></span>${v ? esc(compact(v)) : '<span class="muted">—</span>'}</span>`;
+  return `<span class="pj-tok" title="${esc(`${v.toLocaleString()} tokens: DERIVED: sum of recorded per-call tokens, incl. cache reads counted on every call (far above unique tokens), summed over sessions in the period`)}"><span class="pj-bar"><i style="width:${max ? Math.max(v ? 2 : 0, (100 * v) / max) : 0}%"></i></span>${v ? esc(compact(v)) : '<span class="muted">—</span>'}</span>`;
 }
 
 /** Scope key of a repo node (same as workspace scopeKey of its sessions). */
@@ -148,7 +148,7 @@ function cardsView(companies: ProjNode[], d: WsData, st: WsState): string {
           });
           return `<div class="pj-card" style="--id:${identityColor(p.name)}">
 <div class="pj-ch"><b>${esc(p.name)}</b>${srcTag(p)}<span class="right">${lastCell(d.now, p.stats.lastAt)}</span></div>
-<div class="pj-ks">${miniKpi(p.stats.live + p.stats.liveWorkers, 'live', 'Live sessions + workers (INFERRED)')}${miniKpi(p.stats.today, 'today', 'Active since midnight (DERIVED)')}${miniKpi(p.stats.sessions, 'sessions', `${p.stats.workers} workers too (DERIVED)`)}${miniKpi(compact(p.stats.tokens), 'tokens', 'Recorded by the provider (OBSERVED)')}${miniKpi(p.stats.commits, 'commits', 'Observed during session windows (DERIVED)')}</div>
+<div class="pj-ks">${miniKpi(p.stats.live + p.stats.liveWorkers, 'live', 'Live sessions + workers (INFERRED)')}${miniKpi(p.stats.today, 'today', 'Active since midnight (DERIVED)')}${miniKpi(p.stats.sessions, 'sessions', `${p.stats.workers} workers too (DERIVED)`)}${miniKpi(compact(p.stats.tokens), 'tokens', 'DERIVED: sum of recorded per-call tokens, incl. cache reads counted on every call (far above unique tokens)')}${miniKpi(p.stats.commits, 'commits', 'Observed during session windows (DERIVED)')}</div>
 ${split(p.stats)}
 <div class="pj-chips">${chips.join('')}</div>
 ${live.length ? `<div class="pj-lv">${live.map(s => `<div class="pj-mini${st.selected === s.key ? ' sel' : ''}" data-select="${esc(s.key)}"><span class="dot ${esc(s.status)}"></span>${esc(titleOf(s).slice(0, 44))} <span class="muted">${esc(s.lastAction ? s.lastAction.slice(0, 40) : '')}</span></div>`).join('')}</div>` : ''}
@@ -167,7 +167,7 @@ function sizeOf(n: ProjNode, by: string): number {
   return n.stats.tokens;
 }
 
-const SIZE_LABEL: Record<string, string> = { tokens: 'tokens (OBSERVED)', sessions: 'sessions + workers (DERIVED)', live: 'live sessions + workers (INFERRED)', today: 'sessions active today (DERIVED)' };
+const SIZE_LABEL: Record<string, string> = { tokens: 'tokens (DERIVED sum incl. cache reads)', sessions: 'sessions + workers (DERIVED)', live: 'live sessions + workers (INFERRED)', today: 'sessions active today (DERIVED)' };
 
 function treemapView(companies: ProjNode[], d: WsData, st: WsState): string {
   const by = opt(st, 'projects.size', 'tokens');
@@ -212,14 +212,14 @@ function render(d: WsData, st: WsState): string {
   const t = res.total;
   const nProj = res.companies.reduce((a, c) => a + c.children.length, 0);
   const nRepo = res.companies.reduce((a, c) => a + repos(c).length, 0);
-  const sum = `<div class="pj-sum">${miniKpi(res.companies.length, 'companies', 'DERIVED')}${miniKpi(nProj, 'projects', 'DERIVED')}${miniKpi(nRepo, 'repos', 'DERIVED')}${miniKpi(t.live + t.liveWorkers, 'live', `${t.live} sessions + ${t.liveWorkers} workers (INFERRED)`)}${miniKpi(t.today, 'today', 'Active since midnight (DERIVED)')}${miniKpi(t.sessions, 'sessions', `${t.workers} workers too (DERIVED)`)}${miniKpi(compact(t.tokens), 'tokens', 'Recorded by providers (OBSERVED)')}${miniKpi(t.commits, 'commits', 'Observed during session windows (DERIVED)')}</div>`;
+  const sum = `<div class="pj-sum">${miniKpi(res.companies.length, 'companies', 'DERIVED')}${miniKpi(nProj, 'projects', 'DERIVED')}${miniKpi(nRepo, 'repos', 'DERIVED')}${miniKpi(t.live + t.liveWorkers, 'live', `${t.live} sessions + ${t.liveWorkers} workers (INFERRED)`)}${miniKpi(t.today, 'today', 'Active since midnight (DERIVED)')}${miniKpi(t.sessions, 'sessions', `${t.workers} workers too (DERIVED)`)}${miniKpi(compact(t.tokens), 'tokens', 'DERIVED: sum of recorded per-call tokens, incl. cache reads counted on every call (far above unique tokens)')}${miniKpi(t.commits, 'commits', 'Observed during session windows (DERIVED)')}</div>`;
   const scope = st.opts?.scope ? `<div class="pj-note">Scoped to <b>${esc(st.opts.scope)}</b>: only its sessions are counted. <button class="link" data-opt="scope" data-val="">Clear scope</button> to see every company.</div>` : '';
   const ruleNote = rs.length
     ? `${rs.length} rule${rs.length === 1 ? '' : 's'} from <code>agent.projects</code>${res.unusedRules.length ? ` · <span class="pj-warn" title="${esc(res.unusedRules.map(i => rs[i].match).join('\n'))}">${res.unusedRules.length} matched nothing in this period</span>` : ''}`
     : `No <code>agent.projects</code> rules: companies and projects are inferred from paths. Add rules like <code>{"match": "D:/PROJ/datapass-*", "company": "DataPass", "project": "VS Code"}</code>.`;
   if (!res.companies.length) return `${tb}${scope}<div class="empty">No sessions in this period.</div><div class="muted pj-legend">${ruleNote}</div>`;
   const body = view === 'cards' ? cardsView(res.companies, d, st) : view === 'treemap' ? treemapView(res.companies, d, st) : treeView(res.companies, d, st);
-  return `<div class="pj">${tb}${scope}${sum}${body}<div class="muted pj-legend">${ruleNote} · <span class="pj-src rule">rule</span> = setting (OBSERVED) · <span class="pj-src inferred">path</span> = folder heuristic (INFERRED) · counts DERIVED · tokens OBSERVED · live INFERRED · updated ${esc(hhmm(d.now))}</div></div>`;
+  return `<div class="pj">${tb}${scope}${sum}${body}<div class="muted pj-legend">${ruleNote} · <span class="pj-src rule">rule</span> = setting (OBSERVED) · <span class="pj-src inferred">path</span> = folder heuristic (INFERRED) · counts DERIVED · tokens DERIVED (sum incl. cache reads) · live INFERRED · updated ${esc(hhmm(d.now))}</div></div>`;
 }
 
 /** Paths a session of the current tab actually uses (so an action cannot be pointed elsewhere). */

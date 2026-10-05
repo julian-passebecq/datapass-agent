@@ -8,7 +8,7 @@ import os from 'os';
 import path from 'path';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
-const vsix = path.join(root, 'agent-vscode-0.3.0.vsix');
+const vsix = path.join(root, 'agent-vscode-0.4.0.vsix');
 const shots = path.resolve(process.argv[2] ?? path.join(root, '.smoke', 'screenshots'));
 const codeDir = process.env.VSCODE_DIR ?? path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Microsoft VS Code');
 const codeExe = path.join(codeDir, process.platform === 'win32' ? 'Code.exe' : 'code');
@@ -79,12 +79,16 @@ async function workspacePass(win, ck, theme, views) {
   if (!ws) return;
   await runCommand(win, 'View: Toggle Primary Side Bar Visibility');
   await win.waitForTimeout(1500);
+  // 'all': every screen in the rail (core + built add-on screens), heading = rail label without its badge.
+  if (views === 'all') views = await ws.frame.evaluate(() => [...document.querySelectorAll('[data-nav].nav')].map(b => [b.dataset.nav, (b.childNodes[0]?.textContent ?? '').trim()]));
+  check(`${theme}: rail lists ${views.length} screens`, views.length >= 10, String(views.length));
   for (const [i, [view, heading]] of views.entries()) {
     await ws.frame.evaluate(v => document.querySelector(`[data-nav="${v}"]`)?.click(), view);
-    await win.waitForTimeout(1200);
+    await win.waitForTimeout(2500);
     const txt = await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent ?? '');
-    check(`${theme}: workspace view ${view}`, txt === heading, txt);
-    await shot(win, `${theme === 'Dark' ? 1 : 2}${String(i).padStart(1, '0')}-workspace-${view}-${theme.toLowerCase()}`);
+    const body = await ws.frame.evaluate(() => (document.querySelector('main')?.innerText ?? '').length);
+    check(`${theme}: workspace view ${view}`, txt === heading && body > 40, `${txt} · ${body} chars`);
+    await shot(win, `${theme === 'Dark' ? 1 : 2}${String(i).padStart(2, '0')}-workspace-${view}-${theme.toLowerCase()}`);
   }
   // Keyboard: "2" switches to Attention; "/" filter hides non-matching sessions.
   await ws.frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true })));
@@ -126,8 +130,14 @@ try {
   await icon.click();
   const cockpit = await webviewText(win, 'Ended today', 60_000);
   check('Cockpit renders', cockpit, cockpit ? `${Date.now() - t0}ms after launch` : 'no cockpit text');
-  await win.waitForTimeout(8000); // let git correlation finish
-  const ck = await webviewText(win, 'Ended today');
+  // Initial discovery reads every provider artifact and runs git correlation: on a busy machine with
+  // ~500 MB of history it can take 30-60 s. Poll until sessions are counted instead of a fixed wait.
+  let ck;
+  for (const t1 = Date.now(); Date.now() - t1 < 120_000; await win.waitForTimeout(2000)) {
+    ck = await webviewText(win, 'Ended today');
+    const m = /(\d+)Active(\d+)Idle(?:(\d+)Needs input)?(\d+)Ended today/.exec(ck?.txt ?? '');
+    if (m && Number(m[1]) + Number(m[2]) + Number(m[4]) > 0) break;
+  }
   check('Cockpit shows Claude provider state', ck?.txt.includes('CLAUDE CODE') || ck?.txt.includes('Claude Code'));
   check('Cockpit shows Codex provider state', ck?.txt.includes('CODEX') || ck?.txt.includes('Codex'));
   const counts = /(\d+)Active(\d+)Idle(?:(\d+)Needs input)?(\d+)Ended today/.exec(ck?.txt ?? '');
@@ -160,7 +170,7 @@ try {
   await shot(win, '04-activity-dark');
 
   const ck2 = await webviewText(win, 'Open Agent workspace', 20_000);
-  if (ck2) await workspacePass(win, ck2, 'Dark', [['overview', 'Overview'], ['attention', 'Attention'], ['board', 'Board'], ['team', 'Team'], ['flow', 'Flow'], ['worktrees', 'Worktrees'], ['gantt', 'Last 24 h'], ['verify', 'Verification'], ['activity', 'Activity'], ['providers', 'Sources']]);
+  if (ck2) await workspacePass(win, ck2, 'Dark', 'all');
   else check('Dark: Agent Workspace opens (Overview)', false, 'cockpit button not found');
 
   // Reload window and confirm reactivation
@@ -197,7 +207,7 @@ try {
     await ck.frame.evaluate(() => document.querySelector('[data-open]')?.click());
     await webviewText(win, 'Evidence', 20_000);
     await shot(win, '07-inspector-light');
-    await workspacePass(win, ck, 'Light', [['overview', 'Overview'], ['team', 'Team'], ['flow', 'Flow'], ['gantt', 'Last 24 h']]);
+    await workspacePass(win, ck, 'Light', 'all');
   }
 } catch (e) {
   result.errors.push(String(e?.stack ?? e));
