@@ -94,6 +94,10 @@ async function workspacePass(win, ck, theme, views) {
     }
     const ms = Date.now() - t1;
     await win.waitForTimeout(900); // let async feeds of this screen land before the screenshot
+    // Feeds that are still loading show "Loading…": wait for them (up to 20 s) so the screenshot shows data.
+    const tf = Date.now();
+    while (Date.now() - tf < 20_000 && await ws.frame.evaluate(() => /Loading\b/.test(document.querySelector('main')?.innerText ?? ''))) await win.waitForTimeout(500);
+    (result.feedMs ??= {})[`${theme}:${view}`] = Date.now() - tf;
     const body = await ws.frame.evaluate(() => (document.querySelector('main')?.innerText ?? '').length);
     (result.navMs ??= {})[`${theme}:${view}`] = ms;
     check(`${theme}: workspace view ${view}`, txt === heading && body > 40, `${txt} · ${body} chars · ${ms} ms`);
