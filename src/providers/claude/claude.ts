@@ -191,6 +191,11 @@ export class ClaudeAdapter implements ProviderAdapter {
       // Huge records are tool outputs/attachments; keep only their timestamp.
       const m = /"timestamp":"([^"]{10,40})"/.exec(line.slice(-2000)) ?? /"timestamp":"([^"]{10,40})"/.exec(line.slice(0, 4000));
       acc.touch(toMs(m?.[1]));
+      // A huge tool result: its size still counts (line length = upper bound of the content), content is not parsed.
+      const head = line.slice(0, 4000);
+      const r = /"type":"user"/.test(head) ? /"tool_use_id":"([^"]{1,100})"/.exec(head) : null;
+      // Image payloads (base64) are not text put in context as chars: the call counts, its size does not.
+      if (r) acc.toolResult(r[1], /"type":"image"|data:image\//.test(head) ? 0 : line.length, toMs(m?.[1]));
       return;
     }
     const o = safeParse(line);
@@ -306,6 +311,7 @@ export class ClaudeAdapter implements ProviderAdapter {
       if (c?.type === 'text' && typeof c.text === 'string') prompt(c.text);
       if (c?.type !== 'tool_result' || typeof c.tool_use_id !== 'string') continue;
       acc.toolEnd(c.tool_use_id, c.is_error === true);
+      acc.toolResult(c.tool_use_id, resultChars(c.content), at);
       const t = this.pendingTests.get(c.tool_use_id);
       if (t) {
         this.pendingTests.delete(c.tool_use_id);
@@ -490,6 +496,19 @@ export function toolDetail(name: string, input: Record<string, any>): string {
   if (name === 'Skill') return bounded(input.skill, 80);
   if (name === 'SendMessage') return bounded(input.to ?? input.recipient, 60);
   return '';
+}
+
+/** Characters of a tool result as sent back to the model: string content, or the text parts of a content array.
+ *  Images and other non-text parts are not counted. Only the length is used; the content is never kept. */
+export function resultChars(content: unknown): number {
+  if (typeof content === 'string') return content.length;
+  if (!Array.isArray(content)) return 0;
+  let n = 0;
+  for (const c of content) {
+    if (typeof c === 'string') n += c.length;
+    else if (c && typeof c.text === 'string') n += c.text.length;
+  }
+  return n;
 }
 
 function parentSid(acc: SessionAccumulator): string {

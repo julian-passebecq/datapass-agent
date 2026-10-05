@@ -148,6 +148,8 @@ export interface SessionFacts {
   /** Latest todo / plan list the agent wrote (Claude TodoWrite or TaskCreate / TaskUpdate, Codex update_plan),
    *  capped at 30 items × 120 chars, redacted. */
   todos?: TodoList;
+  /** Tool name → size of the tool results put back into the model context (characters only, never content). */
+  toolResultChars?: Record<string, ToolResultSize>;
 }
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed';
@@ -159,6 +161,16 @@ export interface TodoList {
   items: { text: string; status: TodoStatus }[];
   /** Items dropped by the cap. */
   dropped?: number;
+}
+
+/** Sizes of one tool's results (OBSERVED character counts; tokens are only estimated from them, ≈ chars / 4). */
+export interface ToolResultSize {
+  calls: number;
+  /** Sum and largest result, in characters. */
+  chars: number;
+  max: number;
+  /** [at, chars] of the latest results (capped at 200 per tool) for medians and period filters. */
+  samples: [number, number][];
 }
 
 /** One provider rate-limit window as recorded. resetsAt in epoch ms. */

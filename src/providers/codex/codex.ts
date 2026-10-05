@@ -137,6 +137,11 @@ export class CodexAdapter implements ProviderAdapter {
     if (line.length > MAX_PARSE_LINE) {
       const m = /^\{"timestamp":"([^"]{10,40})"/.exec(line);
       acc.touch(toMs(m?.[1]));
+      // A huge tool output: its size still counts (line length = upper bound of the output), content is not parsed.
+      const head = line.slice(0, 4000);
+      const r = /"type":"(?:custom_tool_call|function_call)_output"/.test(head) ? /"call_id":"([^"]{1,100})"/.exec(head) : null;
+      // Image payloads (base64) are not text put in context as chars: the call counts, its size does not.
+      if (r) acc.toolResult(r[1], /"input_image"|data:image\//.test(head) ? 0 : line.length, toMs(m?.[1]));
       return;
     }
     const o = safeParse(line);
@@ -356,7 +361,10 @@ export class CodexAdapter implements ProviderAdapter {
       return;
     }
     if ((p.type === 'function_call' || p.type === 'custom_tool_call') && typeof p.name === 'string') this.callStart(acc, p, at);
-    if ((p.type === 'function_call_output' || p.type === 'custom_tool_call_output') && typeof p.call_id === 'string') acc.toolEnd(p.call_id);
+    if ((p.type === 'function_call_output' || p.type === 'custom_tool_call_output') && typeof p.call_id === 'string') {
+      acc.toolEnd(p.call_id);
+      acc.toolResult(p.call_id, outputChars(p.output), at);
+    }
     if (p.type === 'function_call' && typeof p.name === 'string') {
       if (p.name === 'spawn_agent') {
         acc.event(at, 'WORKER_STARTED', 'spawn_agent', 'OBSERVED', p.call_id);
@@ -522,4 +530,18 @@ export function objectArg(src: string, from: number): unknown {
     else if (ch === '}' && --depth === 0) return safeParse(src.slice(start, i + 1));
   }
   return undefined;
+}
+
+/** Characters of a function_call_output / custom_tool_call_output as sent back to the model (string, content
+ *  array text parts, or {content}). Only the length is used; the output is never kept. */
+export function outputChars(output: unknown): number {
+  if (typeof output === 'string') return output.length;
+  const parts = Array.isArray(output) ? output : output && typeof output === 'object' ? [(output as any).content] : [];
+  let n = 0;
+  for (const c of parts) {
+    if (typeof c === 'string') n += c.length;
+    else if (Array.isArray(c)) n += outputChars(c);
+    else if (c && typeof c.text === 'string') n += c.text.length;
+  }
+  return n;
 }
