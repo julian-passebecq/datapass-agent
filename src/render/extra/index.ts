@@ -11,6 +11,7 @@ import { exploreView } from './explore';
 import { forecastView } from './forecast';
 import { healthView } from './health';
 import { historyView } from './history';
+import { hudView } from './hud';
 import { launcherView } from './launcher';
 import { lifecycleView } from './lifecycle';
 import { limitsView } from './limits';
@@ -47,6 +48,7 @@ export function allExtra(): ExtraView[] {
   forecastView,
   healthView,
   historyView,
+  hudView,
   launcherView,
   lifecycleView,
   limitsView,
