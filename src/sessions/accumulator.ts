@@ -133,6 +133,7 @@ export class SessionAccumulator {
       lastActionAt: this.lastActionAt,
       evidence: [...this.evidence.values(), ...(this.ranGitCommit ? [{ field: 'commit-command', kind: 'OBSERVED' as const, source: 'provider recorded a git commit command' }] : [])],
       artifactPath: this.artifactPath,
+      artifactBytes: this.cursor?.size,
       diagnostics: [...this.diagnostics, ...(this.malformed ? [`${this.malformed} malformed/oversize line(s) skipped`] : [])],
     };
   }

@@ -1,6 +1,6 @@
 // Agent Workspace: one editor panel with a navigation rail, a main surface and a selection pane.
 // Pure string rendering from snapshots; every value is escaped here.
-import { AgentSessionSnapshot, ProviderState, TimelineEvent } from '../model';
+import { AgentSessionSnapshot, ProviderState, SourceState, TimelineEvent } from '../model';
 import { duration, weekly } from '../activity/activity';
 import { attention, AttentionItem, base, compact, dayStart, flow, hourly, identityColor, isLive, outcome, Outcome, OUTCOME_LABEL, stages, usageSince, workerRole } from '../activity/insights';
 import { esc } from './html';
@@ -21,11 +21,27 @@ export interface WsData {
   now: number;
   ternAvailable: boolean;
   idleAlertMinutes?: number;
+  /** Git correlation collector state (from the store). */
+  git?: { enabled: boolean; lastMs?: number; at?: number };
+}
+
+/** All collectors, providers first, then git. */
+export function sources(d: WsData): SourceState[] {
+  const out = d.providers.flatMap(p => p.sources ?? []);
+  if (d.git) out.push({ id: 'git', label: 'Git correlation', status: d.git.enabled ? 'ready' : 'off', detail: d.git.enabled ? `read-only, hardened${d.git.lastMs !== undefined ? ` · last pass ${d.git.lastMs} ms` : ''}` : 'off in untrusted workspaces', at: d.git.at ?? d.now });
+  return out;
+}
+
+export function bytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 ** 2) return `${(n / 1024).toFixed(0)} KB`;
+  if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(1)} MB`;
+  return `${(n / 1024 ** 3).toFixed(2)} GB`;
 }
 
 const PROV: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
 const VIEW_LABEL: Record<WsView, string> = {
-  overview: 'Overview', attention: 'Attention', board: 'Board', team: 'Team', flow: 'Flow', worktrees: 'Worktrees', gantt: 'Last 24 h', verify: 'Verification', activity: 'Activity', providers: 'Providers',
+  overview: 'Overview', attention: 'Attention', board: 'Board', team: 'Team', flow: 'Flow', worktrees: 'Worktrees', gantt: 'Last 24 h', verify: 'Verification', activity: 'Activity', providers: 'Sources',
 };
 const VIEW_HINT: Record<WsView, string> = {
   overview: 'What is running now, what needs you, and today at a glance.',
@@ -37,7 +53,7 @@ const VIEW_HINT: Record<WsView, string> = {
   gantt: 'When each session was active in the last 24 hours, with commits and test runs.',
   verify: 'Test and build commands observed in sessions, with exit-code provenance.',
   activity: 'Factual daily and hourly rollups. Not a productivity score.',
-  providers: 'What Agent can observe for each provider on this machine.',
+  providers: 'Collectors, provider log storage, and what Agent can observe. Missing access is shown, not hidden.',
 };
 
 export function prettyModel(m: string | undefined): string {
@@ -332,11 +348,25 @@ const MATRIX: [string, string, string][] = [
   ['HEAD before', 'git log before start (DERIVED)', 'session_meta git.commit_hash'],
 ];
 
-function providersView(d: WsData): string {
-  let h = `<div class="grid">${d.providers
+function providersView(d: WsData, st: WsState): string {
+  const src = sources(d);
+  let h = `<h2>Collectors</h2><table class="src"><tr><th></th><th>Source</th><th>Status</th><th>Items</th><th>Detail</th><th>Collected</th></tr>${src
+    .map(x => `<tr><td><span class="sd ${x.status}"></span></td><td>${esc(x.label)}</td><td class="st-${x.status}">${esc(x.status)}</td><td class="num">${x.count ?? ''}</td><td class="muted">${esc(x.detail)}</td><td class="muted">${hhmm(x.at)}</td></tr>`)
+    .join('')}</table>`;
+  // Storage: provider artifacts in the loaded window.
+  const withSize = d.sessions.filter(s => s.artifactBytes);
+  const per = (p: string) => withSize.filter(s => s.provider === p).reduce((n, s) => n + (s.artifactBytes ?? 0), 0);
+  const total = per('claude') + per('codex');
+  h += `<h2>Storage · provider logs in the loaded history</h2><div class="kpis">${kpi(bytes(total), 'Total')}${kpi(bytes(per('claude')), 'Claude Code')}${kpi(bytes(per('codex')), 'Codex')}${kpi(withSize.length, 'Artifacts')}</div>`;
+  if (total) h += `<div class="split"><i class="claude" style="width:${(100 * per('claude')) / total}%"></i><i class="codex" style="width:${(100 * per('codex')) / total}%"></i></div>`;
+  const largest = [...withSize].sort((x, y) => (y.artifactBytes ?? 0) - (x.artifactBytes ?? 0)).slice(0, 10);
+  const max = largest[0]?.artifactBytes ?? 1;
+  if (largest.length) h += `<table class="vt">${largest.map(s => `<tr class="${st.selected === s.key ? 'sel' : ''}" data-select="${esc(s.key)}"><td class="num">${bytes(s.artifactBytes ?? 0)}</td><td style="width:30%"><span class="szbar ${s.provider}" style="width:${Math.max(2, (100 * (s.artifactBytes ?? 0)) / max)}%"></span></td><td>${esc(titleOf(s).slice(0, 48))}${s.isWorker ? ' <span class="muted">worker</span>' : ''}</td><td class="muted">${esc(repoOf(s))}</td><td><button class="link" data-cmd="openArtifactFolder" data-key="${esc(s.key)}">Reveal</button></td></tr>`).join('')}</table>`;
+  h += `<div class="foot">Sizes are the provider's own log files for sessions in the loaded window (\`agent.historyDays\`). Agent reads them incrementally and never copies, compacts or deletes them.</div>`;
+  h += `<h2>Providers</h2><div class="grid">${d.providers
     .map(p => {
       const ss = d.sessions.filter(s => s.provider === p.provider);
-      return `<div class="card" style="--id:${p.provider === 'claude' ? 'var(--claude)' : 'var(--codex)'}"><div class="ct"><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span><b>${esc(PROV[p.provider])}</b><span class="right">${p.version ? esc(p.version) : ''}</span></div><div class="cl muted">${esc(p.detected ? 'detected' : 'not detected')}${p.versionSource ? ` · version from ${esc(p.versionSource)}` : ''}</div><div class="cl">${ss.filter(s => !s.isWorker).length} sessions · ${ss.filter(s => s.isWorker).length} workers · ${ss.filter(isLive).length} live · ${p.artifactsScanned} artifacts scanned</div>${p.note ? `<div class="cl muted">${esc(p.note)}</div>` : ''}${p.diagnostics.slice(0, 5).map(x => `<div class="cl basis">${esc(x)}</div>`).join('')}</div>`;
+      return `<div class="card" style="--id:${p.provider === 'claude' ? 'var(--claude)' : 'var(--codex)'}"><div class="ct"><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span><b>${esc(PROV[p.provider])}</b><span class="right">${p.version ? esc(p.version) : ''}</span></div><div class="cl muted">${esc(p.detected ? 'detected' : 'not detected')}${p.versionSource ? ` · version from ${esc(p.versionSource)}` : ''}</div><div class="cl">${ss.filter(s => !s.isWorker).length} sessions · ${ss.filter(s => s.isWorker).length} workers · ${ss.filter(isLive).length} live</div>${p.diagnostics.slice(0, 5).map(x => `<div class="cl basis">${esc(x)}</div>`).join('')}</div>`;
     })
     .join('')}</div>`;
   h += `<h2>Observability matrix</h2><table><tr><th>Fact</th><th>Claude Code</th><th>Codex</th></tr>${MATRIX.map(r => `<tr><td>${esc(r[0])}</td><td class="muted">${esc(r[1])}</td><td class="muted">${esc(r[2])}</td></tr>`).join('')}</table><div class="foot">Agent reads provider files only. It never uploads transcripts, never edits provider files and never controls sessions.</div>`;
@@ -383,6 +413,14 @@ export function attentionCount(d: WsData): number {
   return attention(d.sessions, d.now, d).filter(a => a.severity !== 'low').length;
 }
 
+function collectorSummary(d: WsData): string {
+  const src = sources(d);
+  if (!src.length) return '';
+  const n = (k: string) => src.filter(s => s.status === k).length;
+  const parts = [['ready', n('ready')], ['partial', n('partial')], ['missing', n('missing')], ['off', n('off')]].filter(([, c]) => c) as [string, number][];
+  return `<button class="link cs" data-nav="providers" title="Collectors">${parts.map(([k, c]) => `<span class="sd ${k}"></span>${c} ${k}`).join(' · ')}</button>`;
+}
+
 export function renderWorkspace(d: WsData, st: WsState): string {
   const top = d.sessions.filter(s => !s.isWorker);
   const badge: Partial<Record<WsView, string>> = {
@@ -391,11 +429,12 @@ export function renderWorkspace(d: WsData, st: WsState): string {
     team: String(d.sessions.filter(s => s.isWorker && isLive(s)).length || ''),
     verify: String(d.sessions.filter(s => isLive(s) && s.tests[s.tests.length - 1]?.outcome === 'FAIL').length || ''),
   };
-  const rail = `<nav class="rail"><div class="brand">Agent</div>${WS_VIEWS.map(v => `<button class="nav${st.view === v ? ' on' : ''}" data-nav="${v}">${esc(VIEW_LABEL[v])}${badge[v] ? `<span class="nb${v === 'attention' || v === 'verify' ? ' hot' : ''}">${esc(badge[v])}</span>` : ''}</button>`).join('')}<div class="railfoot">${d.providers.map(p => `<div><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span> ${esc(PROV[p.provider])} ${esc(p.version ?? '')}</div>`).join('')}<div class="muted">local · read-only</div></div></nav>`;
+  const rail = `<nav class="rail"><div class="brand">Agent</div>${WS_VIEWS.map(v => `<button class="nav${st.view === v ? ' on' : ''}" data-nav="${v}">${esc(VIEW_LABEL[v])}${badge[v] ? `<span class="nb${v === 'attention' || v === 'verify' ? ' hot' : ''}">${esc(badge[v])}</span>` : ''}</button>`).join('')}<div class="railfoot">${d.providers.map(p => `<div><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span> ${esc(PROV[p.provider])} ${esc(p.version ?? '')}</div>`).join('')}${collectorSummary(d)}<div class="muted">local · read-only</div></div></nav>`;
   const body: Record<WsView, () => string> = {
-    overview: () => overview(d, st), attention: () => attentionView(d, st), board: () => board(d, st), team: () => team(d, st), flow: () => flowView(d), worktrees: () => worktrees(d, st), gantt: () => gantt(d, st), verify: () => verify(d, st), activity: () => activity(d), providers: () => providersView(d),
+    overview: () => overview(d, st), attention: () => attentionView(d, st), board: () => board(d, st), team: () => team(d, st), flow: () => flowView(d), worktrees: () => worktrees(d, st), gantt: () => gantt(d, st), verify: () => verify(d, st), activity: () => activity(d), providers: () => providersView(d, st),
   };
-  const main = `<main class="mainw"><header class="mh"><h1>${esc(VIEW_LABEL[st.view])}</h1><span class="muted">${esc(VIEW_HINT[st.view])}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}</main>`;
+  const keys = `<div class="keys"><b>1–0</b> screens <b>j/k</b> move <b>Enter</b> inspect <b>/</b> filter <b>Esc</b> clear <b>r</b> refresh <b>?</b> keys</div>`;
+  const main = `<main class="mainw"><header class="mh"><h1>${esc(VIEW_LABEL[st.view])}</h1><span class="muted">${esc(VIEW_HINT[st.view])}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}${keys}</main>`;
   return `<div class="ws">${rail}${main}<aside class="side">${side(d, st.selected)}</aside></div>`;
 }
 

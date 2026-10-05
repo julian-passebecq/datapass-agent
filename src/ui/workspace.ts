@@ -42,13 +42,13 @@ export class WorkspacePanel implements vscode.Disposable {
     p.onDidChangeViewState(e => e.webviewPanel.visible && this.render(true));
     p.onDidDispose(() => (this.panel = undefined));
     this.panel = p;
-    p.webview.html = page(p.webview.cspSource, this.body());
+    p.webview.html = page(p.webview.cspSource, this.body(), { filter: true });
   }
 
   private body(): string {
     // Full event history only for the hourly heatmap; otherwise just the selected session's events.
     const events = this.state.view === 'activity' ? this.store.timeline(undefined, 200_000) : this.state.selected ? this.store.timeline(this.state.selected) : [];
-    return renderWorkspace({ sessions: this.store.all(), providers: this.store.providerStates, events, now: Date.now(), ternAvailable: this.ternAvailable(), idleAlertMinutes: vscode.workspace.getConfiguration('agent').get<number>('idleAlertMinutes', 30) }, this.state);
+    return renderWorkspace({ sessions: this.store.all(), providers: this.store.providerStates, events, now: Date.now(), ternAvailable: this.ternAvailable(), git: { enabled: this.store.opts.git, lastMs: this.store.lastStats?.gitMs, at: this.store.lastStats?.at }, idleAlertMinutes: vscode.workspace.getConfiguration('agent').get<number>('idleAlertMinutes', 30) }, this.state);
   }
 
   private schedule(): void {

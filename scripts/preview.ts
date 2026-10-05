@@ -20,7 +20,7 @@ async function main() {
   const store = new SessionStore([new ClaudeAdapter(), new CodexAdapter()], { historyDays: 3, maxSessions: 300, idleMinutes: 10, git: true });
   await store.refresh();
   const sessions = store.all();
-  const d: WsData = { sessions, providers: store.providerStates, events: store.timeline(undefined, 200_000), now: Date.now(), ternAvailable: true };
+  const d: WsData = { sessions, providers: store.providerStates, events: store.timeline(undefined, 200_000), now: Date.now(), ternAvailable: true, git: { enabled: true, lastMs: store.lastStats?.gitMs, at: store.lastStats?.at } };
   const live = sessions.filter(s => !s.isWorker && isLive(s));
   const selected = (live.find(s => s.status === 'RUNNING') ?? live[0] ?? sessions[0])?.key;
   for (const view of WS_VIEWS) {

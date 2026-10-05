@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { ProviderState } from '../../model';
+import { SourceState, ProviderState } from '../../model';
 import { SessionAccumulator } from '../../sessions/accumulator';
 import { commandLabel, commandText, isGitCommit, isVerificationCommand, testLabel } from '../../sessions/classify';
 import { readNewLines, safeParse, toMs } from '../../util/jsonl';
@@ -70,7 +70,21 @@ export class ClaudeAdapter implements ProviderAdapter {
       note: detected ? 'transcripts + live registry' : 'Claude Code not detected (no ~/.claude/projects)',
       artifactsScanned: this.accs.size,
       diagnostics: [...this.diagnostics],
+      sources: this.sources(detected),
     };
+  }
+
+  private sources(detected: boolean): SourceState[] {
+    const at = Date.now();
+    const accs = [...this.accs.values()];
+    const workers = accs.filter(a => a.isWorker).length;
+    const regDir = fs.existsSync(path.join(this.root, 'sessions'));
+    return [
+      { id: 'claude.transcripts', label: 'Claude transcripts', status: detected ? 'ready' : 'missing', detail: detected ? 'projects/<slug>/<session>.jsonl' : 'no ~/.claude/projects', count: accs.length - workers, at },
+      { id: 'claude.subagents', label: 'Claude subagents', status: detected ? 'ready' : 'missing', detail: 'subagents/agent-*.jsonl + .meta.json', count: workers, at },
+      { id: 'claude.registry', label: 'Claude live registry', status: regDir ? 'ready' : 'missing', detail: regDir ? 'sessions/<pid>.json busy/idle + pid check' : 'no ~/.claude/sessions: live status falls back to recency', count: this.registry.size, at },
+      { id: 'claude.usage', label: 'Claude usage + cost', status: !detected ? 'missing' : 'ready', detail: 'message.usage per message id; cost-state.totalCostUSD', count: accs.filter(a => a.usage).length, at },
+    ];
   }
 
   watchTargets(): string[] {

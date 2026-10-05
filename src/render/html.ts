@@ -94,6 +94,14 @@ table.vt tr { cursor: pointer; } table.vt td:nth-child(1), table.vt td:nth-child
 .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; } .wd { display: grid; justify-items: center; gap: 2px; font-size: 11px; } .wd b { font-size: 14px; }
 .stack { height: 90px; width: 26px; display: flex; flex-direction: column-reverse; border-radius: 4px; overflow: hidden; background: var(--raise); border: 1px solid var(--line); } .stack i { display: block; width: 100%; } .stack i.claude { background: var(--claude); } .stack i.codex { background: var(--codex); }
 .heat { display: grid; grid-template-columns: 34px repeat(24, 1fr); gap: 2px; font-size: 10px; } .heat i { display: block; height: 15px; border-radius: 2px; background: var(--accent); } .hx, .hy { color: var(--vscode-descriptionForeground); }
+.sd { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; } .sd.ready { background: var(--ok); } .sd.partial { background: var(--warn); } .sd.missing { background: var(--bad); } .sd.off { border: 1px solid var(--quiet); }
+.st-ready { color: var(--ok); } .st-partial { color: var(--warn); } .st-missing { color: var(--bad); } .st-off { color: var(--quiet); } td.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.split { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 2px 0 8px; } .split i.claude { background: var(--claude); } .split i.codex { background: var(--codex); }
+.szbar { display: block; height: 8px; border-radius: 2px; background: var(--claude); } .szbar.codex { background: var(--codex); }
+.cs { font-size: 11px; text-align: left; color: var(--vscode-descriptionForeground); }
+.keys { position: sticky; bottom: 0; margin: 14px -16px -24px; padding: 4px 16px; font-size: 11px; color: var(--vscode-descriptionForeground); background: var(--vscode-editor-background, #1f1f1f); border-top: 1px solid var(--line); } .keys b { color: var(--vscode-foreground); font-weight: 600; margin-left: 8px; } .keys b:first-child { margin-left: 0; }
+.q { position: fixed; top: 6px; right: 316px; z-index: 5; width: 200px; padding: 3px 8px; font: inherit; font-size: 12px; color: var(--vscode-input-foreground, var(--vscode-foreground)); background: var(--vscode-input-background, transparent); border: 1px solid var(--vscode-input-border, var(--line)); border-radius: 3px; } .q:focus { outline: 1px solid var(--vscode-focusBorder); }
+.hide { display: none !important; }
 .foot { font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 8px; }
 .sideh { border-left: 3px solid var(--id); padding-left: 8px; margin-bottom: 8px; } .sideh h3 { margin: 2px 0; font-size: 14px; overflow-wrap: anywhere; }
 .rcard { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 4px; margin: 6px 0; } .rc { border: 1px solid var(--line); border-radius: 5px; padding: 3px 7px; background: var(--raise); min-width: 0; }
@@ -101,7 +109,7 @@ table.vt tr { cursor: pointer; } table.vt td:nth-child(1), table.vt td:nth-child
 .sidestages { margin: 4px 0 8px; } .sloc { font-size: 12px; display: grid; gap: 2px; overflow-wrap: anywhere; } .acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
 .btn { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; border-radius: 3px; padding: 3px 10px; cursor: pointer; font: inherit; } .btn:hover { background: var(--vscode-button-hoverBackground); }
 .mini { font-size: 12px; padding: 2px 4px; border-radius: 3px; cursor: pointer; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; } .mini:hover { background: var(--vscode-list-hoverBackground); } .tl2 { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 1100px) { .ws { grid-template-columns: 130px minmax(0, 1fr); } .side { grid-column: 1 / -1; position: static; height: auto; border-left: none; border-top: 1px solid var(--line); } .cols { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .q { right: 12px; } .ws { grid-template-columns: 130px minmax(0, 1fr); } .side { grid-column: 1 / -1; position: static; height: auto; border-left: none; border-top: 1px solid var(--line); } .cols { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .ws { grid-template-columns: 1fr; } .rail { position: static; height: auto; flex-direction: row; flex-wrap: wrap; border-right: none; } .railfoot { display: none; } .board { grid-template-columns: repeat(5, 200px); } .gh, .gr { grid-template-columns: 120px 1fr; } }
 .tree { font-family: var(--vscode-editor-font-family); font-size: 12px; white-space: pre; overflow-x: auto; }
 .tree a { color: var(--vscode-textLink-foreground); cursor: pointer; text-decoration: none; }
@@ -121,7 +129,35 @@ const vscode = acquireVsCodeApi();
 const root = document.getElementById('root');
 window.addEventListener('message', e => {
   const m = e.data;
-  if (m && m.type === 'render' && typeof m.html === 'string') { root.innerHTML = m.html; if (m.top) window.scrollTo(0, 0); }
+  if (m && m.type === 'render' && typeof m.html === 'string') { root.innerHTML = m.html; if (m.top) window.scrollTo(0, 0); applyFilter(); }
+});
+const q = document.getElementById('q');
+function applyFilter() {
+  if (!q) return;
+  const t = q.value.trim().toLowerCase();
+  for (const el of root.querySelectorAll('main [data-select]')) el.classList.toggle('hide', !!t && !el.textContent.toLowerCase().includes(t));
+}
+if (q) q.addEventListener('input', applyFilter);
+function items() { return [...root.querySelectorAll('main [data-select]')].filter(e => !e.classList.contains('hide')); }
+document.addEventListener('keydown', e => {
+  if (!root.querySelector('.ws')) return;
+  if (e.target === q) { if (e.key === 'Escape') { q.value = ''; applyFilter(); q.blur(); } return; }
+  if (e.ctrlKey || e.metaKey || e.altKey || (e.target.tagName === 'INPUT')) return;
+  const navs = [...root.querySelectorAll('[data-nav].nav')];
+  if (/^[0-9]$/.test(e.key)) { const n = navs[e.key === '0' ? 9 : +e.key - 1]; if (n) { n.click(); e.preventDefault(); } return; }
+  if (e.key === '/' && q) { q.focus(); e.preventDefault(); return; }
+  if (e.key === 'r') { vscode.postMessage({ type: 'cmd', cmd: 'refresh', key: '' }); return; }
+  if (e.key === '?') { root.querySelector('.keys')?.scrollIntoView({ block: 'end' }); return; }
+  if (e.key === 'Escape' && q && q.value) { q.value = ''; applyFilter(); return; }
+  if (['j', 'k', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
+    const list = items();
+    if (!list.length) return;
+    const i = list.findIndex(x => x.classList.contains('sel'));
+    const next = list[Math.max(0, Math.min(list.length - 1, i < 0 ? 0 : i + (e.key === 'j' || e.key === 'ArrowDown' ? 1 : -1)))];
+    next.scrollIntoView({ block: 'nearest' });
+    vscode.postMessage({ type: 'select', key: next.dataset.select });
+    e.preventDefault();
+  }
 });
 vscode.postMessage({ type: 'ready', key: '' });
 document.addEventListener('click', e => {
@@ -140,9 +176,9 @@ document.addEventListener('keydown', e => {
 document.addEventListener('dblclick', e => { const el = e.target.closest('[data-select]'); if (el) vscode.postMessage({ type: 'open', key: el.dataset.select }); });
 `;
 
-export function page(cspSource: string, body: string): string {
+export function page(cspSource: string, body: string, opts: { filter?: boolean } = {}): string {
   const n = nonce();
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp(cspSource, n)}"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${STYLE}</style></head><body><div id="root">${body}</div><script nonce="${n}">${SCRIPT}</script></body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp(cspSource, n)}"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${STYLE}</style></head><body>${opts.filter ? '<input id="q" class="q" type="search" placeholder="Filter sessions  ( / )" aria-label="Filter sessions">' : ''}<div id="root">${body}</div><script nonce="${n}">${SCRIPT}</script></body></html>`;
 }
 
 /** Kept in sync with WS_VIEWS (render/workspace.ts); duplicated so validation has no UI dependency. */

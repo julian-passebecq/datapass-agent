@@ -12,7 +12,7 @@ It **observes** provider-native sessions. It does not launch, schedule, steer, s
 
 ### Agent Workspace (`Agent: Open Workspace`, or the button in the Cockpit)
 
-One editor panel: a navigation rail, the main surface, and a result card for the selected session on the right. Click selects; double-click or Enter opens the Inspector.
+One editor panel: a navigation rail, the main surface, and a result card for the selected session on the right. Click selects; double-click or Enter opens the Inspector. Keyboard: `1`–`0` switch screens, `j`/`k` or arrows move the selection, Enter inspects, `/` filters sessions on the current screen, Esc clears, `r` refreshes. The rail shows a collector summary (for example *9 ready · 1 partial*).
 
 | Screen | What it shows |
 |---|---|
@@ -25,7 +25,7 @@ One editor panel: a navigation rail, the main surface, and a result card for the
 | Last 24 h | Swimlanes from first to last observed activity, with commit and test marks. Probe sessions under 3 minutes with no edit fold into one row |
 | Verification | Every observed test or build command, with its result and whether the result comes from an exit code or a tool status |
 | Activity | 7-day bars per provider, an hour × day heatmap of observed events, and the daily table |
-| Providers | Detection, versions, sessions and diagnostics per provider, plus the observability matrix |
+| Sources | Collectors (Claude transcripts, subagents, live registry, usage; Codex rollouts, archive, titles, live status, usage; Git) each marked ready / partial / missing / off with the reason and collection time; provider log storage with the largest sessions (read-only, Reveal only); providers and the observability matrix |
 
 Lifecycle stages (start → edit → verify → commit → end) come only from observed facts. Tokens and context come from what the provider recorded: Claude `message.usage` (counted once per message id) and Codex `token_count`. Cost is shown only when the provider records it itself (Claude Code `cost-state`). Agent never prices tokens.
 
@@ -91,7 +91,7 @@ npm ci
 npm run check     # tsc --noEmit
 npm test          # fixtures, git, security, perf (node --test)
 npm run build     # esbuild → dist/extension.js
-npm run package   # agent-vscode-0.2.0.vsix
+npm run package   # agent-vscode-0.3.0.vsix
 npm run smoke     # installs the VSIX into an isolated VS Code profile, drives it with Playwright, takes screenshots
 ```
 

@@ -8,7 +8,7 @@ import os from 'os';
 import path from 'path';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
-const vsix = path.join(root, 'agent-vscode-0.2.0.vsix');
+const vsix = path.join(root, 'agent-vscode-0.3.0.vsix');
 const shots = path.resolve(process.argv[2] ?? path.join(root, '.smoke', 'screenshots'));
 const codeDir = process.env.VSCODE_DIR ?? path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Microsoft VS Code');
 const codeExe = path.join(codeDir, process.platform === 'win32' ? 'Code.exe' : 'code');
@@ -86,6 +86,24 @@ async function workspacePass(win, ck, theme, views) {
     check(`${theme}: workspace view ${view}`, txt === heading, txt);
     await shot(win, `${theme === 'Dark' ? 1 : 2}${String(i).padStart(1, '0')}-workspace-${view}-${theme.toLowerCase()}`);
   }
+  // Keyboard: "2" switches to Attention; "/" filter hides non-matching sessions.
+  await ws.frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true })));
+  await win.waitForTimeout(800);
+  await ws.frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: '3', bubbles: true })));
+  await win.waitForTimeout(1000);
+  const h1 = await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent ?? '');
+  check(`${theme}: keyboard 3 opens Board`, h1 === 'Board', h1);
+  const filt = await ws.frame.evaluate(() => {
+    const q = document.getElementById('q');
+    const all = document.querySelectorAll('main [data-select]').length;
+    q.value = 'zzzz-no-such-session';
+    q.dispatchEvent(new Event('input'));
+    const hidden = document.querySelectorAll('main [data-select].hide').length;
+    q.value = '';
+    q.dispatchEvent(new Event('input'));
+    return { all, hidden };
+  });
+  check(`${theme}: filter hides non-matching sessions`, filt.all > 0 && filt.hidden === filt.all, JSON.stringify(filt));
   await runCommand(win, 'View: Toggle Primary Side Bar Visibility');
   await win.waitForTimeout(800);
 }
@@ -142,7 +160,7 @@ try {
   await shot(win, '04-activity-dark');
 
   const ck2 = await webviewText(win, 'Open Agent workspace', 20_000);
-  if (ck2) await workspacePass(win, ck2, 'Dark', [['overview', 'Overview'], ['attention', 'Attention'], ['board', 'Board'], ['team', 'Team'], ['flow', 'Flow'], ['worktrees', 'Worktrees'], ['gantt', 'Last 24 h'], ['verify', 'Verification'], ['activity', 'Activity'], ['providers', 'Providers']]);
+  if (ck2) await workspacePass(win, ck2, 'Dark', [['overview', 'Overview'], ['attention', 'Attention'], ['board', 'Board'], ['team', 'Team'], ['flow', 'Flow'], ['worktrees', 'Worktrees'], ['gantt', 'Last 24 h'], ['verify', 'Verification'], ['activity', 'Activity'], ['providers', 'Sources']]);
   else check('Dark: Agent Workspace opens (Overview)', false, 'cockpit button not found');
 
   // Reload window and confirm reactivation

@@ -100,7 +100,20 @@ export interface AgentSessionSnapshot {
   lastActionAt?: number;
   evidence: Evidence[];
   artifactPath: string;
+  /** Size of the provider artifact when last read (bytes). */
+  artifactBytes?: number;
   diagnostics: string[];
+}
+
+/** One data source Agent reads. Missing access is shown, never hidden. */
+export type SourceStatus = 'ready' | 'partial' | 'missing' | 'off';
+export interface SourceState {
+  id: string;
+  label: string;
+  status: SourceStatus;
+  detail: string;
+  count?: number;
+  at: number;
 }
 
 export interface ProviderState {
@@ -112,6 +125,7 @@ export interface ProviderState {
   note: string;
   artifactsScanned: number;
   diagnostics: string[];
+  sources?: SourceState[];
 }
 
 export function sessionKey(provider: Provider, id: string): string {

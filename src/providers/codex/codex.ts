@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { ProviderState } from '../../model';
+import { ProviderState, SourceState } from '../../model';
 import { SessionAccumulator } from '../../sessions/accumulator';
 import { commandLabel, commandText, isGitCommit, isVerificationCommand, testLabel } from '../../sessions/classify';
 import { readNewLines, safeParse, toMs } from '../../util/jsonl';
@@ -49,7 +49,21 @@ export class CodexAdapter implements ProviderAdapter {
       note: detected ? 'rollout logs; no live process registry exposed' : 'Codex not detected (no ~/.codex/sessions)',
       artifactsScanned: this.accs.size,
       diagnostics: [...this.diagnostics],
+      sources: this.sources(detected),
     };
+  }
+
+  private sources(detected: boolean): SourceState[] {
+    const at = Date.now();
+    const accs = [...this.accs.values()];
+    const has = (p: string) => fs.existsSync(path.join(this.root, p));
+    return [
+      { id: 'codex.rollouts', label: 'Codex rollouts', status: detected ? 'ready' : 'missing', detail: detected ? 'sessions/YYYY/MM/DD/rollout-*.jsonl' : 'no ~/.codex/sessions', count: accs.length - this.archived.size, at },
+      { id: 'codex.archive', label: 'Codex archive', status: has('archived_sessions') ? 'ready' : 'missing', detail: has('archived_sessions') ? 'archived_sessions/ (archived = ENDED)' : 'no archived_sessions/: archived threads not visible', count: this.archived.size, at },
+      { id: 'codex.index', label: 'Codex thread titles', status: has('session_index.jsonl') ? 'ready' : 'partial', detail: has('session_index.jsonl') ? 'session_index.jsonl thread_name' : 'no session_index.jsonl: titles fall back to the first prompt', count: this.titles.size, at },
+      { id: 'codex.live', label: 'Codex live status', status: detected ? 'partial' : 'missing', detail: 'no process registry exposed: open turn + recency (INFERRED)', at },
+      { id: 'codex.usage', label: 'Codex usage', status: detected ? 'ready' : 'missing', detail: 'token_count totals + model_context_window; no cost recorded', count: accs.filter(a => a.usage).length, at },
+    ];
   }
 
   watchTargets(): string[] {

@@ -123,6 +123,17 @@ test('workspace: every view renders, escapes provider text, team root follows wo
   assert.ok(team.includes('coder') && team.includes('tester'), 'lanes from recorded worker roles');
 });
 
+test('sources view: collectors, storage and git off state', () => {
+  const d: WsData = {
+    sessions: [mk({ key: 'claude:big', artifactBytes: 5 * 1024 ** 2 }), mk({ key: 'codex:small', artifactBytes: 2048 })],
+    providers: [{ provider: 'codex', detected: true, note: '', artifactsScanned: 1, diagnostics: [], sources: [{ id: 'codex.live', label: 'Codex live status', status: 'partial', detail: 'INFERRED', at: NOW }, { id: 'codex.archive', label: 'Codex archive', status: 'missing', detail: 'no archived_sessions/', at: NOW }] }],
+    events: [], now: NOW, ternAvailable: false, git: { enabled: false },
+  };
+  const h = renderWorkspace(d, { view: 'providers' });
+  for (const t of ['st-partial', 'st-missing', 'st-off', 'off in untrusted workspaces', '5.0 MB', '2 KB', 'never copies, compacts or deletes']) assert.ok(h.includes(t), t);
+  assert.ok(h.includes('1 partial') && h.includes('1 missing'), 'rail collector summary');
+});
+
 test('messages: nav and select are validated against allow-lists', () => {
   const known = (k: string) => k === 'claude:a';
   assert.deepEqual(validateMessage({ type: 'nav', view: 'team', key: '' }, known), { type: 'nav', view: 'team', key: '' });

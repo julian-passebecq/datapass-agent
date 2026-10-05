@@ -102,6 +102,21 @@ test('codex adapter: meta, turn state, exit-code tests, file changes, subagent p
   assert.equal(st.version, '0.160.0');
 });
 
+test('collectors: each source reports ready / partial / missing explicitly', async () => {
+  const { store } = setup('2026-10-04T12:00:00Z');
+  await store.refresh();
+  const src = new Map(store.providerStates.flatMap(p => p.sources ?? []).map(s => [s.id, s]));
+  assert.equal(src.get('claude.transcripts')?.status, 'ready');
+  assert.equal(src.get('claude.subagents')?.count, 1);
+  assert.equal(src.get('claude.registry')?.status, 'missing', 'fixture has no ~/.claude/sessions');
+  assert.match(src.get('claude.registry')!.detail, /falls back/);
+  assert.equal(src.get('codex.archive')?.status, 'ready');
+  assert.equal(src.get('codex.archive')?.count, 1);
+  assert.equal(src.get('codex.live')?.status, 'partial', 'Codex exposes no live registry');
+  const s = store.get('claude:11111111-1111-4111-8111-111111111111')!;
+  assert.ok((s.artifactBytes ?? 0) > 0, 'artifact size recorded for Storage');
+});
+
 test('codex: open turn without recent activity is UNKNOWN, never RUNNING or FAILED', async () => {
   const { store } = setup('2026-10-04T13:00:00Z');
   await store.refresh();
