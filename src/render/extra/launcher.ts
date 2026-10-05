@@ -1,4 +1,6 @@
 // Add-on screen "Launcher": start or resume a Claude Code / Codex session in a terminal Agent owns.
+// EXPERIMENTAL and the ONLY Agent screen that starts provider sessions (Agent is otherwise a read-only observer).
+// It refuses to start or resume anything in an untrusted workspace (VS Code Workspace Trust).
 // Logic (allow-lists, command building, owned terminals) lives in src/activity/launcher.ts.
 // Nothing starts without ctx.confirm showing the exact folder and command. Never bypassPermissions.
 import * as fs from 'fs';
@@ -38,6 +40,23 @@ function workspaceFolders(): string[] {
     return [];
   }
 }
+
+/** True when VS Code trusts the workspace. Outside the extension host (tests, preview) there is no trust API. */
+let trustProbe = (): boolean => {
+  try {
+    const vs = require('vscode') as typeof import('vscode');
+    return vs.workspace.isTrusted !== false;
+  } catch {
+    return true;
+  }
+};
+
+/** Test hook: replace the workspace-trust probe. */
+export function setTrustProbe(probe: () => boolean): void {
+  trustProbe = probe;
+}
+
+const UNTRUSTED = 'Agent: the Launcher starts provider sessions only in a trusted workspace (Workspaces: Manage Workspace Trust). Copy the command instead.';
 
 const envFeed: Feed<Env> = {
   id: FEED_ID,
@@ -140,7 +159,9 @@ function ownedSection(d: WsData): string {
 function render(d: WsData, st: WsState): string {
   const fsv = feedValue<Env>(FEED_ID);
   const allow = allowOf(d.sessions, fsv.value);
+  const trusted = trustProbe();
   return `<div class="ln">
+<div class="ln-exp" title="Agent observes sessions read-only everywhere else. This screen runs your own CLI in a terminal, after a confirmation.">EXPERIMENTAL · the only Agent screen that starts provider sessions${trusted ? '' : ' · <b>disabled: this workspace is not trusted</b> (copy still works)'}</div>
 <h2>Start a session</h2>${startForm(d, st, allow, fsv.value)}
 <h2>Resume</h2>${resumeSection(d, st)}
 <h2>Terminals Agent started · ${listOwned().length}</h2>${ownedSection(d)}
@@ -160,13 +181,14 @@ export const launcherView: ExtraView = {
   id: 'launcher',
   label: 'Launcher',
   group: 'System',
-  hint: 'Start or resume a Claude / Codex session in a terminal Agent owns.',
+  hint: 'EXPERIMENTAL: the only screen that starts provider sessions. Start or resume a Claude / Codex session in a terminal Agent owns (trusted workspace, confirm first).',
   ready: true,
   feeds: [envFeed as Feed],
   badge: () => (listOwned().length ? String(listOwned().length) : ''),
   render,
   actions: {
     start: async (arg, ctx) => {
+      if (!trustProbe()) return ctx.info(UNTRUSTED);
       const b = rebuild(arg, ctx);
       if (!b.ok) return ctx.info(`Agent: ${b.error}`);
       if (!(await ctx.confirm(`Start a new terminal and run:\n\n${b.command}\n\nin ${b.cwd}`, 'Start'))) return;
@@ -182,6 +204,7 @@ export const launcherView: ExtraView = {
       ctx.info('Agent: command copied.');
     },
     resume: async (arg, ctx) => {
+      if (!trustProbe()) return ctx.info(UNTRUSTED);
       const s = ctx.sessions().find(x => x.key === arg);
       const b = buildResume(s);
       if (!b.ok || !s) return ctx.info(`Agent: ${b.ok ? 'session not found' : b.error}`);
@@ -198,6 +221,7 @@ export const launcherView: ExtraView = {
     },
   },
   css: `
+.ln .ln-exp { font-size: 11px; color: var(--vscode-descriptionForeground); border: 1px dashed var(--line); border-radius: 4px; padding: 3px 8px; margin: 0 0 6px; }
 .ln .ln-lab { font-size: 11px; color: var(--vscode-descriptionForeground); margin: 8px 0 2px; }
 .ln .ln-folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px; }
 .ln .ln-f { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; background: var(--raise); color: var(--vscode-foreground); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; cursor: pointer; font: inherit; min-width: 0; }
