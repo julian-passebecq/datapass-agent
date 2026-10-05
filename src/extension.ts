@@ -54,6 +54,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
     if (m.type === 'open') return inspector.open(m.key);
     if (m.type === 'select') return workspace.open(undefined, m.key);
     if (m.type === 'nav') return workspace.open(m.view);
+    if (m.type === 'opt') return; // workspace-only
     switch (m.cmd) {
       case 'refresh':
         void store.refresh();

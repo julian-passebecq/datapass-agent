@@ -161,9 +161,10 @@ document.addEventListener('keydown', e => {
 });
 vscode.postMessage({ type: 'ready', key: '' });
 document.addEventListener('click', e => {
-  const el = e.target.closest('[data-open],[data-cmd],[data-nav],[data-select]');
+  const el = e.target.closest('[data-open],[data-cmd],[data-nav],[data-select],[data-opt]');
   if (!el) return;
-  if (el.dataset.nav) vscode.postMessage({ type: 'nav', view: el.dataset.nav, key: '' });
+  if (el.dataset.opt) vscode.postMessage({ type: 'opt', name: el.dataset.opt, value: el.dataset.val || '', key: el.dataset.key || '' });
+  else if (el.dataset.nav) vscode.postMessage({ type: 'nav', view: el.dataset.nav, key: '' });
   else if (el.dataset.select) vscode.postMessage({ type: 'select', key: el.dataset.select });
   else if (el.dataset.open) vscode.postMessage({ type: 'open', key: el.dataset.open });
   else vscode.postMessage({ type: 'cmd', cmd: el.dataset.cmd, key: el.dataset.key || '' });
@@ -176,19 +177,22 @@ document.addEventListener('keydown', e => {
 document.addEventListener('dblclick', e => { const el = e.target.closest('[data-select]'); if (el) vscode.postMessage({ type: 'open', key: el.dataset.select }); });
 `;
 
-export function page(cspSource: string, body: string, opts: { filter?: boolean } = {}): string {
+export function page(cspSource: string, body: string, opts: { filter?: boolean; css?: string } = {}): string {
   const n = nonce();
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp(cspSource, n)}"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${STYLE}</style></head><body>${opts.filter ? '<input id="q" class="q" type="search" placeholder="Filter sessions  ( / )" aria-label="Filter sessions">' : ''}<div id="root">${body}</div><script nonce="${n}">${SCRIPT}</script></body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp(cspSource, n)}"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${STYLE}${opts.css ?? ''}</style></head><body>${opts.filter ? '<input id="q" class="q" type="search" placeholder="Filter sessions  ( / )" aria-label="Filter sessions">' : ''}<div id="root">${body}</div><script nonce="${n}">${SCRIPT}</script></body></html>`;
 }
 
 /** Kept in sync with WS_VIEWS (render/workspace.ts); duplicated so validation has no UI dependency. */
 export const NAV_VIEWS = ['overview', 'attention', 'board', 'team', 'flow', 'worktrees', 'gantt', 'verify', 'activity', 'providers'] as const;
+/** Add-on screen ids (render/extra) accepted by nav validation; filled by the workspace panel. */
+export const EXTRA_NAV = new Set<string>();
 
 export type WebviewMessage =
   | { type: 'ready'; key: '' }
   | { type: 'open'; key: string }
   | { type: 'select'; key: string }
-  | { type: 'nav'; view: (typeof NAV_VIEWS)[number]; key: '' }
+  | { type: 'nav'; view: string; key: '' }
+  | { type: 'opt'; name: string; value: string; key: string }
   | { type: 'cmd'; cmd: 'refresh' | 'timelineAll' | 'revealWorktree' | 'copySessionId' | 'openTimeline' | 'openInTern' | 'openArtifactFolder' | 'openWorkspace'; key: string };
 
 const CMDS = new Set(['refresh', 'timelineAll', 'revealWorktree', 'copySessionId', 'openTimeline', 'openInTern', 'openArtifactFolder', 'openWorkspace']);
@@ -202,7 +206,8 @@ export function validateMessage(m: unknown, knownKey: (k: string) => boolean): W
   if (o.type === 'ready' && key === '') return { type: 'ready', key: '' };
   if (o.type === 'open' && knownKey(key)) return { type: 'open', key };
   if (o.type === 'select' && knownKey(key)) return { type: 'select', key };
-  if (o.type === 'nav' && key === '' && typeof o.view === 'string' && (NAV_VIEWS as readonly string[]).includes(o.view)) return { type: 'nav', view: o.view as (typeof NAV_VIEWS)[number], key: '' };
+  if (o.type === 'nav' && key === '' && typeof o.view === 'string' && ((NAV_VIEWS as readonly string[]).includes(o.view) || EXTRA_NAV.has(o.view))) return { type: 'nav', view: o.view, key: '' };
+  if (o.type === 'opt' && typeof o.name === 'string' && /^[a-z0-9.-]{1,40}$/.test(o.name) && typeof o.value === 'string' && /^[a-z0-9._:-]{0,40}$/.test(o.value) && (key === '' || knownKey(key))) return { type: 'opt', name: o.name, value: o.value, key };
   if (o.type === 'cmd' && typeof o.cmd === 'string' && CMDS.has(o.cmd) && (key === '' || knownKey(key))) return { type: 'cmd', cmd: o.cmd as any, key };
   return undefined;
 }

@@ -4,14 +4,24 @@ import { AgentSessionSnapshot, ProviderState, SourceState, TimelineEvent } from 
 import { duration, weekly } from '../activity/activity';
 import { attention, AttentionItem, base, compact, dayStart, flow, hourly, identityColor, isLive, outcome, Outcome, OUTCOME_LABEL, stages, usageSince, workerRole } from '../activity/insights';
 import { esc } from './html';
+import { EXTRA_VIEWS } from './extra';
 import { hhmm, statusText } from './views';
 
 export const WS_VIEWS = ['overview', 'attention', 'board', 'team', 'flow', 'worktrees', 'gantt', 'verify', 'activity', 'providers'] as const;
-export type WsView = (typeof WS_VIEWS)[number];
+export type CoreView = (typeof WS_VIEWS)[number];
+/** Core view id or an add-on screen id from render/extra. */
+export type WsView = string;
+
+/** Every screen id, core first then add-ons. */
+export function allViews(): string[] {
+  return [...WS_VIEWS, ...EXTRA_VIEWS.map(v => v.id)];
+}
 
 export interface WsState {
   view: WsView;
   selected?: string;
+  /** Per-screen options set by toolbar toggles (granularity, orientation, chart type …). */
+  opts?: Record<string, string>;
 }
 
 export interface WsData {
@@ -23,6 +33,8 @@ export interface WsData {
   idleAlertMinutes?: number;
   /** Git correlation collector state (from the store). */
   git?: { enabled: boolean; lastMs?: number; at?: number };
+  /** Lazy access to the store's event history for screens that need more than `events`. */
+  timeline?: (key?: string, limit?: number) => TimelineEvent[];
 }
 
 /** All collectors, providers first, then git. */
@@ -40,10 +52,10 @@ export function bytes(n: number): string {
 }
 
 const PROV: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
-const VIEW_LABEL: Record<WsView, string> = {
+const VIEW_LABEL: Record<CoreView, string> = {
   overview: 'Overview', attention: 'Attention', board: 'Board', team: 'Team', flow: 'Flow', worktrees: 'Worktrees', gantt: 'Last 24 h', verify: 'Verification', activity: 'Activity', providers: 'Sources',
 };
-const VIEW_HINT: Record<WsView, string> = {
+const VIEW_HINT: Record<CoreView, string> = {
   overview: 'What is running now, what needs you, and today at a glance.',
   attention: 'Sessions that need a human look, with the observation behind each item.',
   board: 'Every session by live status.',
@@ -62,15 +74,15 @@ export function prettyModel(m: string | undefined): string {
   return c ? `${c[1][0].toUpperCase()}${c[1].slice(1)} ${c[2]}.${c[3]}` : m;
 }
 
-const repoOf = (s: AgentSessionSnapshot) => base(s.repository) || base(s.cwd) || '(no repo)';
-const titleOf = (s: AgentSessionSnapshot) => s.title ?? s.workerLabel ?? s.sessionId.slice(0, 8);
-const ago = (now: number, t?: number) => (t ? `${duration(now - t)} ago` : '');
+export const repoOf = (s: AgentSessionSnapshot) => base(s.repository) || base(s.cwd) || '(no repo)';
+export const titleOf = (s: AgentSessionSnapshot) => s.title ?? s.workerLabel ?? s.sessionId.slice(0, 8);
+export const ago = (now: number, t?: number) => (t ? `${duration(now - t)} ago` : '');
 
-function stageStrip(s: AgentSessionSnapshot): string {
+export function stageStrip(s: AgentSessionSnapshot): string {
   return `<span class="stages">${stages(s).map(g => `<span class="stg ${g.state}" title="${esc(`${g.label}: ${g.detail}`)}">${esc(g.label)}</span>`).join('')}</span>`;
 }
 
-function usageLine(s: AgentSessionSnapshot): string {
+export function usageLine(s: AgentSessionSnapshot): string {
   const u = s.usage;
   if (!u) return '';
   const parts: string[] = [];
@@ -80,7 +92,7 @@ function usageLine(s: AgentSessionSnapshot): string {
   return parts.join(' · ');
 }
 
-function ctxBar(s: AgentSessionSnapshot): string {
+export function ctxBar(s: AgentSessionSnapshot): string {
   const u = s.usage;
   if (!u?.contextTokens || !u.contextWindow) return '';
   const pct = Math.min(100, Math.round((100 * u.contextTokens) / u.contextWindow));
@@ -99,7 +111,7 @@ export function card(s: AgentSessionSnapshot, d: WsData, sel?: string, extra = '
 <div class="cl"><span class="who">${esc(who)}</span></div><div class="cl muted">${esc(where)}</div>${u ? `<div class="cl num">${esc(u)}</div>` : ''}${ctxBar(s)}${act}${extra}<div>${stageStrip(s)}</div></div>`;
 }
 
-function kpi(value: string | number, label: string, cls = '', title = ''): string {
+export function kpi(value: string | number, label: string, cls = '', title = ''): string {
   return `<div class="kpi ${cls}"${title ? ` title="${esc(title)}"` : ''}><b>${esc(value)}</b><span>${esc(label)}</span></div>`;
 }
 
@@ -409,6 +421,16 @@ function sideRest(d: WsData, s: AgentSessionSnapshot, kids: AgentSessionSnapshot
 
 // ---------------------------------------------------------------- shell
 
+/** Scope key of a session: lowercase repository (or cwd) folder name. Toolbar values are lowercase. */
+export const scopeKey = (s: AgentSessionSnapshot) => repoOf(s).toLowerCase();
+
+/** Applies the `scope` option (a scopeKey from the Projects screen) to every screen. */
+export function scoped(d: WsData, scope: string | undefined): WsData {
+  if (!scope) return d;
+  const keep = new Set(d.sessions.filter(s => scopeKey(s) === scope).map(s => s.key));
+  return { ...d, sessions: d.sessions.filter(s => keep.has(s.key)), events: d.events.filter(e => keep.has(e.sessionKey)) };
+}
+
 export function attentionCount(d: WsData): number {
   return attention(d.sessions, d.now, d).filter(a => a.severity !== 'low').length;
 }
@@ -421,20 +443,30 @@ function collectorSummary(d: WsData): string {
   return `<button class="link cs" data-nav="providers" title="Collectors">${parts.map(([k, c]) => `<span class="sd ${k}"></span>${c} ${k}`).join(' · ')}</button>`;
 }
 
-export function renderWorkspace(d: WsData, st: WsState): string {
+export function renderWorkspace(d0: WsData, st0: WsState): string {
+  let st = st0;
+  const d = scoped(d0, st0.opts?.scope);
   const top = d.sessions.filter(s => !s.isWorker);
-  const badge: Partial<Record<WsView, string>> = {
+  const badge: Record<string, string> = {
     attention: String(attentionCount(d) || ''),
     board: String(top.filter(isLive).length || ''),
     team: String(d.sessions.filter(s => s.isWorker && isLive(s)).length || ''),
     verify: String(d.sessions.filter(s => isLive(s) && s.tests[s.tests.length - 1]?.outcome === 'FAIL').length || ''),
   };
-  const rail = `<nav class="rail"><div class="brand">Agent</div>${WS_VIEWS.map(v => `<button class="nav${st.view === v ? ' on' : ''}" data-nav="${v}">${esc(VIEW_LABEL[v])}${badge[v] ? `<span class="nb${v === 'attention' || v === 'verify' ? ' hot' : ''}">${esc(badge[v])}</span>` : ''}</button>`).join('')}<div class="railfoot">${d.providers.map(p => `<div><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span> ${esc(PROV[p.provider])} ${esc(p.version ?? '')}</div>`).join('')}${collectorSummary(d)}<div class="muted">local · read-only</div></div></nav>`;
-  const body: Record<WsView, () => string> = {
+  for (const x of EXTRA_VIEWS) if (x.badge) badge[x.id] = x.badge(d);
+  const ext = new Map(EXTRA_VIEWS.map(x => [x.id, x]));
+  const label = (v: string) => (VIEW_LABEL as Record<string, string>)[v] ?? ext.get(v)?.label ?? v;
+  const hint = (v: string) => (VIEW_HINT as Record<string, string>)[v] ?? ext.get(v)?.hint ?? '';
+  const navBtn = (v: string) => `<button class="nav${st.view === v ? ' on' : ''}" data-nav="${esc(v)}">${esc(label(v))}${badge[v] ? `<span class="nb${v === 'attention' || v === 'verify' ? ' hot' : ''}">${esc(badge[v])}</span>` : ''}</button>`;
+  const groups = ['Now', 'Sessions', 'Time', 'Git', 'Usage', 'Quality', 'System'].map(g => [g, EXTRA_VIEWS.filter(x => x.group === g)] as const).filter(([, xs]) => xs.length);
+  const rail = `<nav class="rail"><div class="brand">Agent</div>${WS_VIEWS.map(navBtn).join('')}${groups.map(([g, xs]) => `<div class="railg">${esc(g)}</div>${xs.map(x => navBtn(x.id)).join('')}`).join('')}<div class="railfoot">${d.providers.map(p => `<div><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span> ${esc(PROV[p.provider])} ${esc(p.version ?? '')}</div>`).join('')}${collectorSummary(d)}<div class="muted">local · read-only</div></div></nav>`;
+  const body: Record<string, () => string> = {
     overview: () => overview(d, st), attention: () => attentionView(d, st), board: () => board(d, st), team: () => team(d, st), flow: () => flowView(d), worktrees: () => worktrees(d, st), gantt: () => gantt(d, st), verify: () => verify(d, st), activity: () => activity(d), providers: () => providersView(d, st),
   };
+  for (const x of EXTRA_VIEWS) body[x.id] = () => x.render(d, st);
+  if (!body[st.view]) st = { ...st, view: 'overview' };
   const keys = `<div class="keys"><b>1–0</b> screens <b>j/k</b> move <b>Enter</b> inspect <b>/</b> filter <b>Esc</b> clear <b>r</b> refresh <b>?</b> keys</div>`;
-  const main = `<main class="mainw"><header class="mh"><h1>${esc(VIEW_LABEL[st.view])}</h1><span class="muted">${esc(VIEW_HINT[st.view])}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}${keys}</main>`;
+  const main = `<main class="mainw"><header class="mh"><h1>${esc(label(st.view))}</h1>${st.opts?.scope ? `<button class="link scope" data-opt="scope" data-val="" title="Clear scope">scope: ${esc(st.opts.scope)} ✕</button>` : ""}<span class="muted">${esc(hint(st.view))}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}${keys}</main>`;
   return `<div class="ws">${rail}${main}<aside class="side">${side(d, st.selected)}</aside></div>`;
 }
 

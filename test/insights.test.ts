@@ -8,7 +8,7 @@ import { ClaudeAdapter } from '../src/providers/claude/claude';
 import { CodexAdapter } from '../src/providers/codex/codex';
 import { SessionStore } from '../src/sessions/store';
 import { validateMessage } from '../src/render/html';
-import { renderWorkspace, teamRoot, WS_VIEWS, WsData } from '../src/render/workspace';
+import { allViews, renderWorkspace, teamRoot, WsData } from '../src/render/workspace';
 import { T, tmpDir } from './helpers';
 
 const NOW = T('2026-10-04T12:00:00Z');
@@ -112,7 +112,7 @@ test('workspace: every view renders, escapes provider text, team root follows wo
   const w1 = mk({ key: 'claude:lead/w1', isWorker: true, parentSessionId: 'claude:lead', workerLabel: 'coder · build it', status: 'RUNNING' });
   const w2 = mk({ key: 'claude:lead/w2', isWorker: true, parentSessionId: 'claude:lead', workerLabel: 'tester · run', tests: [{ command: evil, at: NOW, outcome: 'PASS', source: 'provider-tool-error-flag' }] });
   const d: WsData = { sessions: [lead, w1, w2, mk({ key: 'codex:x', status: 'NEEDS_INPUT' })], providers: [{ provider: 'claude', detected: true, version: '2.1.289', note: '', artifactsScanned: 3, diagnostics: [] }], events: [], now: NOW, ternAvailable: false };
-  for (const view of WS_VIEWS) {
+  for (const view of allViews()) {
     const h = renderWorkspace(d, { view, selected: 'claude:lead/w1' });
     assert.ok(!h.includes('<img'), `${view}: escaped`);
     assert.ok(!/<script/i.test(h), `${view}: no script`);

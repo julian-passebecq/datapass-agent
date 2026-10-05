@@ -7,7 +7,7 @@ import { ClaudeAdapter } from '../src/providers/claude/claude';
 import { CodexAdapter } from '../src/providers/codex/codex';
 import { SessionStore } from '../src/sessions/store';
 import { STYLE } from '../src/render/html';
-import { renderWorkspace, teamRoot, WS_VIEWS, WsData } from '../src/render/workspace';
+import { allViews, renderWorkspace, teamRoot, WsData } from '../src/render/workspace';
 import { isLive } from '../src/activity/insights';
 
 const DARK = `--vscode-font-family: 'Segoe UI', sans-serif; --vscode-font-size: 13px; --vscode-editor-font-family: Consolas, monospace; --vscode-foreground: #cccccc; --vscode-descriptionForeground: #9d9d9d; --vscode-editor-background: #1f1f1f; --vscode-editorWidget-background: #202020; --vscode-widget-border: #313131; --vscode-list-hoverBackground: #2a2d2e; --vscode-list-activeSelectionBackground: #04395e; --vscode-list-activeSelectionForeground: #fff; --vscode-badge-background: #616161; --vscode-badge-foreground: #f8f8f8; --vscode-focusBorder: #0078d4; --vscode-textLink-foreground: #4daafc; --vscode-button-background: #0078d4; --vscode-button-foreground: #fff; --vscode-charts-green: #89d185; --vscode-charts-red: #f14c4c; --vscode-charts-orange: #d18616; --vscode-charts-yellow: #cca700; --vscode-charts-blue: #3794ff; --vscode-charts-purple: #b180d7; --vscode-disabledForeground: #6e6e6e; background: #1f1f1f;`;
@@ -23,7 +23,7 @@ async function main() {
   const d: WsData = { sessions, providers: store.providerStates, events: store.timeline(undefined, 200_000), now: Date.now(), ternAvailable: true, git: { enabled: true, lastMs: store.lastStats?.gitMs, at: store.lastStats?.at } };
   const live = sessions.filter(s => !s.isWorker && isLive(s));
   const selected = (live.find(s => s.status === 'RUNNING') ?? live[0] ?? sessions[0])?.key;
-  for (const view of WS_VIEWS) {
+  for (const view of allViews()) {
     const sel = view === 'team' ? teamRoot(d)?.key : selected;
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html{${theme}}${STYLE}</style></head><body><div id="root">${renderWorkspace(d, { view, selected: sel })}</div></body></html>`;
     fs.writeFileSync(path.join(out, `${view}.html`), html);
