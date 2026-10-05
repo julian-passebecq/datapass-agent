@@ -7,6 +7,7 @@ import { checkKind, commandLabel, commandText, isGitCommit, isVerificationComman
 import { readNewLines, safeParse, toMs } from '../../util/jsonl';
 import { isInside, isPlausibleLocalPath } from '../../util/paths';
 import { bounded } from '../../util/redact';
+import { DirCache, statFile } from '../discover';
 import { ArtifactRef, ProviderAdapter } from '../types';
 
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
@@ -57,6 +58,8 @@ export class ClaudeAdapter implements ProviderAdapter {
   private agentLabels = new Map<string, string>(); // tool_use id → description
   private registry = new Map<string, RegistryEntry>();
   private registryCheckedAt = 0;
+  /** Folder listings cached by directory mtime: unchanged project folders are not re-listed. */
+  readonly dirCache = new DirCache();
   diagnostics: string[] = [];
 
   constructor(readonly root = claudeRoot()) {}
@@ -99,41 +102,27 @@ export class ClaudeAdapter implements ProviderAdapter {
   listArtifacts(sinceMs: number, max: number): ArtifactRef[] {
     const projects = path.join(this.root, 'projects');
     const out: ArtifactRef[] = [];
-    let dirs: fs.Dirent[] = [];
-    try {
-      dirs = fs.readdirSync(projects, { withFileTypes: true });
-    } catch {
-      return out;
-    }
+    const dc = this.dirCache;
+    dc.begin();
+    const dirs = dc.list(projects);
+    if (!dirs) return out;
     for (const d of dirs) {
-      if (!d.isDirectory()) continue;
+      if (!d.dir) continue;
       const pdir = path.join(projects, d.name);
-      let entries: fs.Dirent[] = [];
-      try {
-        entries = fs.readdirSync(pdir, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const e of entries) {
+      for (const e of dc.list(pdir) ?? []) {
         const p = path.join(pdir, e.name);
-        if (e.isFile() && e.name.endsWith('.jsonl')) push(p);
-        else if (e.isDirectory()) {
+        if (e.file && e.name.endsWith('.jsonl')) push(p);
+        else if (e.dir) {
+          // <session>/ gains subagents/ when the first worker starts (its mtime changes): both listings are cached.
+          if (!dc.list(p)?.some(x => x.dir && x.name === 'subagents')) continue;
           const sub = path.join(p, 'subagents');
-          try {
-            for (const s of fs.readdirSync(sub)) if (s.startsWith('agent-') && s.endsWith('.jsonl')) push(path.join(sub, s));
-          } catch {
-            /* no subagents */
-          }
+          for (const s of dc.list(sub) ?? []) if (s.name.startsWith('agent-') && s.name.endsWith('.jsonl')) push(path.join(sub, s.name));
         }
       }
     }
     function push(p: string) {
-      try {
-        const st = fs.statSync(p);
-        if (st.mtimeMs >= sinceMs && st.size > 0) out.push({ path: p, mtimeMs: st.mtimeMs, size: st.size });
-      } catch {
-        /* vanished */
-      }
+      const st = statFile(p); // vanished → undefined
+      if (st && st.mtimeMs >= sinceMs && st.size > 0) out.push({ path: p, mtimeMs: st.mtimeMs, size: st.size });
     }
     // Parents before their subagents so parent links resolve; newest first otherwise.
     out.sort((a, b) => b.mtimeMs - a.mtimeMs);

@@ -4,9 +4,10 @@ import * as path from 'path';
 import { ProviderState, SourceState } from '../../model';
 import { SessionAccumulator } from '../../sessions/accumulator';
 import { commandLabel, commandText, isGitCommit, isVerificationCommand, testLabel } from '../../sessions/classify';
-import { readNewLines, safeParse, toMs } from '../../util/jsonl';
+import { Cursor, readNewLines, safeParse, toMs } from '../../util/jsonl';
 import { isInside, isPlausibleLocalPath } from '../../util/paths';
 import { bounded } from '../../util/redact';
+import { DirCache, statFile } from '../discover';
 import { ArtifactRef, ProviderAdapter } from '../types';
 import { parseRateLimits } from '../../activity/limits';
 import { cmpVersion } from '../claude/claude';
@@ -34,7 +35,10 @@ export class CodexAdapter implements ProviderAdapter {
   private archived = new Set<SessionAccumulator>();
   private pendingCalls = new Map<string, { acc: SessionAccumulator; cmd: string; at?: number; test: boolean }>();
   private titles = new Map<string, string>();
-  private indexMtime = 0;
+  /** session_index.jsonl byte cursor: only appended titles are read. */
+  private indexCursor?: Cursor;
+  /** Folder listings cached by directory mtime: unchanged day folders are not re-listed. */
+  readonly dirCache = new DirCache();
   private latestCli?: string;
   diagnostics: string[] = [];
 
@@ -76,13 +80,12 @@ export class CodexAdapter implements ProviderAdapter {
   listArtifacts(sinceMs: number, max: number): ArtifactRef[] {
     const out: ArtifactRef[] = [];
     const add = (p: string) => {
-      try {
-        const st = fs.statSync(p);
-        if (st.mtimeMs >= sinceMs && st.size > 0) out.push({ path: p, mtimeMs: st.mtimeMs, size: st.size });
-      } catch {
-        /* vanished */
-      }
+      const st = statFile(p); // vanished → undefined
+      if (st && st.mtimeMs >= sinceMs && st.size > 0) out.push({ path: p, mtimeMs: st.mtimeMs, size: st.size });
     };
+    const dc = this.dirCache;
+    dc.begin();
+    const safeDir = (d: string) => dc.names(d);
     const sessions = path.join(this.root, 'sessions');
     // Only walk day folders that can contain files modified since sinceMs (rollouts are filed by start day, may run for days).
     const cutoff = new Date(sinceMs - 7 * 86400_000);
@@ -475,14 +478,16 @@ export class CodexAdapter implements ProviderAdapter {
 
   private loadIndex(): void {
     const f = path.join(this.root, 'session_index.jsonl');
+    const st = statFile(f);
+    const c = this.indexCursor;
+    if (!st || (c && c.size === st.size && c.mtimeMs === st.mtimeMs)) return;
     try {
-      const st = fs.statSync(f);
-      if (st.mtimeMs === this.indexMtime || st.size > 16 << 20) return;
-      this.indexMtime = st.mtimeMs;
-      for (const l of fs.readFileSync(f, 'utf8').split('\n')) {
-        const o = l ? safeParse(l) : undefined;
+      // Append-only index: read from the last byte offset in bounded chunks, never the whole file again.
+      const res = readNewLines(f, c, l => {
+        const o = safeParse(l);
         if (o && typeof o.id === 'string' && typeof o.thread_name === 'string') this.titles.set(o.id, bounded(o.thread_name, 80));
-      }
+      });
+      this.indexCursor = res.cursor;
     } catch {
       /* optional */
     }
@@ -541,14 +546,6 @@ function codeCmd(input: string): string {
   const m = /\b(?:cmd|command)\s*:\s*("(?:[^"\\]|\\.){0,400}"|'(?:[^'\\]|\\.){0,400}'|`[^`]{0,400}`)/.exec(input.slice(0, 4000));
   if (!m) return '';
   return bounded(commandLabel(m[1].slice(1, -1).replace(/\\(["'\\])/g, '$1')), 80);
-}
-
-function safeDir(d: string): string[] {
-  try {
-    return fs.readdirSync(d);
-  } catch {
-    return [];
-  }
 }
 
 /** update_plan arguments ({explanation?, plan: [{step, status}]}) → the session's todo list. */
