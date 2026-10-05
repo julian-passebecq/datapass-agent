@@ -97,3 +97,34 @@ test('timeline renders chronologically with day headers', () => {
   );
   assert.ok(html.indexOf('session started') < html.indexOf('a81c2'));
 });
+
+test('inspector: State (permission mode, current tool), Usage, Related, honest end and test verdicts', () => {
+  const lead = snap({ key: 'claude:lead', sessionId: 'lead', title: 'lead', status: 'RUNNING', statusReason: 'live registry: busy', startedAt: NOW - 3600_000, lastActivityAt: NOW - 60_000, facts: { spawns: [{ at: NOW - 1800_000 - 1000, type: 'coder', description: 'pkg <A>' }] } });
+  const w = snap({
+    key: 'claude:w', sessionId: 'w', title: 'worker', isWorker: true, parentSessionId: 'claude:lead', workerLabel: 'coder', status: 'ENDED', statusReason: 'no live registry entry: process no longer active (inferred, no end recorded)',
+    startedAt: NOW - 1800_000, lastActivityAt: NOW - 600_000, endedAt: NOW - 600_000,
+    usage: { totalTokens: 120_000, outputTokens: 3000, cachedInputTokens: 90_000, contextTokens: 50_000 },
+    facts: { permissionMode: 'acceptEdits', activeMs: 900_000, modelTokens: { 'claude-opus-5-5': 100_000, 'claude-haiku-5': 20_000 } },
+    tests: [{ command: 'npm test | tail · piped', at: NOW - 700_000, outcome: 'PASS', source: 'provider-tool-error-flag' }],
+    commits: [{ sha: 'c'.repeat(40), at: NOW - 650_000, subject: 'x', attribution: 'during-session' }],
+  });
+  const h = renderInspector(w, [], lead, [], false, NOW);
+  const order = ['<h2>Result', '<h2>State', '<h2>Location', '<h2>Change', '<h2>Verification', '<h2>Usage', '<h2>Workers', '<h2>Activity', '<h2>Evidence', '<h2>Related'].map(x => h.indexOf(x));
+  assert.ok(order.every((x, i) => x >= 0 && (i === 0 || x > order[i - 1])), `section order ${order}`);
+  assert.ok(h.includes('No longer active (inferred)') && h.includes('Inactive since'), 'inferred end');
+  assert.ok(!/>Ended</.test(h), 'no plain Ended for an inferred end');
+  assert.ok(h.includes('acceptEdits'), 'permission mode in State');
+  assert.ok(h.includes('Current tool'));
+  assert.ok(h.includes('120,000 total') && h.includes('Active time') && h.includes('Wall time') && h.includes('claude-haiku-5'), 'usage');
+  assert.ok(!h.includes('Cost (recorded'), 'no cost unless recorded');
+  assert.ok(h.includes('UNKNOWN (recorded PASS)'), 'piped test with only a tool flag is not a pass');
+  assert.ok(h.includes('not proof the session made it'), 'window commit caveat');
+  assert.ok(h.includes('data-open="claude:lead"'), 'related parent link');
+  assert.ok(h.includes('finished, unverified') && h.includes('pkg &lt;A&gt;'), 'dispatch row reused');
+  assert.ok(h.includes('PR</dt><dd><span class="muted">not loaded'), 'PR not loaded without the opt-in feed');
+  const li = renderInspector(lead, [w], undefined, [], false, NOW);
+  assert.ok(li.includes('1 finished, unverified') || li.includes('0 verified · 1 finished, unverified'), 'lead sees its dispatches');
+  assert.equal(statusText(w), 'No longer active (inferred)');
+  const top = { ...w, key: 'claude:top', isWorker: false, parentSessionId: undefined };
+  assert.ok(renderCockpit([top], [], NOW).includes('inactive since'), 'cockpit row: inferred end is not "ended HH:MM"');
+});
