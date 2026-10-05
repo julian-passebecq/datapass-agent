@@ -1,0 +1,1 @@
+{ "model": "claude-sonnet-4-5", "permissions": { "allow": ["Read", "Bash(npm test:*)"], "ask": ["Bash(git push:*)"] } }

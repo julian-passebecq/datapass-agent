@@ -1,0 +1,46 @@
+model = "gpt-5.5-codex"
+model_reasoning_effort = "high" # trailing comment
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+notify = ["node", "notify.js"]
+profile = "fast"
+
+[features]
+multi_agent = true
+js_repl = false
+
+[profiles.fast]
+model = "gpt-5.5-mini"
+model_reasoning_effort = "low"
+
+[profiles.yolo]
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
+[mcp_servers.linear]
+url = "https://example.invalid/mcp"
+
+[mcp_servers.node_repl]
+command = "node"
+args = [
+  "repl.js",
+  "--x",
+]
+
+[mcp_servers.node_repl.env]
+GITHUB_TOKEN = "fake-mcp-env-value-should-not-leak"
+
+[shell_environment_policy.set]
+SECRET_THING = "fake-shell-secret"
+
+[projects.'d:\proj\a.b']
+trust_level = "trusted"
+
+[projects.'d:\proj\c']
+trust_level = "untrusted"
+
+[plugins."browser@openai-bundled"]
+enabled = true
+
+[plugins."pdf@x"]
+enabled = false
