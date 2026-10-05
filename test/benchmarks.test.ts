@@ -197,7 +197,7 @@ test('benchmarks: local workload rows are DERIVED from dispatch analytics, cost 
   const lead = mk({ key: 'claude:lead' });
   const w = (k: string, model: string, effort: string | undefined, ok: boolean, tokens: number) => mk({
     key: `claude:${k}`, parentSessionId: 'claude:lead', isWorker: true, workerLabel: 'coder', model, effort, usage: { totalTokens: tokens, outputTokens: 10, cachedInputTokens: 0 },
-    ...(ok ? { commits: [{ sha: k, at: NOW - 2 * H, subject: 's', attribution: 'during-session' as const }] } : { tests: [{ command: 'npm test', at: NOW - 2 * H, outcome: 'FAIL' as const, source: 'provider-exit-code' as const, exitCode: 1 }] }),
+    ...(ok ? { commits: [{ sha: k, at: NOW - 2 * H, subject: 's', attribution: 'session-ran-git-commit' as const }] } : { tests: [{ command: 'npm test', at: NOW - 2 * H, outcome: 'FAIL' as const, source: 'provider-exit-code' as const, exitCode: 1 }] }),
   });
   const ds = buildDispatches([lead, w('a', 'fake-opus', 'high', true, 1000), w('b', 'fake-opus', 'high', false, 3000), w('c', 'fake-sonnet', undefined, true, 500)], undefined, NOW);
   const rows = localRows(ds);
