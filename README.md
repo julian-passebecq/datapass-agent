@@ -31,6 +31,111 @@ Lifecycle stages (start → edit → verify → commit → end) come only from o
 
 Agent stands alone. It needs no DataPass, Tern, Factory, MongoDB or cloud backend. When Tern is installed, `Open in Tern` calls `tern.revealWorktree`; otherwise the command is hidden.
 
+## Screens
+
+Add-on screens sit in the rail under group headings. Every value shows its evidence kind (OBSERVED, DERIVED, INFERRED, UNKNOWN) in a tooltip or legend. "Git" means read-only hardened git in repositories the agents used. "gh / glab" means the GitHub / GitLab CLI, run only when the opt-in setting is on and the workspace is trusted. Nothing else starts a process or uses the network.
+
+| Group | Screen | What it shows | Source | Evidence | Git | gh / glab |
+|---|---|---|---|---|---|---|
+| Now | Live | Every live session and worker: current tool, tokens per minute, pace | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
+| Now | Workflows | Claude Code workflow runs: phases, agents, model, time, tokens; background subagents and Codex workers | workflow files, transcripts | OBSERVED, DERIVED, INFERRED | no | no |
+| Now | Projects | Company, project, repository, sessions tree; click sets the scope for every screen | sessions + `agent.projects` | OBSERVED, DERIVED, INFERRED | no | no |
+| Sessions | Topology | Lead, workers and nested workers as a tree with rolled-up tokens, cost, time | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
+| Sessions | Transcript | One session as a conversation (prompts, replies, tool calls), redacted | one transcript / rollout, read on demand | OBSERVED, DERIVED, INFERRED | no | no |
+| Sessions | Replay | Step through one session's events with play, pause, speed | recorded events | OBSERVED, DERIVED, INFERRED | no | no |
+| Time | Week | Sessions on a Monday to Sunday calendar | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
+| Time | Run strips | One row per repository over 14 days, concurrency per hour against `agent.parallelTarget` | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
+| Time | Forecast | Gantt of running work with end times projected from your own history (median and quartiles, sample size shown) | local history | INFERRED from OBSERVED durations | no | no |
+| Time | History | Weeks side by side from the weekly archive | `~/.agent/history` | DERIVED | no | no |
+| Git | Repositories | Branches, worktrees, dirty state, ahead / behind, recent commits | git | OBSERVED, DERIVED | yes | no |
+| Git | Changes | Per-file +/- over each session's commit window, uncommitted work per worktree, edit heat | git, edit calls | OBSERVED, DERIVED | yes | no |
+| Git | Review | Working / Needs you / In review / Ready to merge / CI failed lanes | sessions, recorded commands, PR / MR state | OBSERVED, DERIVED, INFERRED | no | yes, opt-in network (`agent.review.prState`) |
+| Git | Pipelines | GitHub Actions and GitLab runs, jobs as a Gantt, what blocks, runner | gh / glab | OBSERVED, DERIVED, INFERRED | no | yes, opt-in network (`agent.pipelines.enabled`) |
+| Usage | Explore | Pivot sessions by dimension and metric as bars, table, treemap, heatmap or line; CSV export | loaded sessions | DERIVED | no | no |
+| Usage | Token rhythm | Tokens per minute, hour or day by provider, model, repo or session; peaks, context growth | provider usage records | OBSERVED, DERIVED | no | no |
+| Quality | Signals | Unsolved, blocked, permissions, swallowed, looping, each with its basis | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
+| Quality | Health | Test pass rate, commits per session, context use against a reference window | provider artifacts | OBSERVED, DERIVED | no | no |
+| Quality | Backlog | Packages and checklist items from `handoff/PLAN.md`, `ROADMAP.md`, `TODO.md` with the sessions that mention them | plan files (read-only, size cap) | OBSERVED, DERIVED, INFERRED | no | no |
+| System | Audit trail | Observed transitions, filters, local JSONL export | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
+| System | Settings | Effective Claude Code and Codex configuration layers, agents, hooks (read-only, redacted) | settings files, `config.toml` | OBSERVED | no | no |
+
+The Launcher screen is not enabled in this version.
+
+### Multiple tabs and project scope
+
+`Agent: Open Workspace in New Tab` (or `+ tab` in the rail) opens another workspace panel with its own screen, selection, filters and scope. Pick a project in **Projects** to set a scope: every screen then shows only that repository's sessions. The scope appears next to the screen title; click it to clear. `Open in new tab` on a project opens the tab already scoped.
+
+Map sessions to company and project with `agent.projects`. A rule's `match` is a path prefix, a glob (`*`, `?`, `**`) or a bare repository folder name. The most specific rule wins. Unmatched sessions are inferred from the path.
+
+## Weekly history
+
+```
+npm run weekly
+```
+
+This reads all local Claude Code and Codex history (archived Codex sessions included) and merges it into `~/.agent/history/YYYY-Www.json`, plus a markdown audit report `YYYY-Www.md` per week. It stores counts, tokens, repositories, models and outcomes. **No prompt, title or command text is stored.** Weeks already archived are kept after the provider deletes its logs.
+
+Options (after `--`, for example `npm run weekly -- --dry`): `--out <dir>` archive folder, `--days <n>` days to scan (default 3650), `--no-git` skip git correlation (commits are then not counted), `--max <n>` most artifacts per provider, `--dry` compute and print only.
+
+The History screen reads that folder (`agent.history.dir`, `agent.history.maxWeeks`) and can build it with *Build now*.
+
+Windows Task Scheduler, every Monday 08:00 (run `npm run compile-tests` once in the checkout first, so `out-test` exists):
+
+```
+schtasks /Create /SC WEEKLY /D MON /ST 08:00 /TN "Agent weekly history" /TR "node <checkout>\out-test\scripts\weekly.js"
+```
+
+## Settings
+
+Defined in `package.json`. Commands are in the Command Palette under "Agent:".
+
+| Setting | Type | Default | Meaning |
+|---|---|---|---|
+| `agent.historyDays` | number | `3` | How many days of provider session history to load. |
+| `agent.maxSessions` | number | `300` | Upper bound on session artifacts ingested. |
+| `agent.claude.enabled` | boolean | `true` | Observe Claude Code sessions (~/.claude). |
+| `agent.codex.enabled` | boolean | `true` | Observe Codex sessions (~/.codex). |
+| `agent.idleMinutes` | number | `10` | Minutes without activity before an open session is shown as IDLE rather than RUNNING (Codex). |
+| `agent.idleAlertMinutes` | number | `30` | Minutes an IDLE session waits before it appears in the Attention queue. |
+| `agent.projects` | list | `[]` | Maps sessions to company / project for the Projects screen. match is a path prefix, a glob (* ? **) or a bare repository folder name; the most specific rule wins. Unmatched sessions are inferred from the path. |
+| `agent.repos.maxRepos` | number | `20` | Repositories screen: most repositories read (live first, then most recent session activity). |
+| `agent.repos.maxWorktrees` | number | `24` | Repositories screen: most worktrees per repository whose git status is read (worktrees with live sessions first). |
+| `agent.repos.commits` | number | `8` | Repositories screen: recent commits listed per repository (0 = off). |
+| `agent.repos.untracked` | boolean | `true` | Repositories screen: count untracked files (false is faster). |
+| `agent.repos.extra` | list | `[]` | Repositories screen: extra repository paths always shown, even without a session. |
+| `agent.settings.extraRoots` | list | `[]` | Settings screen: extra folders scanned for .claude/settings*.json, agents, skills and CLAUDE.md. |
+| `agent.settings.maxRepos` | number | `40` | Settings screen: most repositories (most recent first) read for project settings layers. |
+| `agent.settings.managed` | boolean | `true` | Settings screen: also read the machine managed-settings.json (admin policy layer) if present. |
+| `agent.transcript.maxBytes` | number | `5242880` | Transcript screen: bytes read from the end of a transcript. |
+| `agent.transcript.maxRecords` | number | `2000` | Transcript screen: most conversation entries kept per transcript (oldest dropped first). |
+| `agent.transcript.pageSize` | number | `150` | Transcript screen: entries per page. |
+| `agent.parallelTarget` | number | `0` | Target number of agents running at once: draws a target line on concurrency charts (0 = no target). |
+| `agent.health.contextWindow` | number | `272000` | Reference context window and marker line; used as the window when the provider records none (Claude Code). A setting, not a fact. |
+| `agent.health.warnPercent` | number | `80` | Context % at which bars, KPIs and badges turn red. |
+| `agent.backlog.extraRoots` | list | `[]` | Backlog screen: extra folders scanned for plan files besides the repositories agents used. |
+| `agent.backlog.maxRepos` | number | `40` | Backlog screen: most recent repositories scanned. |
+| `agent.backlog.maxKB` | number | `200` | Backlog screen: plan files larger than this (KB) are skipped and listed. |
+| `agent.backlog.archive` | boolean | `true` | Backlog screen: also read handoff/archive/*.md for the weekly archive. |
+| `agent.review.prState` | boolean | `false` | Review screen: read PR / MR, CI and review state with gh / glab (read-only, network). Off: lanes from sessions and recorded commands only. |
+| `agent.review.maxRepos` | number | `12` | Review screen: repositories queried (most recent first). |
+| `agent.review.limit` | number | `30` | Review screen: PRs / MRs listed per remote. |
+| `agent.changes.maxSessions` | number | `60` | Changes screen: most recent sessions whose commit window gets a git diff --numstat. |
+| `agent.changes.maxWorktrees` | number | `16` | Changes screen: worktrees inspected for uncommitted work. |
+| `agent.changes.worktreeHours` | number | `24` | Changes screen: inspect a worktree if a session there is live or was active within this many hours. |
+| `agent.changes.untracked` | boolean | `true` | Changes screen: count untracked files. |
+| `agent.pipelines.enabled` | boolean | `false` | Pipelines screen: read GitHub Actions / GitLab CI through the gh / glab CLIs (read-only, network). Off by default. |
+| `agent.pipelines.maxRepos` | number | `12` | Pipelines screen: most recently used agent repositories checked. |
+| `agent.pipelines.runsPerRepo` | number | `20` | Pipelines screen: runs listed per remote. |
+| `agent.pipelines.jobRuns` | number | `4` | Pipelines screen: runs per remote whose jobs are loaded (active first, then newest, then latest failures). |
+| `agent.pipelines.gitlabHosts` | list | `[]` | Pipelines screen: extra self-managed GitLab host names. |
+| `agent.pipelines.extraRepos` | list | `[]` | Pipelines screen: extra local repository paths to include. |
+| `agent.history.dir` | string | `""` | History screen: folder holding the weekly archive (empty = ~/.agent/history). Written by npm run weekly or the screen's Build now. |
+| `agent.history.maxWeeks` | number | `52` | History screen: how many of the newest week files are read. |
+
+## No AI
+
+Agent uses no LLM. Every number is read from a provider artifact or computed by a fixed rule from those artifacts. Estimates (Forecast) are medians of your own past durations, labelled INFERRED with their basis. Nothing leaves the machine, except the read-only `gh` / `glab` calls you turn on yourself in Review and Pipelines.
+
 ## Observability matrix (Claude Code 2.1.289 CLI / 2.1.286 desktop; Codex CLI 0.160.0)
 
 | Field | Claude Code | Codex |
@@ -67,11 +172,11 @@ Anything not in the table shows as *not exposed*. Agent never invents model, eff
 
 ## Git correlation
 
-Git runs read-only in the session's cwd: `rev-parse`, `status --porcelain -uno` (live sessions only), `rev-list`, `log`, and `diff --numstat`. Every call is hardened with `core.fsmonitor=false`, no external diff or textconv, no pager, no credential helper and `GIT_TERMINAL_PROMPT=0`, so a repository named by an artifact cannot run its own programs. Commits are labelled **observed during session**. **Session ran git commit** appears only when the provider recorded a `git commit` command. In untrusted workspaces Git correlation is off.
+Git runs read-only in the session's cwd (and, for Repositories and Changes, in the repositories agents used): `rev-parse`, `status --porcelain -uno` (live sessions only), `rev-list`, `log`, and `diff --numstat`. Every call is hardened with `core.fsmonitor=false`, no external diff or textconv, no pager, no credential helper and `GIT_TERMINAL_PROMPT=0`, so a repository named by an artifact cannot run its own programs. Commits are labelled **observed during session**. **Session ran git commit** appears only when the provider recorded a `git commit` command. In untrusted workspaces Git correlation is off.
 
 ## Privacy and security
 
-- Local only. No network calls, no telemetry, no transcript copies. Provider artifacts stay the authority; Agent holds an in-memory projection that it rebuilds on reload.
+- Local only. No telemetry, no transcript copies. The only network use is the opt-in read-only `gh` / `glab` calls of Review and Pipelines (both off by default). Provider artifacts stay the authority; Agent holds an in-memory projection that it rebuilds on reload.
 - Kept text is limited to titles and command lines, single-line, length-bounded and redacted (API keys, GitHub/GitLab/Slack tokens, JWTs, `Authorization`/`Bearer`, `*_TOKEN=`/`*_SECRET=`, URL credentials, private keys).
 - Environment: Agent reads only `USERPROFILE`, `HOME`, `CODEX_HOME` and `CLAUDE_CONFIG_DIR`. Child processes (`git`, `claude --version`, `codex --version`) get a minimal environment with no tokens.
 - Artifacts are opened read-only. A path that resolves outside the provider root (traversal, symlink, junction) is rejected. Paths read from artifacts must be plausible absolute local paths.
@@ -91,7 +196,7 @@ npm ci
 npm run check     # tsc --noEmit
 npm test          # fixtures, git, security, perf (node --test)
 npm run build     # esbuild → dist/extension.js
-npm run package   # agent-vscode-0.3.0.vsix
+npm run package   # agent-vscode-0.4.0.vsix
 npm run smoke     # installs the VSIX into an isolated VS Code profile, drives it with Playwright, takes screenshots
 ```
 

@@ -8,7 +8,7 @@ import os from 'os';
 import path from 'path';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
-const vsix = path.join(root, 'agent-vscode-0.3.0.vsix');
+const vsix = path.join(root, 'agent-vscode-0.4.0.vsix');
 const shots = path.resolve(process.argv[2] ?? path.join(root, '.smoke', 'screenshots'));
 const codeDir = process.env.VSCODE_DIR ?? path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Microsoft VS Code');
 const codeExe = path.join(codeDir, process.platform === 'win32' ? 'Code.exe' : 'code');
@@ -130,8 +130,14 @@ try {
   await icon.click();
   const cockpit = await webviewText(win, 'Ended today', 60_000);
   check('Cockpit renders', cockpit, cockpit ? `${Date.now() - t0}ms after launch` : 'no cockpit text');
-  await win.waitForTimeout(8000); // let git correlation finish
-  const ck = await webviewText(win, 'Ended today');
+  // Initial discovery reads every provider artifact and runs git correlation: on a busy machine with
+  // ~500 MB of history it can take 30-60 s. Poll until sessions are counted instead of a fixed wait.
+  let ck;
+  for (const t1 = Date.now(); Date.now() - t1 < 120_000; await win.waitForTimeout(2000)) {
+    ck = await webviewText(win, 'Ended today');
+    const m = /(\d+)Active(\d+)Idle(?:(\d+)Needs input)?(\d+)Ended today/.exec(ck?.txt ?? '');
+    if (m && Number(m[1]) + Number(m[2]) + Number(m[4]) > 0) break;
+  }
   check('Cockpit shows Claude provider state', ck?.txt.includes('CLAUDE CODE') || ck?.txt.includes('Claude Code'));
   check('Cockpit shows Codex provider state', ck?.txt.includes('CODEX') || ck?.txt.includes('Codex'));
   const counts = /(\d+)Active(\d+)Idle(?:(\d+)Needs input)?(\d+)Ended today/.exec(ck?.txt ?? '');
