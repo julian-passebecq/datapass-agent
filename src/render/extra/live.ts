@@ -1,7 +1,7 @@
 // Add-on screen "Live": who does what right now. One row per live session and worker: provider, model · effort,
 // permission mode, current tool + elapsed, last action, tokens / min, context, prompts, files, workers.
 // Layouts: dense table, cards, swimlanes (by repo / provider / model, horizontal or vertical). Pure rendering.
-import type { AgentSessionSnapshot } from '../../model';
+import type { AgentSessionSnapshot, EvidenceKind } from '../../model';
 import { duration } from '../../activity/activity';
 import { compact, identityColor } from '../../activity/insights';
 import { lanes, LiveRow, liveRows, LiveSort, liveTotals } from '../../activity/live';
@@ -71,15 +71,67 @@ const T_RATE = (c: Cfg) => `${c.basis === 'output' ? 'output' : 'prompt + output
 const T_TOOL = 'OBSERVED: tool call with no recorded result yet; elapsed since the call (DERIVED)';
 const T_LAST = 'OBSERVED: latest recorded action (no tool call open)';
 const T_CTX = 'context = prompt size of the latest model call (OBSERVED); % only when the provider records the window (Codex), else UNKNOWN';
-const T_MODE = 'permission / approval / sandbox mode as recorded in the transcript or rollout (OBSERVED)';
+const T_MODE = 'Claude permission mode; Codex approval policy and collaboration mode (plan = Codex plan mode); sandbox — as recorded in the transcript or rollout (evidence chip per value)';
 
 function who(s: AgentSessionSnapshot): string {
   return [prettyModel(s.model), s.effort].filter(Boolean).join(' · ');
 }
 
-function mode(s: AgentSessionSnapshot): string {
+/** One recorded provider mode fact (permission mode, approval policy, collaboration mode, sandbox) with its evidence. */
+export interface ModeFact {
+  field: 'permissionMode' | 'approvalPolicy' | 'collaborationMode' | 'sandbox';
+  label: string;
+  value: string;
+  kind: EvidenceKind;
+  basis: string;
+}
+
+const MODE_BASIS: Record<ModeFact['field'], string> = {
+  permissionMode: 'transcript permissionMode (latest)',
+  approvalPolicy: 'rollout turn_context.approval_policy (an approval policy, not a permission mode)',
+  collaborationMode: 'rollout turn_context.collaboration_mode.mode / task_started.collaboration_mode_kind (plan = Codex plan mode)',
+  sandbox: 'sandbox policy as recorded',
+};
+
+/**
+ * Provider mode facts of a session, in display order. Claude: permission mode. Codex: approval policy (falls back to the
+ * legacy permissionMode alias), collaboration mode. Both: sandbox. Evidence comes from the session's own evidence list
+ * (field `facts.<name>`) when the provider adapter recorded one, else OBSERVED (facts are read from the provider record).
+ */
+export function modeFacts(s: AgentSessionSnapshot): ModeFact[] {
   const f = s.facts;
-  return [f?.permissionMode, f?.sandbox].filter(Boolean).join(' · ');
+  if (!f) return [];
+  const out: ModeFact[] = [];
+  const add = (field: ModeFact['field'], label: string, value: string | undefined, basis = MODE_BASIS[field]) => {
+    if (typeof value !== 'string' || !value) return;
+    const e = s.evidence?.find(x => x.field === `facts.${field}`);
+    out.push({ field, label, value, kind: e?.kind ?? 'OBSERVED', basis: e?.source ?? basis });
+  };
+  if (s.provider === 'codex') {
+    if (f.approvalPolicy) add('approvalPolicy', 'approval', f.approvalPolicy);
+    else add('approvalPolicy', 'approval', f.permissionMode, 'rollout turn_context.approval_policy (legacy permissionMode alias)');
+    add('collaborationMode', 'collaboration', f.collaborationMode);
+  } else {
+    add('permissionMode', 'permission', f.permissionMode);
+  }
+  add('sandbox', 'sandbox', f.sandbox);
+  return out;
+}
+
+/** Evidence chip (global .chip.ev styles): KIND with the basis as tooltip. */
+export function modeChip(kind: EvidenceKind, basis: string): string {
+  return `<span class="chip ev ${esc(kind)}" title="${esc(`${kind}: ${basis}`)}">${esc(kind)}</span>`;
+}
+
+/** "approval never · collaboration plan · sandbox …" followed by one evidence chip (the weakest kind among the facts). */
+export function modeHtml(s: AgentSessionSnapshot, o: { chip?: boolean } = {}): string {
+  const fs = modeFacts(s);
+  if (!fs.length) return '';
+  const text = fs.map(x => `${x.label} ${x.value}`).join(' · ');
+  if (o.chip === false) return esc(text);
+  const order: EvidenceKind[] = ['UNKNOWN', 'INFERRED', 'DERIVED', 'OBSERVED'];
+  const kind = order.find(k => fs.some(x => x.kind === k)) ?? 'OBSERVED';
+  return `${esc(text)}${modeChip(kind, fs.map(x => `${x.label}: ${x.kind} · ${x.basis}`).join('; '))}`;
 }
 
 function toolHeat(ms: number): string {
@@ -149,7 +201,7 @@ function table(rows: LiveRow[], d: WsData, st: WsState, c: Cfg, max: number): st
   const body = rows.map(r => {
     const s = r.s;
     const pad = 6 + r.depth * 16;
-    return `<tr ${rowAttrs(r, st, 'lv-tr')}><td class="lv-n1" style="padding-left:${pad}px">${r.depth ? '<span class="lv-br">└</span>' : ''}${nameCell(r)}</td><td class="lv-st">${esc(statusText(s))}</td><td class="lv-who"><span class="lv-pv">${esc(PROV[s.provider] ?? s.provider)}</span> ${esc(who(s))}</td><td class="lv-mode" title="${esc(T_MODE)}">${esc(mode(s))}</td><td class="lv-do">${doing(r, d.now)}</td><td class="r lv-rate" title="${esc(T_RATE(c))}">${esc(rateText(rateOf(r, c)))}</td><td>${sparkline(r, c, max)}</td><td class="r">${ctxCell(r)}</td><td class="r" title="user prompts recorded (OBSERVED)">${r.prompts ?? ''}</td><td class="r" title="files the provider recorded editing (OBSERVED)">${r.files || ''}</td><td class="r">${workersCell(r)}</td><td class="r" title="total tokens recorded for the session (OBSERVED)">${s.usage ? esc(compact(s.usage.totalTokens)) : ''}</td><td class="lv-where">${esc(where(s))}</td><td class="r" title="since session start (DERIVED)">${esc(el(s.startedAt !== undefined ? d.now - s.startedAt : undefined))}</td></tr>`;
+    return `<tr ${rowAttrs(r, st, 'lv-tr')}><td class="lv-n1" style="padding-left:${pad}px">${r.depth ? '<span class="lv-br">└</span>' : ''}${nameCell(r)}</td><td class="lv-st">${esc(statusText(s))}</td><td class="lv-who"><span class="lv-pv">${esc(PROV[s.provider] ?? s.provider)}</span> ${esc(who(s))}</td><td class="lv-mode" title="${esc(T_MODE)}">${modeHtml(s)}</td><td class="lv-do">${doing(r, d.now)}</td><td class="r lv-rate" title="${esc(T_RATE(c))}">${esc(rateText(rateOf(r, c)))}</td><td>${sparkline(r, c, max)}</td><td class="r">${ctxCell(r)}</td><td class="r" title="user prompts recorded (OBSERVED)">${r.prompts ?? ''}</td><td class="r" title="files the provider recorded editing (OBSERVED)">${r.files || ''}</td><td class="r">${workersCell(r)}</td><td class="r" title="total tokens recorded for the session (OBSERVED)">${s.usage ? esc(compact(s.usage.totalTokens)) : ''}</td><td class="lv-where">${esc(where(s))}</td><td class="r" title="since session start (DERIVED)">${esc(el(s.startedAt !== undefined ? d.now - s.startedAt : undefined))}</td></tr>`;
   }).join('');
   return `<div class="lv-tw"><table class="lv-tab"><thead><tr><th>Session</th><th>Status</th><th>Provider · model</th><th>Mode</th><th>Now doing</th><th class="r">Tok/min</th><th>Last ${SPARK_MIN} min</th><th class="r">Context</th><th class="r">Prompts</th><th class="r">Files</th><th class="r">Workers</th><th class="r">Tokens</th><th>Repo · branch</th><th class="r">Up</th></tr></thead><tbody>${body}</tbody></table></div>`;
 }
@@ -163,10 +215,10 @@ function cardOf(r: LiveRow, d: WsData, st: WsState, c: Cfg, max: number, mini = 
     r.files ? `<span title="files edited (OBSERVED)">${r.files} file${r.files === 1 ? '' : 's'}</span>` : '',
     r.workersTotal ? `<span>workers ${workersCell(r)}</span>` : '',
   ].filter(Boolean).join('');
-  const m = mode(s);
+  const m = modeHtml(s);
   return `<div ${rowAttrs(r, st, `lv-card${mini ? ' lv-mini' : ''}${r.depth ? ' lv-wk' : ''}`)}>
 <div class="lv-c1">${nameCell(r)}<span class="lv-up" title="since session start (DERIVED)">${esc(el(s.startedAt !== undefined ? d.now - s.startedAt : undefined))}</span></div>
-<div class="lv-c2"><span class="lv-pv">${esc(PROV[s.provider] ?? s.provider)}</span> ${esc(who(s))}${m ? ` · <span title="${esc(T_MODE)}">${esc(m)}</span>` : ''}</div>
+<div class="lv-c2"><span class="lv-pv">${esc(PROV[s.provider] ?? s.provider)}</span> ${esc(who(s))}${m ? ` · <span title="${esc(T_MODE)}">${m}</span>` : ''}</div>
 ${mini ? '' : `<div class="lv-c2 muted">${esc(where(s))}</div>`}
 <div class="lv-c3">${doing(r, d.now)}</div>
 <div class="lv-c4">${stats}</div>

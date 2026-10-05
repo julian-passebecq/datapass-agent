@@ -13,6 +13,7 @@ import type { WsData, WsState } from '../workspace';
 import { ago, repoOf, titleOf } from '../workspace';
 import { ExtraView, opt, seg, toolbar } from './kit';
 import { Feed, feedValue } from './feeds';
+import { TOKEN_FACTS_CSS, tokenFacts, tokenFactsStrip } from './ctxcost';
 
 // ---------------------------------------------------------------- settings (via feed)
 
@@ -275,7 +276,9 @@ function render(d: WsData, st: WsState): string {
     noFacts ? 'Per-call token records are not exposed in this build, so context peaks fall back to the latest call.' : '',
     `Period ${esc(c.period)} · ${total.sessions.length} session(s) · ${esc(duration(d.now - Math.min(...d.sessions.map(s => s.startedAt ?? d.now))))} of history loaded.`,
   ].filter(Boolean).join(' ');
-  return `<div class="hl">${tb1}${tb2}${kpis(c, total, live)}<h2>Trends · per ${esc(c.gran)}</h2>${trends(c, tr)}<h2>Context use · ${esc(tok(c.marker))} marker</h2>${contextChart(c, sessionRows, d, st)}<h2>${c.group === 'session' ? 'Sessions' : `By ${esc(c.group)}`} · ${rows.length}</h2>${table(c, rows, d, st)}<div class="foot">${notes}</div></div>`;
+  const keys = new Set(total.sessions);
+  const facts = tokenFactsStrip(tokenFacts(d.sessions.filter(s => keys.has(s.key))), d.now, 'hl-pf');
+  return `<div class="hl">${tb1}${tb2}${kpis(c, total, live)}${facts}<h2>Trends · per ${esc(c.gran)}</h2>${trends(c, tr)}<h2>Context use · ${esc(tok(c.marker))} marker</h2>${contextChart(c, sessionRows, d, st)}<h2>${c.group === 'session' ? 'Sessions' : `By ${esc(c.group)}`} · ${rows.length}</h2>${table(c, rows, d, st)}<div class="foot">${notes}</div></div>`;
 }
 
 const CSS = `
@@ -339,6 +342,8 @@ const CSS = `
 .hl .hl-tt { max-width: 640px; }
 `;
 
+const FACTS_CSS = TOKEN_FACTS_CSS('hl-pf');
+
 export const healthView: ExtraView = {
   id: 'health',
   label: 'Health',
@@ -346,7 +351,7 @@ export const healthView: ExtraView = {
   hint: 'Test pass rate, commits per session and context use against a reference window, with trends and sparklines.',
   ready: true,
   render,
-  css: CSS,
+  css: CSS + FACTS_CSS,
   feeds: [cfgFeed as Feed],
   badge: d => {
     const n = d.sessions.filter(s => isLive(s) && (ctxInfo(s, settings().window).pct ?? 0) >= settings().warn / 100).length;

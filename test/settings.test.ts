@@ -128,3 +128,23 @@ test('settings actions only open files the feed listed', async () => {
   await assert.rejects(async () => settingsView.actions!.open('C:\\Windows\\win.ini', ctx));
   clearFeeds();
 });
+
+test('settings: observed sessions show approval policy / collaboration mode / permission mode with an evidence chip', () => {
+  clearFeeds();
+  setFeedValue('settings.config', report());
+  const base = { status: 'ENDED', statusReason: 'r', commits: [], changedFiles: [], tests: [], isWorker: false, counts: { tools: 0, commands: 0, fileEdits: 0, turns: 0 }, evidence: [], artifactPath: '', diagnostics: [], repository: REPO, lastActivityAt: 1 };
+  const sessions = [
+    { ...base, key: 'codex:a', provider: 'codex', sessionId: 'a', model: 'gpt-6', facts: { approvalPolicy: 'never', collaborationMode: 'plan' } },
+    { ...base, key: 'claude:b', provider: 'claude', sessionId: 'b', model: 'claude-opus-5-5', facts: { permissionMode: 'acceptEdits' } },
+  ];
+  const d = { sessions, providers: [], events: [], now: Date.now(), ternAvailable: false } as unknown as WsData;
+  for (const layout of ['matrix', 'cards', 'table']) {
+    const html = settingsView.render(d, { view: 'settings', opts: { 'settings.repos': 'all', 'settings.layout': layout } });
+    if (!html.includes('cfg-seen')) continue;
+    assert.ok(html.includes('approval never · collaboration plan'), layout);
+    assert.ok(html.includes('permission acceptEdits'), layout);
+    assert.ok(html.includes('chip ev OBSERVED'), layout);
+  }
+  assert.ok(settingsView.render(d, { view: 'settings', opts: { 'settings.repos': 'all' } }).includes('cfg-seen'), 'default layout shows observed sessions');
+  clearFeeds();
+});

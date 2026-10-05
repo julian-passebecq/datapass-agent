@@ -11,7 +11,8 @@ import type { CiReport } from '../../feeds/pipelines';
 import { loadLessons } from '../../feeds/lessons';
 import { esc } from '../html';
 import { ago, ctxBar, prettyModel, repoOf, titleOf, WsData, WsState } from '../workspace';
-import { ExtraView, opt, seg, toolbar } from './kit';
+import { ExtraView, loadError, loading, opt, seg, toolbar } from './kit';
+import { ModeFact, modeFacts } from './live';
 import { Feed, feedValue } from './feeds';
 import { sessTok } from './lifecycle';
 import { statusEvidenceOf } from '../../sessions/classify';
@@ -60,14 +61,22 @@ function row(label: string, value: string, extra = ''): string {
 const hms = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 function modeRow(s: AgentSessionSnapshot): string {
-  const m = s.facts?.permissionMode;
+  const fs = modeFacts(s);
+  const get = (f: ModeFact['field']) => fs.find(x => x.field === f);
+  const tag = (x: ModeFact) => `<span class="hud-tag">${esc(`${x.label} ${x.value}`)}</span>${ev(x.kind, x.basis)}`;
   if (s.provider === 'claude') {
-    if (!m) return row('plan mode', `<span class="muted">unknown</span>${ev('UNKNOWN', 'no permissionMode recorded in the transcript')}`);
-    const on = m === 'plan';
-    return row('plan mode', `<span class="hud-tag ${on ? 'on' : ''}">[${on ? 'ON' : 'off'}]</span>${on ? '' : ` <span class="muted">${esc(m)}</span>`}${ev('OBSERVED', 'transcript permissionMode (latest)')}`);
+    const pm = get('permissionMode');
+    if (!pm) return row('plan mode', `<span class="muted">unknown</span>${ev('UNKNOWN', 'no permissionMode recorded in the transcript')}`);
+    const on = pm.value === 'plan';
+    const sb = get('sandbox');
+    return row('plan mode', `<span class="hud-tag ${on ? 'on' : ''}">[${on ? 'ON' : 'off'}]</span>${on ? '' : ` <span class="muted" title="permission mode">${esc(pm.value)}</span>`}${ev(pm.kind, pm.basis)}${sb ? ` ${tag(sb)}` : ''}`);
   }
-  const parts = [m && `approval ${m}`, s.facts?.sandbox && `sandbox ${s.facts.sandbox}`].filter(Boolean).join(' · ');
-  return row('mode', parts ? `<span class="hud-tag">${esc(parts)}</span>${ev('OBSERVED', 'rollout turn_context approval_policy / sandbox_policy')} <span class="muted" title="Codex has no plan mode">plan n/a</span>` : `<span class="muted">unknown</span>${ev('UNKNOWN', 'no turn_context recorded')}`);
+  if (!fs.length) return row('mode', `<span class="muted">unknown</span>${ev('UNKNOWN', 'no turn_context recorded')}`);
+  const cm = get('collaborationMode');
+  const plan = cm
+    ? ` <span class="hud-tag ${cm.value === 'plan' ? 'on' : ''}" title="Codex collaboration mode plan = plan mode">plan [${cm.value === 'plan' ? 'ON' : 'off'}]</span>`
+    : ` <span class="muted" title="no collaboration mode recorded (older Codex rollouts)">plan ?</span>${ev('UNKNOWN', 'no collaboration_mode recorded in the rollout')}`;
+  return row('mode', `${fs.map(tag).join(' ')}${plan}`);
 }
 
 const W_ICON: Record<HudWorker['state'], string> = { run: '●', needs: '!', idle: '◌', ended: '✓', unknown: '?' };
@@ -117,10 +126,14 @@ const CI_TXT: Record<string, [string, string]> = {
   success: ['passing', 'ok'], failed: ['failing', 'bad'], running: ['running', 'warn'], pending: ['queued', 'warn'], blocked: ['waiting for a person', 'warn'], canceled: ['canceled', 'quiet'], skipped: ['skipped', 'quiet'], unknown: ['unknown', 'quiet'],
 };
 
-function ciRow(s: AgentSessionSnapshot, report: CiReport | undefined, enabled: boolean): string {
+function ciRow(s: AgentSessionSnapshot, report: CiReport | undefined, enabled: boolean, error?: string): string {
   if (!enabled) return row('CI', `<span class="muted" title="Opt-in setting agent.pipelines.enabled (network via gh / glab)">not enabled</span>${ev('UNKNOWN', 'Pipelines feed is off')}`);
   const c: CiState | 'off' | 'none' = ciFor(s, report);
-  if (c === 'off') return row('CI', `<span class="muted">${report?.state === 'untrusted' ? 'untrusted workspace' : 'loading…'}</span>${ev('UNKNOWN', 'Pipelines feed has no data yet')}`);
+  if (c === 'off') {
+    if (report?.state === 'untrusted') return row('CI', `<span class="muted">untrusted workspace</span>${ev('UNKNOWN', 'Pipelines feed has no data yet')}`);
+    if (!report && error) return row('CI', loadError(`CI not read: ${error}`, 'refresh'));
+    return row('CI', loading(`hud.ci.${s.key}`, 'loading CI…', { inline: true, retry: 'refresh' }));
+  }
   if (c === 'none') return row('CI', `<span class="muted">no run found for this repository</span>${ev('UNKNOWN', 'no CI run in the Pipelines feed for the session repository')}`);
   const [txt, cls] = CI_TXT[c.status] ?? CI_TXT.unknown;
   return row('CI', `<span class="hud-ci ${c.basis === 'repo' ? 'quiet' : cls}">${esc(txt)}</span> <span class="muted">${esc(c.ref)}${c.basis === 'repo' ? ' (latest of repo, none on this branch)' : ''}</span>${c.basis === 'repo' ? ev('INFERRED', `newest run of the repository, not of this branch (CI API via the Pipelines feed: ${c.title})`) : ev('OBSERVED', `CI API via the Pipelines feed: ${c.title}`)}`);
@@ -135,10 +148,11 @@ function ctxRow(s: AgentSessionSnapshot, marker: number): string {
   return row('context', `${meter} <b>${Math.round(pct * 100)} %</b> used <span class="muted">${esc(ctxLabel(c))}${c.compactions ? ` · ⟲${c.compactions}` : ''}</span>${ev(c.windowSource === 'OBSERVED' ? 'OBSERVED' : 'DERIVED', basis)}`);
 }
 
-function lessonsRow(s: AgentSessionSnapshot, lessons: Record<string, LessonsInfo> | undefined): string {
+function lessonsRow(s: AgentSessionSnapshot, lessons: Record<string, LessonsInfo> | undefined, error?: string): string {
   if (!s.repository) return row('lessons', `<span class="muted">no repository</span>${ev('UNKNOWN', 'session has no git repository root')}`);
   const l = lessons?.[s.repository];
-  if (!l) return row('lessons', `<span class="muted">${lessons ? 'not loaded (repository not among the 24 most recent)' : 'loading…'}</span>${ev('UNKNOWN', 'lessons feed')}`);
+  if (!l && lessons) return row('lessons', `<span class="muted">not loaded (repository not among the 24 most recent)</span>${ev('UNKNOWN', 'lessons feed')}`);
+  if (!l) return row('lessons', error ? loadError(`lessons not read: ${error}`, 'refresh') : loading(`hud.lessons.${s.key}`, 'loading lessons…', { inline: true, retry: 'refresh' }));
   if (!l.file) return row('lessons', `<span class="muted">no handoff/MEMORY.md, tasks/lessons.md or CLAUDE.md Lessons section</span>${ev('DERIVED', 'files looked up in the repository root')}`);
   const fill = Math.min(1, l.rules / 50);
   return row('lessons', `${bar(fill, 'acc')} <b>${l.rules}</b> rules <span class="muted">${esc(l.file)}${l.truncated ? ' (first 256 KB)' : ''}</span>${ev('DERIVED', `bullet / numbered lines in ${l.file}${l.file === 'CLAUDE.md' ? ' under a "Lessons" heading' : ''}; bar full at 50`)}`);
@@ -159,7 +173,15 @@ function logBlock(s: AgentSessionSnapshot, d: WsData): string {
   return `<div class="hud-log"><div class="hud-lh">$ tail -f session.log <span class="muted">· last ${LOG_LINES} events (lead + workers), OBSERVED / DERIVED per line</span></div>${body}</div>`;
 }
 
-function hudCard(s: AgentSessionSnapshot, d: WsData, st: WsState, pinned: boolean, lessons: Record<string, LessonsInfo> | undefined, ci: CiReport | undefined, ciOn: boolean, marker: number, full: boolean): string {
+interface HudFeeds {
+  lessons?: Record<string, LessonsInfo>;
+  lessonsError?: string;
+  ci?: CiReport;
+  ciError?: string;
+  ciOn: boolean;
+}
+
+function hudCard(s: AgentSessionSnapshot, d: WsData, st: WsState, pinned: boolean, f: HudFeeds, marker: number, full: boolean): string {
   const ws = workersOf(s, d.sessions);
   const who = [s.provider, prettyModel(s.model), s.effort].filter(Boolean).join(' · ');
   const where = [repoOf(s), s.branch ?? s.facts?.recordedBranch].filter(Boolean).join(' · ');
@@ -169,7 +191,7 @@ function hudCard(s: AgentSessionSnapshot, d: WsData, st: WsState, pinned: boolea
   return `<section class="hud-c${st.selected === s.key ? ' sel' : ''}" style="--id:${identityColor(repoOf(s))};--pv:var(--${esc(s.provider)})">
 <div class="hud-h" data-select="${esc(s.key)}" tabindex="0" title="${esc(`${s.key} · ${s.statusReason}`)}"><span class="dot ${esc(s.status)}"></span><b class="hud-t">${esc(titleOf(s))}</b>${pinned ? '<span class="hud-pin" title="Pinned">📌</span>' : ''}<span class="hud-st hud-st-${esc(stE.kind)}" title="${esc(`${stE.kind}: ${stE.basis}`)}">${esc(stE.text)}${stE.kind === 'OBSERVED' ? '' : ` <span class="hud-ev">${EV_SHORT[stE.kind]}</span>`}</span></div>
 <div class="hud-meta muted">${esc(who)} · ${esc(where)} · ${esc(ago(d.now, s.lastActivityAt))}</div>${now}
-<div class="hud-body">${modeRow(s)}${workersRow(s, ws, d)}${todoRow(s, d, full)}${testsRow(s, d)}${ciRow(s, ci, ciOn)}${ctxRow(s, marker)}${lessonsRow(s, lessons)}</div>
+<div class="hud-body">${modeRow(s)}${workersRow(s, ws, d)}${todoRow(s, d, full)}${testsRow(s, d)}${ciRow(s, f.ci, f.ciOn, f.ciError)}${ctxRow(s, marker)}${lessonsRow(s, f.lessons, f.lessonsError)}</div>
 ${logBlock(s, d)}</section>`;
 }
 
@@ -197,12 +219,13 @@ export function renderHud(d: WsData, st: WsState): string {
     seg(st, 'hud.todo', [['open', 'Open items'], ['all', 'All items']], 'open', 'Checklist: open items only, or every item'),
   );
   const ciOn = d.config?.<boolean>('agent.pipelines.enabled', false) === true;
-  const ci = ciOn ? feedValue<CiReport>(pipelinesFeed.id).value : undefined;
-  const lessons = feedValue<Record<string, LessonsInfo>>(LESSONS_FEED).value;
+  const ciFs = ciOn ? feedValue<CiReport>(pipelinesFeed.id) : {};
+  const lsFs = feedValue<Record<string, LessonsInfo>>(LESSONS_FEED);
+  const feeds: HudFeeds = { lessons: lsFs.value, lessonsError: lsFs.error, ci: ciFs.value, ciError: ciFs.error, ciOn };
   const mk = Number(d.config?.<number>('agent.health.contextWindow', DEFAULT_WINDOW));
   const marker = Number.isFinite(mk) && mk >= 1000 ? mk : DEFAULT_WINDOW;
   const body = cards.length
-    ? `<div class="hud-grid hud-cols-${esc(cols)}">${cards.map(s => hudCard(s, d, st, s === pinned, lessons, ci, ciOn, marker, full)).join('')}</div>`
+    ? `<div class="hud-grid hud-cols-${esc(cols)}">${cards.map(s => hudCard(s, d, st, s === pinned, feeds, marker, full)).join('')}</div>`
     : '<div class="muted hud-empty">No live session. Pin a session above to watch it here.</div>';
   const foot = `<div class="legend hud-foot">One card per live lead session (workers fold into their lead) plus the pinned one. Evidence per value: <b>obs</b> read from the provider record · <b>der</b> computed (child sessions, counts, percentages) · <b>inf</b> heuristic · <b>unk</b> not exposed. Todo = the latest TodoWrite / TaskCreate list (Claude) or update_plan (Codex), ≤ 30 items × 120 chars, redacted. Lessons = bullet lines of handoff/MEMORY.md, tasks/lessons.md or the CLAUDE.md "Lessons" section. CI needs <code>agent.pipelines.enabled</code>.</div>`;
   return `${bar0}${picker}${body}${foot}`;
@@ -215,6 +238,9 @@ export const hudView: ExtraView = {
   hint: 'Terminal-style panel per live session: plan mode, subagents, todo checklist, tests, CI, context, lessons and a log tail.',
   ready: true,
   feeds: [lessonsFeed as Feed, pipelinesFeed as Feed],
+  actions: {
+    refresh: (_arg, ctx) => ctx.refreshFeeds(),
+  },
   render: (d, st) => `<div class="hud">${renderHud(d, st)}</div>`,
   badge: d => {
     const n = d.sessions.filter(s => isLive(s) && !s.isWorker).length;
