@@ -23,6 +23,7 @@ import { reposView } from './repos';
 import { reviewView } from './review';
 import { rolesView } from './roles';
 import { runsView } from './runs';
+import { scopeView } from './scope';
 import { settingsView } from './settings';
 import { signalsView } from './signals';
 import { tokensView } from './tokens';
@@ -58,6 +59,7 @@ export function allExtra(): ExtraView[] {
   reviewView,
   rolesView,
   runsView,
+  scopeView,
   settingsView,
   signalsView,
   tokensView,
