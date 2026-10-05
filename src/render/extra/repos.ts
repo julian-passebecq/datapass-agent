@@ -3,7 +3,7 @@
 // sessions work in which worktree right now. Data: one hardened git feed (src/git/repos.ts).
 import * as fs from 'fs';
 import type { AgentSessionSnapshot } from '../../model';
-import { actBtn, ActCtx, ExtraView, opt, seg, toolbar } from './kit';
+import { actBtn, ActCtx, ExtraView, loadError, loading, opt, seg, toolbar } from './kit';
 import { Feed, FeedState, feedValue } from './feeds';
 import { esc } from '../html';
 import { ago, kpi, titleOf, WsData, WsState } from '../workspace';
@@ -241,9 +241,9 @@ function render(d: WsData, st: WsState): string {
     actBtn('refresh', '', 'Re-read git', 'Run the read-only git commands again now'),
     stateLine(f, d.now),
   );
-  if (f.error && !f.value) return `${tb}<div class="empty">Git could not be read: ${esc(f.error)}</div>`;
+  if (f.error && !f.value) return `${tb}${loadError(`Git could not be read: ${f.error}`, 'refresh')}`;
   const snap = f.value;
-  if (!snap) return `${tb}<div class="empty">${f.running ? 'Reading git in every repository agents touched…' : 'Waiting for the first git read.'}</div>`;
+  if (!snap) return `${tb}${loading('repos', f.running ? 'Reading git in every repository agents touched…' : 'Waiting for the first git read…', { retry: 'refresh' })}`;
   if (snap.off === 'untrusted') return `${tb}<div class="empty">Off in untrusted workspaces: Agent runs no git process until you trust this workspace.</div>`;
   if (!snap.repos.length) return `${tb}<div class="empty">No repository found for the sessions in the loaded history.</div>`;
   const c: Ctx = { d, st, snap, where: sessionsByWorktree(d, snap.repos), show: opt(st, 'repos.show', 'active') };

@@ -7,7 +7,7 @@ import { execRunner, loadPrs, PrInfo, PrReport, reposOf } from '../../feeds/revi
 import { identityColor, isLive } from '../../activity/insights';
 import { esc } from '../html';
 import { ago, prettyModel, repoOf, titleOf, WsData, WsState } from '../workspace';
-import { actBtn, ExtraView, opt, seg, toolbar } from './kit';
+import { actBtn, ExtraView, loadError, loading, opt, seg, toolbar } from './kit';
 import { Feed, FeedCtx, feedValue } from './feeds';
 
 const FEED_ID = 'review.prs';
@@ -152,9 +152,9 @@ function prTable(prs: PrInfo[], d: WsData, title: string): string {
 function feedLine(f: ReturnType<typeof feedValue<PrReport>>, d: WsData): string {
   const v = f.value;
   const refresh = actBtn('refresh', '', '↻ refresh', 'Reload PR / MR state now', 'link rv-mini');
-  if (f.running && !v) return `<div class="rv-feed"><span class="sd partial"></span>PR / MR state: loading (gh / glab)…</div>`;
+  if (f.error && !v) return `<div class="rv-feed">${loadError(`PR / MR state: ${f.error}`, 'refresh')}</div>`;
   if (f.error) return `<div class="rv-feed"><span class="sd missing"></span>PR / MR state: ${esc(f.error)} ${refresh}</div>`;
-  if (!v) return `<div class="rv-feed"><span class="sd off"></span>PR / MR state not loaded yet.</div>`;
+  if (!v) return `<div class="rv-feed">${loading('review.prs', 'PR / MR state not loaded yet: loading (gh / glab)…', { retry: 'refresh', inline: true })}</div>`;
   if (v.state === 'off')
     return `<div class="rv-feed"><span class="sd off"></span>PR / MR state <b>off</b>: lanes use sessions and the push / PR commands they recorded. Turn on <code>agent.review.prState</code> to read open PRs and CI with <code>gh</code> / <code>glab</code> (read-only, network).</div>`;
   if (v.state === 'untrusted') return `<div class="rv-feed"><span class="sd off"></span>PR / MR state off in an untrusted workspace (no process is started).</div>`;

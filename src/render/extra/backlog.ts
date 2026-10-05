@@ -14,7 +14,7 @@ import { ARCHIVE_FEED, archiveFeed, ArchiveView, itemKey } from '../../archive/r
 import * as path from 'path';
 import { esc } from '../html';
 import { ago, bytes, kpi, titleOf, WsData, WsState } from '../workspace';
-import { actBtn, ActCtx, ExtraView, opt, seg, toolbar } from './kit';
+import { actBtn, ActCtx, ExtraView, loadError, loading, opt, seg, toolbar } from './kit';
 import { Feed, FeedCtx, feedValue } from './feeds';
 
 export const BACKLOG_FEED = 'backlog.plans';
@@ -309,7 +309,7 @@ function archivedRows(av: ArchiveView | undefined, files: PlanFile[], inScope: (
 function render(d: WsData, st: WsState): string {
   const fs = feedValue<BacklogFeedOut>(FEED_ID);
   const out = fs.value;
-  if (!out) return fs.error ? `<div class="empty bl-bad">Could not read plan files: ${esc(fs.error)}</div>` : '<div class="empty">Reading plan files…</div>';
+  if (!out) return fs.error ? loadError(`Could not read plan files: ${fs.error}`, 'refresh') : loading('backlog', 'Reading plan files…', { retry: 'refresh' });
   const { report } = out;
   const c = conf(st);
   // scope: only repositories of the sessions on screen, plus configured extra roots

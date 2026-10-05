@@ -16,7 +16,7 @@ import type { WsData, WsState } from '../workspace';
 import { ago, repoOf, scopeKey } from '../workspace';
 import { ARCHIVE_FEED, archiveFeed, ArchiveView, archivedOnly } from '../../archive/reader';
 import type { ArchivedSession } from '../../archive/archive';
-import { actBtn, ActCtx, ExtraView, opt, seg, toolbar } from './kit';
+import { actBtn, ActCtx, ExtraView, loadError, loading, opt, seg, toolbar } from './kit';
 import { Feed, FeedState, feedValue } from './feeds';
 
 type View = 'weeks' | 'trend' | 'matrix' | 'week';
@@ -479,7 +479,7 @@ function archivedList(extra: ArchivedOnly[], now: number): string {
     .slice(0, 150)
     .map(({ rec, s }) => `<tr><td>${archChip(rec)}</td><td class="muted">${esc(s.lastActivityAt ? new Date(s.lastActivityAt).toLocaleDateString() : '—')}</td><td><span class="prov ${esc(s.provider)}">${esc(s.provider)}</span></td><td><span class="hi-sw" style="background:${identityColor(repoOf(s))}"></span>${esc(repoOf(s))}</td><td>${esc((s.title ?? s.workerLabel ?? s.sessionId.slice(0, 8)).slice(0, 70))}${s.isWorker ? ' <span class="muted">worker</span>' : ''}</td><td class="muted">${esc(prettyModelName(s.model) || '—')}</td><td class="r" title="OBSERVED: provider-recorded tokens, as archived">${esc(fmtMetric('tokens', s.usage?.totalTokens ?? 0))}</td><td class="r" title="DERIVED: commits observed in the session window, as archived">${s.commits.length || ''}</td><td class="muted">${esc(s.status)}</td></tr>`)
     .join('');
-  return `<details class="hi-how hi-archl"><summary>${extra.length} session(s) known only from the archive <span class="muted">(ARCHIVED, oldest kept ${esc(extra[extra.length - 1].rec.day)})</span></summary><table class="hi-t"><tr><th>Archived</th><th>Last activity</th><th>Provider</th><th>Repo</th><th>Session</th><th>Model</th><th class="r">Tokens</th><th class="r">Commits</th><th>Status</th></tr>${rows}</table>${extra.length > 150 ? `<div class="muted">+${extra.length - 150} more</div>` : ''}<div class="muted">Read ${esc(ago(now, extra[0].rec.archivedAt) || 'just now')} from the daily archive; titles only when the provider named the session (never prompt text).</div></details>`;
+  return `<details class="hi-how hi-archl"><summary>${extra.length} session(s) known only from the archive <span class="muted">(ARCHIVED, oldest kept ${esc(extra[extra.length - 1].rec.day)})</span></summary><table class="hi-t"><tr><th>Archived</th><th>Last activity</th><th>Provider</th><th>Repo</th><th>Session</th><th>Model</th><th class="r">Tokens</th><th class="r">Commits</th><th title="OBSERVED when the session was archived; it may have changed since">Status at capture</th></tr>${rows}</table>${extra.length > 150 ? `<div class="muted">+${extra.length - 150} more</div>` : ''}<div class="muted">Read ${esc(ago(now, extra[0].rec.archivedAt) || 'just now')} from the daily archive; titles only when the provider named the session (never prompt text).</div></details>`;
 }
 
 // ---------------------------------------------------------------- empty archive help
@@ -544,7 +544,8 @@ function render(d: WsData, st: WsState): string {
   else tb2 = toolbar(metricSeg);
 
   const hasData = cols.some(c => c.rows.length) || weeks.size > 0;
-  if (!arch && f.running && !hasData) return `<div class="hi">${tb1}<div class="empty">Reading the history archive…</div></div>`;
+  if (!arch && !hasData && f.error) return `<div class="hi">${tb1}${loadError(`The history archive could not be read: ${f.error}`, 'refresh')}</div>`;
+  if (!arch && !hasData && (f.running || f.at === undefined)) return `<div class="hi">${tb1}${loading('history', 'Reading the history archive…', { retry: 'refresh' })}</div>`;
   const missing = !arch?.files;
   const banner = missing
     ? `<div class="hi-ban">No week file yet in <code>${esc(dir)}</code>${cf.live ? ': showing only the sessions loaded in the workspace' : ''}. ${actBtn('build', 'all', 'Build now', 'Read all local history now and write the week files (asks first)')}</div>`
@@ -736,5 +737,5 @@ export const historyView: ExtraView = {
   feeds: [historyFeed as Feed, archiveFeed as Feed],
   render,
   css: CSS,
-  actions: { build, open: openDir, report, copy, csv },
+  actions: { build, open: openDir, report, copy, csv, refresh: (_arg: string, ctx: ActCtx) => ctx.refreshFeeds() },
 };

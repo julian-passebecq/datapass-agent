@@ -1,7 +1,7 @@
 // Add-on screen "Pipelines": GitHub Actions and GitLab CI runs for the repositories agents touch.
 // Data: src/feeds/pipelines.ts (opt-in, trusted only, read-only gh / glab API GETs). Rendering is pure.
 import type { ActCtx, ExtraView } from './kit';
-import { actBtn, opt, seg, toolbar } from './kit';
+import { actBtn, loadError, loading, opt, seg, toolbar } from './kit';
 import { Feed, FeedCtx, feedValue } from './feeds';
 import { esc } from '../html';
 import { ago, kpi, titleOf, WsData, WsState } from '../workspace';
@@ -337,8 +337,8 @@ function runnersTab(runs: CiRun[], d: WsData, stt: WsState): string {
 
 function offState(r: CiReport | undefined, d: WsData, error?: string): string {
   if (r?.state === 'untrusted') return `<div class="empty">Pipelines are off in untrusted workspaces: reading CI needs the gh / glab CLIs.</div>`;
-  if (error) return `<div class="empty">Pipelines could not be read: ${esc(error)}</div>`;
-  if (!r) return `<div class="empty">Reading pipelines…</div>`;
+  if (error) return loadError(`Pipelines could not be read: ${error}`, 'refresh');
+  if (!r) return loading('pipelines', 'Reading pipelines…', { retry: 'refresh' });
   return `<div class="pl-off"><h2>Pipelines are off</h2><p>This screen reads GitHub Actions and GitLab CI runs for the ${esc(String(d.sessions.length ? new Set(d.sessions.map(s => s.repository ?? s.cwd)).size : 0))} repositories agents touched, with the CLIs you are already logged in to (<code>gh api</code>, <code>glab api</code>, GET only). It calls the network, so it is opt-in.</p><p>Turn on <code>agent.pipelines.enabled</code>. Nothing is sent anywhere except the read requests to your own GitHub / GitLab host.</p><p>${actBtn('settings', '', 'Open Pipelines settings', 'Open the agent.pipelines settings', 'btn')}</p></div>`;
 }
 
