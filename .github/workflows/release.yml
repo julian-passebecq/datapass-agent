@@ -88,10 +88,15 @@ jobs:
             foreach ($c in $failed) { "- FAIL $($c.name): $($c.detail)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
           } else { 'No smoke-result.json written.' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
 
+      - name: Artifact name (branch refs such as p5/gate contain a slash, not allowed in artifact names)
+        if: always()
+        shell: pwsh
+        run: "ARTIFACT_NAME=agent-vscode-release-$($env:GITHUB_REF_NAME -replace '[^A-Za-z0-9._-]', '-')-$($env:GITHUB_RUN_NUMBER)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: agent-vscode-release-${{ github.ref_name }}-${{ github.run_number }}
+          name: ${{ env.ARTIFACT_NAME }}
           path: |
             agent-vscode-*.vsix
             vsix-sha256.txt
