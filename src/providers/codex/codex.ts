@@ -9,6 +9,7 @@ import { isInside, isPlausibleLocalPath } from '../../util/paths';
 import { bounded } from '../../util/redact';
 import { ArtifactRef, ProviderAdapter } from '../types';
 import { cmpVersion } from '../claude/claude';
+import { codexStateSources } from './state';
 
 const MAX_PARSE_LINE = 512 * 1024;
 const ROLLOUT = /^rollout-.*-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
@@ -63,6 +64,7 @@ export class CodexAdapter implements ProviderAdapter {
       { id: 'codex.index', label: 'Codex thread titles', status: has('session_index.jsonl') ? 'ready' : 'partial', detail: has('session_index.jsonl') ? 'session_index.jsonl thread_name' : 'no session_index.jsonl: titles fall back to the first prompt', count: this.titles.size, at },
       { id: 'codex.live', label: 'Codex live status', status: detected ? 'partial' : 'missing', detail: 'no process registry exposed: open turn + recency (INFERRED)', at },
       { id: 'codex.usage', label: 'Codex usage', status: detected ? 'ready' : 'missing', detail: 'token_count totals + model_context_window; no cost recorded', count: accs.filter(a => a.usage).length, at },
+      ...codexStateSources(this.root, at),
     ];
   }
 
