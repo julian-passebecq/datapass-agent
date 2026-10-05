@@ -1,7 +1,17 @@
 # Agent — plan
 
-State (5 Oct 2026, 07:00): 0.4.1 on `main` (45 PRs merged during the night build, waves 1–4). Evidence `D:\PROJ\AGENT-V04-EVIDENCE` (96/96 VSIX smoke, 36 screens). Julian gave full merge rights on this repo (5 Oct). Wave 5 (dispatch, lifecycle, panes) running.
+State (5 Oct 2026, 07:00): 0.4.1 on `main` (45 PRs merged during the night build, waves 1–4). Evidence `D:\PROJ\AGENT-V04-EVIDENCE` (96/96 VSIX smoke, 36 screens). Julian gave full merge rights on this repo (5 Oct). Wave 5 (dispatch, lifecycle, panes) merged in 0.5.0; wave 6 (hud, ctxcost, scope) merged in 0.6.0.
 Rule for every package: observe only, local only, every value carries its evidence kind; no LLM judgement, no control of sessions.
+
+## Idées de Julian (2026-10-05 evening, via ACC 2: 5 more screenshots)
+
+| Idea | Fit for Agent | Decision |
+|---|---|---|
+| Boris Cherny workflow TUI: session panel (plan mode, subagents run/idle, todo 5/8, lessons rules, tests 41/42, CI, context %) + session log tail | strong | **Wave 6 · hud** (Session HUD) |
+| Leviathan: tokens put into context per method, log bars vs the context window | adapted: per tool, from tool-result sizes (≈ chars/4, INFERRED) | **Wave 6 · ctxcost** (Context cost) |
+| "Artifact that maps the full scope of each project, updated at every milestone" | strong: from PLAN.md / ROADMAP.md, as Backlog reads them | **Wave 6 · scope** (Scope map) |
+| Multi-pane dev workspace | already done | Panes (0.5.0) |
+| Opus medium, context < 400k, router chat + worktrees, subagents | covered by Session HUD context %, Topology, Worktrees | noted |
 
 ## Idées de Julian (2026-10-05 morning, via ACC 2: 5 more screenshots)
 
