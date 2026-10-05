@@ -163,6 +163,8 @@ export class CodexAdapter implements ProviderAdapter {
           acc.cwd = p.cwd;
           acc.ev('cwd', 'OBSERVED', 'turn_context.cwd');
         }
+        acc.setFact('permissionMode', p.approval_policy, 30);
+        acc.setFact('sandbox', typeof p.sandbox_policy === 'string' ? p.sandbox_policy : p.sandbox_policy?.type ?? p.sandbox_policy?.mode, 40);
         return;
       case 'event_msg':
         acc.touch(at);
@@ -171,7 +173,9 @@ export class CodexAdapter implements ProviderAdapter {
         acc.touch(at);
         return this.responseItem(acc, p, at);
       case 'compacted':
+        acc.touch(at);
         acc.event(at, 'SESSION_ACTIVITY', 'context compacted', 'OBSERVED');
+        acc.bump('compactions', 'record');
         return;
       default:
         if (typeof o.type === 'string') acc.touch(at);
@@ -202,7 +206,9 @@ export class CodexAdapter implements ProviderAdapter {
     if (typeof p.git?.branch === 'string') {
       acc.branch = bounded(p.git.branch, 120);
       acc.ev('branch', 'OBSERVED', 'session_meta.git.branch');
+      acc.setFact('recordedBranch', p.git.branch, 120);
     }
+    acc.setFact('entrypoint', typeof p.originator === 'string' ? p.originator : typeof p.source === 'string' ? p.source : undefined, 40);
     const spawn = p.source?.subagent?.thread_spawn;
     const parent = p.parent_thread_id ?? spawn?.parent_thread_id;
     if (typeof parent === 'string' && /^[0-9a-f-]{36}$/i.test(parent)) {
@@ -223,6 +229,7 @@ export class CodexAdapter implements ProviderAdapter {
     switch (p.type) {
       case 'task_started': {
         acc.counts.turns++;
+        acc.humanPrompt(toMs(p.started_at) ?? at, null);
         if (turn) set(this.openTurns, acc).add(turn);
         acc.event(toMs(p.started_at) ?? at, 'SESSION_ACTIVITY', 'turn started', 'OBSERVED', turn && `ts:${turn}`);
         return;
@@ -230,6 +237,8 @@ export class CodexAdapter implements ProviderAdapter {
       case 'task_complete':
       case 'turn_aborted': {
         if (turn) set(this.openTurns, acc).delete(turn);
+        if ((this.openTurns.get(acc)?.size ?? 0) === 0) acc.clearPendingTools();
+        acc.agentDone(toMs(p.completed_at) ?? at);
         const label = p.type === 'turn_aborted' ? `turn aborted (${bounded(p.reason, 20) || 'unknown'})` : p.error ? 'turn completed with error' : 'turn completed';
         acc.event(toMs(p.completed_at) ?? at, 'SESSION_ACTIVITY', label, 'OBSERVED', turn && `tc:${turn}`);
         return;
@@ -239,6 +248,8 @@ export class CodexAdapter implements ProviderAdapter {
         const n = (x: unknown) => (typeof x === 'number' && x >= 0 ? x : 0);
         if (!t || typeof t !== 'object') return;
         const u = (acc.usage ??= { totalTokens: 0, outputTokens: 0, cachedInputTokens: 0 });
+        // Per-call rhythm: a cumulative total that grew means one more model call (repeated records carry the same total).
+        if (n(t.total_tokens) > u.totalTokens && l && typeof l === 'object') acc.modelCall(undefined, at, n(l.input_tokens), n(l.output_tokens));
         u.totalTokens = n(t.total_tokens);
         u.outputTokens = n(t.output_tokens);
         u.cachedInputTokens = n(t.cached_input_tokens);
@@ -250,11 +261,26 @@ export class CodexAdapter implements ProviderAdapter {
       case 'item_completed':
         return this.item(acc, p.item, toMs(p.completed_at_ms) ?? at);
       case 'user_message':
+        if (typeof p.message === 'string' && !p.message.startsWith('<')) acc.bump('prompts', 'event');
         if (!acc.firstPrompt && typeof p.message === 'string') acc.firstPrompt = bounded(p.message, 80);
+        return;
+      case 'agent_message':
+        acc.bump('replies', 'event');
+        return;
+      case 'exec_command_begin':
+        // Older rollout format: begin / end pair.
+        if (typeof p.call_id === 'string' && !acc.seenIds.has(`call:${p.call_id}`)) {
+          acc.seenIds.add(`call:${p.call_id}`);
+          acc.toolStart('exec_command', bounded(commandLabel(commandText(p.command)), 80), at, p.call_id);
+        }
         return;
       case 'exec_command_end':
         // Older rollout format.
+        if (typeof p.call_id === 'string') acc.toolEnd(p.call_id);
         return this.command(acc, commandText(p.command), typeof p.exit_code === 'number' ? p.exit_code : undefined, at, p.call_id, p.duration);
+      case 'web_search_end':
+        acc.bump('web', 'event');
+        return;
     }
   }
 
@@ -267,12 +293,18 @@ export class CodexAdapter implements ProviderAdapter {
       case 'FileChange': {
         const changes = it.changes && typeof it.changes === 'object' ? it.changes : {};
         const files = Object.keys(changes).filter(isPlausibleLocalPath);
-        for (const f of files) acc.file(f);
+        for (const f of files) {
+          acc.file(f);
+          acc.editedFile(f, at);
+        }
+        if (it.status === 'failed') acc.toolError();
         acc.counts.fileEdits += files.length;
         if (files.length) acc.event(at, 'FILE_CHANGE', files.length === 1 ? `${changes[files[0]]?.type ?? 'changed'} ${path.basename(files[0])}` : `${files.length} files changed`, 'OBSERVED', id);
         return;
       }
       case 'UserMessage': {
+        const txt = Array.isArray(it.content) ? it.content.find((c: any) => typeof c?.text === 'string')?.text : undefined;
+        if (typeof txt !== 'string' || !txt.startsWith('<')) acc.bump('prompts', 'item');
         if (!acc.firstPrompt && Array.isArray(it.content)) {
           const t = it.content.find((c: any) => typeof c?.text === 'string');
           if (t && !t.text.startsWith('<')) acc.firstPrompt = bounded(t.text, 80);
@@ -287,10 +319,21 @@ export class CodexAdapter implements ProviderAdapter {
         if (it.kind === 'started' || it.kind === 'spawned') acc.event(at, 'WORKER_STARTED', 'subagent started', 'OBSERVED', id);
         else if (it.kind === 'completed' || it.kind === 'finished' || it.kind === 'closed') acc.event(at, 'WORKER_ENDED', 'subagent finished', 'OBSERVED', id);
         return;
+      case 'AgentMessage':
+        acc.bump('replies', 'item');
+        return;
+      case 'ContextCompaction':
+        acc.bump('compactions', 'item');
+        return;
       case 'McpToolCall':
       case 'WebSearch':
       case 'ImageView':
       case 'Extension':
+        if (it.type === 'McpToolCall') {
+          acc.mcp(bounded(typeof it.server === 'string' ? it.server : 'mcp', 60));
+          if (it.status === 'failed' || it.status === 'error') acc.toolError();
+        }
+        if (it.type === 'WebSearch') acc.bump('web', 'item');
         acc.counts.tools++;
         acc.event(at, 'TOOL_ACTIVITY', it.type === 'McpToolCall' ? `mcp ${bounded(it.tool ?? it.name ?? '', 40)}`.trim() : it.type, 'OBSERVED', id);
         return;
@@ -299,6 +342,13 @@ export class CodexAdapter implements ProviderAdapter {
 
   private responseItem(acc: SessionAccumulator, p: Record<string, any>, at?: number): void {
     // Function calls: worker spawn and older shell formats. Newer exec items are taken from item_completed.
+    if (p.type === 'web_search_call') {
+      acc.bump('web', 'call');
+      acc.toolStart('web_search', '', at);
+      return;
+    }
+    if ((p.type === 'function_call' || p.type === 'custom_tool_call') && typeof p.name === 'string') this.callStart(acc, p, at);
+    if ((p.type === 'function_call_output' || p.type === 'custom_tool_call_output') && typeof p.call_id === 'string') acc.toolEnd(p.call_id);
     if (p.type === 'function_call' && typeof p.name === 'string') {
       if (p.name === 'spawn_agent') {
         acc.event(at, 'WORKER_STARTED', 'spawn_agent', 'OBSERVED', p.call_id);
@@ -321,12 +371,44 @@ export class CodexAdapter implements ProviderAdapter {
     }
   }
 
+  /** Tool counts, current tool and spawns from model tool calls (function_call / custom_tool_call). */
+  private callStart(acc: SessionAccumulator, p: Record<string, any>, at?: number): void {
+    const id = typeof p.call_id === 'string' ? p.call_id : undefined;
+    if (id) {
+      if (acc.seenIds.has(`call:${id}`)) return;
+      acc.seenIds.add(`call:${id}`);
+    }
+    let name = bounded(p.name, 60);
+    let detail = '';
+    if (p.type === 'custom_tool_call' && typeof p.input === 'string') {
+      // "exec" runs a small script calling tools.<name>(…): report the first inner tool, not the script.
+      const inner = /\btools\.([A-Za-z_][\w]{0,59})\s*\(/.exec(p.input.slice(0, 4000));
+      if (p.name === 'exec' && inner) name = inner[1];
+      if (p.name === 'apply_patch') detail = patchTarget(p.input);
+      else detail = codeCmd(p.input.slice(inner?.index ?? 0));
+    } else {
+      const args = typeof p.arguments === 'string' ? safeParse(p.arguments.length > 64 * 1024 ? '' : p.arguments) : p.arguments;
+      if (args && typeof args === 'object') {
+        const cmd = args.cmd ?? args.command;
+        if (cmd !== undefined) detail = bounded(commandLabel(commandText(cmd)), 80);
+        else if (typeof args.task_name === 'string') detail = bounded(args.task_name, 80);
+        else if (typeof args.target === 'string') detail = bounded(args.target, 60);
+      }
+      if (p.name === 'spawn_agent') {
+        const type = typeof args?.agent_type === 'string' ? args.agent_type : typeof args?.role === 'string' ? args.role : 'agent';
+        acc.spawn(at, bounded(type, 40), bounded(args?.task_name ?? args?.description, 80));
+      }
+    }
+    acc.toolStart(name, detail, at, id);
+  }
+
   private command(acc: SessionAccumulator, cmd: string, exit: number | undefined, at: number | undefined, id?: string, duration?: any, status?: string): void {
     if (!cmd || at === undefined) return;
     if (id && acc.seenIds.has(`cmd:${id}`)) return;
     if (id) acc.seenIds.add(`cmd:${id}`);
     acc.counts.commands++;
     acc.counts.tools++;
+    if ((exit !== undefined && exit !== 0) || status === 'failed') acc.toolError();
     const label = bounded(commandLabel(cmd), 100);
     const durMs = typeof duration?.secs === 'number' ? duration.secs * 1000 + Math.round((duration.nanos ?? 0) / 1e6) : undefined;
     if (isVerificationCommand(cmd)) {
@@ -384,6 +466,19 @@ function set<K, V>(m: Map<K, Set<V>>, k: K): Set<V> {
   let s = m.get(k);
   if (!s) m.set(k, (s = new Set()));
   return s;
+}
+
+/** First file named in an apply_patch body ("*** Update File: <path>"), basename only. */
+function patchTarget(input: string): string {
+  const m = /\*\*\* (?:Update|Add|Delete) File: ([^\r\n]{1,400})/.exec(input.slice(0, 4000));
+  return m ? bounded(path.basename(m[1].trim()), 80) : '';
+}
+
+/** First command string in an exec script (tools.exec_command({cmd: "…"})), redacted and bounded. */
+function codeCmd(input: string): string {
+  const m = /\b(?:cmd|command)\s*:\s*("(?:[^"\\]|\\.){0,400}"|'(?:[^'\\]|\\.){0,400}'|`[^`]{0,400}`)/.exec(input.slice(0, 4000));
+  if (!m) return '';
+  return bounded(commandLabel(m[1].slice(1, -1).replace(/\\(["'\\])/g, '$1')), 80);
 }
 
 function safeDir(d: string): string[] {
