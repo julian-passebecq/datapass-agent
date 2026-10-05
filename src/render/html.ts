@@ -51,6 +51,10 @@ th { font-weight: 600; color: var(--vscode-descriptionForeground); font-size: 11
 .nav { display: flex; justify-content: space-between; align-items: center; text-align: left; background: none; border: none; color: var(--vscode-foreground); padding: 5px 8px; border-radius: 4px; cursor: pointer; font: inherit; }
 .nav:hover { background: var(--vscode-list-hoverBackground); } .nav.on { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
 .nb { font-size: 10px; min-width: 16px; text-align: center; border-radius: 8px; padding: 0 5px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); } .nb.hot { background: var(--bad); color: #fff; }
+.rail { overflow-y: auto; } .rg { display: flex; flex-direction: column; gap: 1px; margin-bottom: 4px; }
+.rail .railg { display: flex; align-items: center; gap: 4px; width: 100%; background: none; border: none; cursor: pointer; font: inherit; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--vscode-descriptionForeground); margin: 6px 0 2px; padding: 2px 4px; border-radius: 3px; }
+.rail .railg:hover { background: var(--vscode-list-hoverBackground); } .rail .chev { width: 10px; } .rail .rgc { margin-left: auto; font-size: 10px; opacity: .7; }
+.rail .nav { padding: 4px 8px 4px 18px; }
 .railfoot { margin-top: auto; font-size: 11px; padding: 8px; display: grid; gap: 3px; }
 .mainw { padding: 10px 16px 24px; min-width: 0; }
 .mh { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; } .mh h1 { font-size: 18px; margin: 0; } .mh .right { margin-left: auto; font-size: 11px; }
