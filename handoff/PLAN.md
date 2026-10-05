@@ -31,4 +31,6 @@ Each badge names its basis and the event times. Done: unit tests per signal on f
 **P3 · Session replay** — `src/render/replay.ts`, Inspector tab "Replay".
 Left: the session log (real timeline events with t+offset). Centre: the session → workers → repo / worktree → tests / commits diagram, lighting each node as its event plays. Controls: play / pause, 1× / 4× / 16×, step. Pure client-side animation of already-rendered events; no new data. Done: replays a fixture session; respects reduced motion; smoke step.
 
-Order: P1 → P2 → P3 (P1 and P2 touch different files and can run in parallel).
+**P4 · Agent topology** (idea: donvito "Agent Monitor" + orchestrator sidebar trees) — `src/render/topology.ts`, Team view toggle "Lanes | Tree". Real parent → worker → nested-worker tree (only recorded edges) as connected nodes, each with status, model, tokens, recorded cost and a rolled-up subtree total ("Done N / live N"). Done: renders the fixture tree and a 50-worker real lead without overlap; 1 rollup test.
+
+Order: P1 → P2 → P3 → P4 (P1 and P2 touch different files and can run in parallel).
