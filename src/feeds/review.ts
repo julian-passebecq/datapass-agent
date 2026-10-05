@@ -4,7 +4,7 @@
 // titles pass bounded() (redaction), URLs are kept only when they are https links on the remote's own host.
 import { execFile } from 'child_process';
 import * as fs from 'fs';
-import { HARDEN } from '../git/git';
+import { HARDEN, resolveExe } from '../git/git';
 import { bounded } from '../util/redact';
 import { isPlausibleLocalPath, normalizeCase } from '../util/paths';
 import type { AgentSessionSnapshot } from '../model';
@@ -244,7 +244,9 @@ function childEnv(): NodeJS.ProcessEnv {
 
 export const execRunner: Runner = (cmd, args, cwd) =>
   new Promise(resolve => {
-    execFile(cmd, args, { cwd, timeout: 5_000, windowsHide: true, maxBuffer: 8 << 20, env: childEnv() }, (err, stdout, stderr) => {
+    const exe = resolveExe(cmd);
+    if (!exe) return resolve({ ok: false, out: '', err: `${cmd} not found on PATH` });
+    execFile(exe, args, { cwd, timeout: 5_000, windowsHide: true, maxBuffer: 8 << 20, env: childEnv() }, (err, stdout, stderr) => {
       resolve({ ok: !err, out: String(stdout ?? ''), err: err ? bounded(String(stderr || (err as Error).message || err), 160) : '' });
     });
   });

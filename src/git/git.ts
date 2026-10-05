@@ -9,6 +9,51 @@ import { isPlausibleLocalPath, relTo } from '../util/paths';
  *  external diff/textconv drivers, pagers, credential prompts). */
 export const HARDEN = ['-c', 'core.fsmonitor=false', '-c', 'core.untrackedCache=false', '-c', 'core.quotepath=off', '-c', 'diff.external=', '-c', 'core.pager=cat', '-c', 'credential.helper=', '--no-optional-locks', '--no-pager'];
 
+/** Resolved absolute paths of external tools, by name (cached for the process; `clearExeCache` resets it). */
+const exeCache = new Map<string, string | undefined>();
+
+/**
+ * Absolute path of `name` found on PATH, or undefined. Never looks in the current directory: on Windows a bare
+ * `execFile('git', …, { cwd })` would run a `git.exe` planted in that cwd (a session worktree) before PATH.
+ * Only absolute PATH entries are scanned (empty, '.' and relative entries are skipped). On Windows only `.exe` / `.com`
+ * are tried: `execFile` cannot start a `.cmd` / `.bat` without a shell, which Agent never uses.
+ */
+export function findExe(name: string, pathVar: string | undefined, platform: NodeJS.Platform = process.platform): string | undefined {
+  if (!/^[A-Za-z0-9][\w.\-]*$/.test(name)) return undefined;
+  const win = platform === 'win32';
+  const p = win ? path.win32 : path.posix;
+  const exts = win ? (/\.(exe|com)$/i.test(name) ? [''] : ['.exe', '.com']) : [''];
+  for (const raw of (pathVar ?? '').split(win ? ';' : ':')) {
+    const dir = raw.trim().replace(/^"(.*)"$/, '$1');
+    // Drive-rooted or UNC on Windows (not "\x" or "C:x", which depend on the current drive / directory).
+    if (!dir || (win ? !/^(?:[A-Za-z]:[\\/]|\\\\[^\\/])/.test(dir) : !p.isAbsolute(dir))) continue;
+    for (const ext of exts) {
+      const f = p.join(dir, name + ext);
+      try {
+        if (!fs.statSync(f).isFile()) continue;
+        if (!win) fs.accessSync(f, fs.constants.X_OK);
+        return f;
+      } catch {
+        /* not here */
+      }
+    }
+  }
+  return undefined;
+}
+
+/** `findExe` on this process's PATH, cached per name. Callers report the tool as unavailable when it returns undefined. */
+export function resolveExe(name: string): string | undefined {
+  if (exeCache.has(name)) return exeCache.get(name);
+  const key = Object.keys(process.env).find(k => k.toUpperCase() === 'PATH');
+  const exe = findExe(name, key ? process.env[key] : undefined);
+  exeCache.set(name, exe);
+  return exe;
+}
+
+export function clearExeCache(): void {
+  exeCache.clear();
+}
+
 /** Read-only git invocations. Git is the authority for Git; Agent never writes to a repository. */
 export const gitStats = { calls: 0, ms: 0, byCmd: {} as Record<string, number> };
 
@@ -17,7 +62,9 @@ function git(cwd: string, args: string[], timeoutMs = 15_000): Promise<string | 
   gitStats.calls++;
   gitStats.byCmd[args[0]] = (gitStats.byCmd[args[0]] ?? 0) + 1;
   return new Promise<string | undefined>(resolve => {
-    execFile('git', [...HARDEN, ...args], { cwd, timeout: timeoutMs, windowsHide: true, maxBuffer: 4 << 20, env: gitEnv() }, (err, stdout) => {
+    const exe = resolveExe('git');
+    if (!exe) return resolve(undefined);
+    execFile(exe, [...HARDEN, ...args], { cwd, timeout: timeoutMs, windowsHide: true, maxBuffer: 4 << 20, env: gitEnv() }, (err, stdout) => {
       resolve(err ? undefined : stdout.toString());
     });
   }).finally(() => (gitStats.ms += performance.now() - t0));

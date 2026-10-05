@@ -2,6 +2,7 @@ import { execFile } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { resolveExe } from '../git/git';
 
 export interface InstalledVersion {
   version?: string;
@@ -14,8 +15,10 @@ function run(bin: string, args: string[]): Promise<string | undefined> {
     // Minimal env: no tokens forwarded to the provider binary.
     const env: NodeJS.ProcessEnv = {};
     for (const k of ['PATH', 'Path', 'SystemRoot', 'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'TEMP', 'TMP']) if (process.env[k]) env[k] = process.env[k];
-    // No shell: on Windows a bare name is resolved through PATH by execFile only for .exe, which is how both CLIs ship.
-    execFile(bin, args, { timeout: 8000, windowsHide: true, env }, (err, out) => resolve(err ? undefined : String(out).trim()));
+    // No shell; a bare name is resolved on absolute PATH entries only, never in the current directory.
+    const exe = path.isAbsolute(bin) ? bin : resolveExe(bin);
+    if (!exe) return resolve(undefined);
+    execFile(exe, args, { timeout: 8000, windowsHide: true, env }, (err, out) => resolve(err ? undefined : String(out).trim()));
   });
 }
 
