@@ -1,7 +1,63 @@
 # Agent — plan
 
-State (5 Oct 2026, 07:00): 0.4.1 on `main` (45 PRs merged during the night build, waves 1–4). Evidence `D:\PROJ\AGENT-V04-EVIDENCE` (96/96 VSIX smoke, 36 screens). Julian gave full merge rights on this repo (5 Oct). Wave 5 (dispatch, lifecycle, panes) merged in 0.5.0; wave 6 (hud, ctxcost, scope) merged in 0.6.0.
+State (5 Oct 2026, evening): `main` = **0.6.0** (#54), **42 screens** (10 core + 32 add-ons), 12 commands. Evidence and the 0.6.0 audit (A1–A6): `D:\PROJ\AGENT-V04-EVIDENCE`. Julian gave full merge rights on this repo (5 Oct).
+Canonical repository: `github.com/julian-passebecq/agent-vscode` (remote `agent`; package.json points there). `julian-passebecq/datapass-agent` (remote `origin`) still exists: archive or mirror is an **open owner decision**; no migration done.
 Rule for every package: observe only, local only, every value carries its evidence kind; no LLM judgement, no control of sessions.
+Agent is not a harness: no dispatch, no auto-merge, no start-next. Every screen, view mode and chart variant is kept (no screen is removed, hidden or merged).
+
+## Now
+
+- 0.6.0 audit fix wave: one branch per audit package (`audit/docs`, `audit/evidence`, `audit/perf`, `audit/providers`, `audit/sec`, `audit/ux`), each a PR to `main`.
+- Model benchmarks screen: separate PR (`feat/model-benchmarks`); not on `main` yet.
+- Release gate: `.github/workflows/release.yml` (manual or `v*` tag) runs the installed-VSIX smoke; `ci.yml` stays the fast check.
+
+## Team
+
+Written by the PM only (coders report in their PR).
+
+| Name | Role | Package | GO date | Rules version |
+|---|---|---|---|---|
+
+## Shipped on main (0.6.0)
+
+Core screens (10): Overview, Attention, Board, Team, Flow, Worktrees, Last 24 h, Verification, Activity, Sources — `src/render/workspace.ts` (#1, #2, #13, #33).
+
+| Screen | File (`src/render/extra/` + logic) | PR |
+|---|---|---|
+| Explore | `explore.ts` | #3 |
+| Topology | `topology.ts` | #4 |
+| Week | `week.ts` | #5 |
+| Projects | `projects.ts` | #6 |
+| Settings | `settings.ts`, `src/feeds/settings.ts` | #9 |
+| Repositories | `repos.ts`, `src/git/repos.ts` | #10 |
+| Signals | `signals.ts` | #11 |
+| Workflows | `workflows.ts`, `src/providers/claude/workflows.ts` | #12, #32 |
+| Live | `live.ts` | #14 |
+| Token rhythm | `tokens.ts` | #16 |
+| Run strips | `runs.ts` | #17 |
+| Backlog | `backlog.ts`, `src/feeds/backlog.ts` | #18 |
+| Review | `review.ts`, `src/feeds/review.ts` | #19 |
+| Health | `health.ts` | #20 |
+| Transcript | `transcript.ts`, `src/providers/transcript.ts` | #8, #21 |
+| Changes | `changes.ts`, `src/git/changes.ts` | #22 |
+| Pipelines | `pipelines.ts`, `src/feeds/pipelines.ts` | #23 |
+| Audit trail | `audit.ts` | #25 |
+| Forecast | `forecast.ts` | #15, #26 |
+| History | `history.ts`, `scripts/weekly.ts` | #27 |
+| Replay | `replay.ts` | #28 |
+| Launcher | `launcher.ts` | #29 |
+| Limits | `limits.ts` | #34, #39 |
+| Roles | `roles.ts` | #35 |
+| Codex | `codex.ts`, `src/providers/codex/state.ts` | #37 |
+| Catalog | `catalog.ts`, `src/feeds/catalog.ts` | #38, #43 |
+| Dispatches | `dispatch.ts`, `src/activity/dispatch.ts` | #47 |
+| Panes | `panes.ts` | #48 |
+| Lifecycle | `lifecycle.ts` | #49 |
+| Scope map | `scope.ts`, `src/feeds/scope.ts` | #51 |
+| Session HUD | `hud.ts`, `src/feeds/lessons.ts` | #52 |
+| Context cost | `ctxcost.ts` | #53 |
+
+Also shipped: SessionFacts data (#7), daily archive (#36), exec hardening (#31, #42), versions 0.4.0 (#30), 0.4.1 (#45), 0.5.0 (#50), 0.6.0 (#54).
 
 ## Idées de Julian (2026-10-05 evening, via ACC 2: 5 more screenshots)
 
@@ -33,7 +89,11 @@ Rule for every package: observe only, local only, every value carries its eviden
 | "Beacon": one workspace for all repos (commits, PR checks, stash, merge) | Git product, not Agent | → **Tern** (Agent already links via Open in Tern) |
 | Fabric tenant tree next to Claude Code | needs Fabric credentials and a tenant API; outside a local observer | → DataPass / X-Ray, not Agent |
 
-## Packages (each ≤ 60 M, one coder subagent, different files)
+## History (done)
+
+Night build 4–5 Oct (waves 1–4, 0.4.x), wave 5 (dispatch, lifecycle, panes → 0.5.0) and wave 6 (hud, ctxcost, scope → 0.6.0) are merged. The package texts below are kept as written when planned.
+
+### Packages P1–P14 as planned on 5 Oct (all merged; the shipped files are in the table above, e.g. P1 is `src/render/extra/week.ts`, not `calendar.ts`)
 
 **P1 · Week calendar** — `src/render/calendar.ts`, workspace view `week`.
 Mon–Sun columns × hours, one block per session (first → last activity), colour = repo identity, provider border, live blocks pulse. Week ←/→ and Today. Clicking a block fills the side result card. Filter chips by repo / provider. Done: renders 7 days of real data; 1 test (block geometry across midnight); smoke screenshot dark + light.
@@ -53,7 +113,7 @@ Left: the session log (real timeline events with t+offset). Centre: the session 
 
 **P4 · Agent topology** (idea: donvito "Agent Monitor" + orchestrator sidebar trees) — `src/render/topology.ts`, Team view toggle "Lanes | Tree". Real parent → worker → nested-worker tree (only recorded edges) as connected nodes, each with status, model, tokens, recorded cost and a rolled-up subtree total ("Done N / live N"). Done: renders the fixture tree and a 50-worker real lead without overlap; 1 rollup test.
 
-### More ideas (2026-10-05, via ACC 2: agent kanban, project sidebar, reui DevOps blocks, Factory Log)
+#### More ideas (2026-10-05, via ACC 2: agent kanban, project sidebar, reui DevOps blocks, Factory Log)
 
 - **P5 · Review board** (agent kanban): Board columns Working / Needs you / In review / Ready to merge / CI failed, using PR + CI state read **opt-in** from the local `gh` / `glab` CLI (read-only, off by default, shows "provider state unavailable" when off).
 - **P6 · Run strips** (cron-job runs): one row per repo, one tick per session over 14 days, coloured by observed outcome; click a tick to select the session.
@@ -62,7 +122,7 @@ Left: the session log (real timeline events with t+offset). Centre: the session 
 - **P9 · Project tree in the rail**: repo → live sessions under the screen list, with counts; click scopes every screen to that repo.
 - Not for Agent: architecture map / code-path flow (Tern / Factory), firewall, canary deploys, connection-sync tiles (not agent observation).
 
-### Last batch (2026-10-05, via ACC 2: Cezar cockpit, crawler visual, T3 orchestrator, context thread, calendar, Lens, kanban)
+#### Last batch (2026-10-05, via ACC 2: Cezar cockpit, crawler visual, T3 orchestrator, context thread, calendar, Lens, kanban)
 
 - Into **P1**: the 24 h / week bars end with a commit or PR chip (Cezar night timeline).
 - Into **P4**: workers grouped under their lead, collapsed by default ("3 subagents · 3 done"), each with duration and a one-line result (the parent's recorded Agent tool result, cut to 120 characters and redacted) (T3 orchestrator).
@@ -72,7 +132,7 @@ Left: the session log (real timeline events with t+offset). Centre: the session 
 - **P11 · Concurrency**: peak sessions running at once per hour over the last 24 h, against an optional `agent.parallelTarget`; "waiting for you" is counted separately from running (Cezar slots).
 - Skipped: spider and crawler animation (decoration), queueing and dispatch of tasks (control, which Agent never does), the Chrome extension prompt.
 
-### Final 3 (CodeAlta, remediation Sankey, trading dashboard)
+#### Final 3 (CodeAlta, remediation Sankey, trading dashboard)
 
 - **P12 · Flow drill-down** (remediation Sankey): Flow gains a 4th column, verification (tests pass / fail / none); clicking a node or band filters a session table under the diagram.
 - **P13 · Per-file changes** (CodeAlta "Modified files"): the Inspector lists files with +/− per file (git `diff --numstat` over the session window, live and recent sessions only).
@@ -80,7 +140,7 @@ Left: the session log (real timeline events with t+offset). Centre: the session 
 - Into **P8**: compact context readout "17.5k / 272k · 6 %" in cards (CodeAlta status bar).
 - Skipped: the Effect TS layer tree and AGENTS.md tweet (not UI), mermaid rendering and tabs (VS Code already has these), and the trading widgets themselves.
 
-### Re-check of all 20 photos sent directly (2026-10-05)
+#### Re-check of all 20 photos sent directly (2026-10-05)
 
 Every photo maps to a package above or a skip. Two details from the nested-thread screenshot (devbook / Marlies) were missing:
 - Into **P13**: an "Uncommitted · N files, +x −y" chip on live session cards (git `diff --shortstat` on the worktree, read-only).
