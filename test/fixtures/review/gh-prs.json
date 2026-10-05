@@ -1,0 +1,8 @@
+[
+  {"number":12,"title":"Review screen <b>lanes</b>","state":"OPEN","isDraft":false,"headRefName":"night/review","baseRefName":"main","url":"https://github.com/acme/agent/pull/12","updatedAt":"2026-10-04T11:50:00Z","mergedAt":null,"reviewDecision":"","mergeable":"MERGEABLE","statusCheckRollup":[{"__typename":"CheckRun","name":"build","status":"COMPLETED","conclusion":"SUCCESS"}]},
+  {"number":11,"title":"Signals","state":"OPEN","isDraft":false,"headRefName":"night/signals","baseRefName":"main","url":"https://github.com/acme/agent/pull/11","updatedAt":"2026-10-04T11:40:00Z","mergedAt":null,"reviewDecision":"REVIEW_REQUIRED","mergeable":"MERGEABLE","statusCheckRollup":[{"__typename":"CheckRun","name":"build","status":"COMPLETED","conclusion":"FAILURE"},{"__typename":"StatusContext","context":"lint","state":"SUCCESS"}]},
+  {"number":10,"title":"Repos","state":"MERGED","isDraft":false,"headRefName":"night/repos","baseRefName":"main","url":"https://github.com/acme/agent/pull/10","updatedAt":"2026-10-04T11:00:00Z","mergedAt":"2026-10-04T11:00:00Z","reviewDecision":"APPROVED","mergeable":"UNKNOWN","statusCheckRollup":[]},
+  {"number":9,"title":"Draft thing","state":"OPEN","isDraft":true,"headRefName":"night/draft","baseRefName":"main","url":"javascript:alert(1)","updatedAt":"2026-10-04T10:00:00Z","reviewDecision":"","mergeable":"CONFLICTING","statusCheckRollup":[{"name":"build","status":"IN_PROGRESS","conclusion":""}]},
+  {"number":8,"title":"Unlinked open","state":"OPEN","isDraft":false,"headRefName":"human/fix","baseRefName":"main","url":"https://evil.example/pull/8","updatedAt":"2026-10-04T09:00:00Z","reviewDecision":"","mergeable":"MERGEABLE","statusCheckRollup":null},
+  {"title":"no number"}
+]

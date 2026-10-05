@@ -1,0 +1,4 @@
+[
+  {"iid":288,"title":"Qualify release","state":"opened","draft":false,"source_branch":"codex/release","target_branch":"main","web_url":"https://gitlab.com/group/proj/-/merge_requests/288","updated_at":"2026-10-04T11:30:00.000Z","detailed_merge_status":"ci_still_running"},
+  {"iid":287,"title":"Stub","state":"merged","draft":false,"source_branch":"v51/stub","target_branch":"main","web_url":"https://gitlab.com/group/proj/-/merge_requests/287","updated_at":"2026-10-04T10:30:00.000Z","merged_at":"2026-10-04T10:30:00.000Z","detailed_merge_status":"not_open"}
+]
