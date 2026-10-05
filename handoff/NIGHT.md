@@ -19,7 +19,7 @@ Julian (5 Oct, evening): "integrate as many useful things as possible tonight; s
 - New settings: do not edit package.json; read them with `ctx.config('agent.<id>.<name>', default)` and list them in your report (PM adds the contributions).
 
 ## Done condition (every package)
-`npm run check` and `npm test` green; your screen renders with the real local data (`npm run build:test` if present, then `node out-test/scripts/preview.js <scratch> dark`; open nothing in the preview pane, just check the HTML is non-empty and escaped); branch `night/<id>` pushed to remote `agent`; PR opened against `main` with a short description. Do not merge. Return ≤ 3 lines: branch, PR URL, what works / what is missing.
+`npm run check` and `npm test` green; your screen renders with the real local data (`npm run compile-tests`, then `node out-test/scripts/preview.js <scratch-dir> dark`; open nothing in the preview pane, just check the HTML is non-empty and escaped); branch `night/<id>` pushed to remote `agent`; PR opened against `main` with a short description. Do not merge. Return ≤ 3 lines: branch, PR URL, what works / what is missing.
 
 ## Packages
 Wave 1:
