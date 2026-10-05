@@ -21,10 +21,10 @@ const T_OUT = 'OBSERVED: output tokens recorded by the provider';
 const T_DISP = 'OBSERVED: time of the matching spawn call in the parent (Task / spawn_agent), else the worker’s first record';
 const T_DUR = 'DERIVED: worker first record → last activity (live: → now)';
 const T_COST = 'DERIVED from your setting agent.dispatch.pricePerMTok: tokens Σ / 1e6 × your price for the model. Agent has no prices of its own.';
-const SUCCESS_DEF = 'Success (DERIVED) = the dispatch finished (session ENDED or workflow agent done / failed recorded) with no failure signal. Failure signals (OBSERVED): the last test / build command observed failed, or the workflow journal records the agent as failed. A finished dispatch with no test observed counts as success ("no tests needed"); tool errors alone do not count as failure. Verified (DERIVED) = success and (last test passed or a commit observed). Live dispatches and dispatches whose end is not observed are left out of the rates.';
+const SUCCESS_DEF = 'Outcome (DERIVED), for dispatches whose end is observed (session ENDED or workflow agent done / failed recorded). Verified = its OWN last test passed (a chained or piped command counts only with a recorded exit code) or it ran git commit itself (OBSERVED). Finished, unverified = no failure signal but nothing verifies it: no test, an untrusted outcome, or only commits correlated by time. Failed = its last test failed, or the workflow journal records the agent as failed. Commits made by anyone in the worker’s time window in a shared cwd are only correlated (INFERRED, shown ≈n) and never verify a dispatch. Tool errors alone do not count as failure. Live dispatches and dispatches whose end is not observed are left out of the rates.';
 
-const STATE_TEXT: Record<Dispatch['state'], string> = { live: 'running', ok: 'ended', failed: 'failed', unknown: 'end not observed' };
-const STATE_COLOR: Record<Dispatch['state'], string> = { live: 'var(--warn)', ok: 'var(--ok)', failed: 'var(--bad)', unknown: 'var(--quiet)' };
+const STATE_TEXT: Record<Dispatch['state'], string> = { live: 'running', verified: 'verified', unverified: 'finished, unverified', failed: 'failed', unknown: 'end not observed' };
+const STATE_COLOR: Record<Dispatch['state'], string> = { live: 'var(--warn)', verified: 'var(--ok)', unverified: 'var(--quiet)', failed: 'var(--bad)', unknown: 'var(--quiet)' };
 const KIND_TEXT: Record<Dispatch['kind'], string> = { subagent: 'subagent', workflow: 'workflow', codex: 'Codex agent' };
 
 const pct = (x: number | undefined) => (x === undefined ? '—' : `${Math.round(x * 100)}%`);
@@ -92,7 +92,7 @@ function logView(all: Dispatch[], st: WsState, pr: Record<string, unknown>): str
     return `<tr${sel}>
 <td class="dp-tm" title="${esc(`${T_DISP}${d.spawnMatched ? ' · spawn call matched' : ' · no spawn call matched: worker first record'}`)}">${esc(when(d.dispatchedAt))}${d.spawnMatched ? '' : ' <span class="muted">*</span>'}</td>
 <td class="dp-p" title="${esc(d.parentKey ?? 'no parent recorded')}">${esc(d.parentTitle ?? (d.parentKey ? d.parentKey.slice(0, 16) : '—'))}</td>
-<td><span class="dp-k dp-k-${d.kind}" title="${esc(`${KIND_TEXT[d.kind]} · ${d.provider}`)}">${esc(KIND_TEXT[d.kind])}</span> <span class="dp-ty" style="--rc:${identityColor(d.type)}" title="${esc(`${d.typeKind}: ${d.typeKind === 'UNKNOWN' ? 'no worker type recorded' : 'worker type recorded by the provider'}`)}">${esc(d.type)}</span></td>
+<td><span class="dp-k dp-k-${d.kind}" title="${esc(`${KIND_TEXT[d.kind]} · ${d.provider}`)}">${esc(KIND_TEXT[d.kind])}</span> <span class="dp-ty" style="--rc:${identityColor(d.type)}" title="${esc(`${d.typeKind}: ${d.typeKind === 'UNKNOWN' ? 'no worker type recorded' : d.typeKind === 'DERIVED' ? 'type of the spawn call matched by time' : 'worker type recorded by the provider'}`)}">${esc(d.type)}</span></td>
 <td class="dp-l" title="${esc(`${d.label}${d.description ? ` · spawn description: ${d.description}` : ''}${d.runName ? ` · run ${d.runName}` : ''}`)}">${esc(d.label)}${d.description && d.description !== d.label ? `<div class="muted">${esc(d.description)}</div>` : ''}</td>
 <td title="OBSERVED: model and effort recorded by the worker">${esc(modelText(d.model))}${d.effort ? ` <span class="muted">· ${esc(d.effort)}</span>` : ''}</td>
 <td class="r" title="${esc(T_DUR)}">${duration(d.durationMs)}</td>
@@ -100,9 +100,9 @@ function logView(all: Dispatch[], st: WsState, pr: Record<string, unknown>): str
 <td class="r" title="${esc(T_OUT)}">${d.output === undefined ? '—' : compact(d.output)}</td>
 ${anyPrice ? `<td class="r" title="${esc(T_COST)}">${c === undefined ? '—' : usd(c)}</td>` : ''}
 <td class="r" title="OBSERVED: tool calls (provider-flagged errors)">${d.tools || ''}${d.toolErrors ? ` <span class="dp-bad">(${d.toolErrors})</span>` : ''}</td>
-<td title="${esc(`DERIVED: ${STATE_TEXT[d.state]}${why}`)}"><i class="dp-dot" style="--c:${STATE_COLOR[d.state]}"></i>${esc(STATE_TEXT[d.state])}${d.state === 'ok' && d.verified ? ' <span class="dp-ok" title="DERIVED: last test passed or commit observed">✓</span>' : ''}</td>
-<td class="r" title="OBSERVED test / build commands: pass / fail">${tests ? `<span class="dp-ok">${d.pass}</span> / <span class="${d.fail ? 'dp-bad' : ''}">${d.fail}</span>` : '—'}</td>
-<td class="r" title="OBSERVED commits during the worker">${d.commits || ''}</td>
+<td title="${esc(`DERIVED: ${STATE_TEXT[d.state]}${why}`)}"><i class="dp-dot" style="--c:${STATE_COLOR[d.state]}"></i>${esc(STATE_TEXT[d.state])}${d.state === 'verified' ? ' <span class="dp-ok" title="DERIVED: own last test passed or own git commit observed">✓</span>' : ''}</td>
+<td class="r" title="OBSERVED test commands of this worker: pass / fail (chained or piped commands without a recorded exit code count as neither)">${tests ? `<span class="dp-ok">${d.pass}</span> / <span class="${d.fail ? 'dp-bad' : ''}">${d.fail}</span>` : '—'}</td>
+<td class="r" title="OBSERVED: commits made by this worker's own git commit command · ≈ INFERRED: commits in its time window, correlated only">${d.commits || ''}${d.correlatedCommits ? ` <span class="muted" title="INFERRED: ${d.correlatedCommits} commit(s) in the worker's time window (shared cwd, not attributed)">≈${d.correlatedCommits}</span>` : ''}</td>
 <td class="r" title="OBSERVED files the worker edited">${d.files || ''}</td>
 <td>${esc(d.repo)}</td>
 </tr>`;
@@ -116,7 +116,7 @@ ${anyPrice ? `<td class="r" title="${esc(T_COST)}">${c === undefined ? '—' : u
 interface Pt { g: DispatchGroup; x: number; y: number }
 
 function chart(groups: DispatchGroup[], st: WsState, by: GroupBy, useCost: boolean): string {
-  const yName = opt(st, 'dispatch.y', 'success');
+  const yName = opt(st, 'dispatch.y', 'verified');
   const logX = opt(st, 'dispatch.xscale', 'lin') === 'log';
   const yOf = (g: DispatchGroup) => (yName === 'verified' ? g.verifiedRate : g.successRate);
   const xOf = (g: DispatchGroup) => (useCost ? g.medCost : g.medTokens);
@@ -162,11 +162,11 @@ function chart(groups: DispatchGroup[], st: WsState, by: GroupBy, useCost: boole
     const name = by === 'type' ? p.g.key : p.g.key.replace(p.g.model, prettyModel(p.g.model));
     const label = `${name.length > 26 ? `${name.slice(0, 25)}…` : name} · n=${p.g.finished}${few ? ' (n<5)' : ''}`;
     const right = cx < L + pw * 0.7;
-    const tip = `${p.g.key}: ${p.g.finished} finished dispatch(es) of ${p.g.n}; ${yName === 'verified' ? 'verified' : 'success'} ${pct(p.y)} (DERIVED); median ${useCost ? `cost ${usd(p.x)} (DERIVED from your price)` : `tokens Σ ${compact(Math.round(p.x))}`}${few ? ' · n < 5: not enough data' : ''}`;
+    const tip = `${p.g.key}: ${p.g.finished} finished dispatch(es) of ${p.g.n}; ${yName === 'verified' ? `verified ${p.g.verified}/${p.g.finished}` : `no failure signal ${p.g.ok}/${p.g.finished} (verified ${p.g.verified} + unverified ${p.g.unverified})`} = ${pct(p.y)} (DERIVED); median ${useCost ? `cost ${usd(p.x)} (DERIVED from your price)` : `tokens Σ ${compact(Math.round(p.x))}`}${few ? ' · n < 5: not enough data' : ''}`;
     return `<g class="dp-pt${few ? ' dp-few' : ''}" style="--c:${identityColor(p.g.model)}"><title>${esc(tip)}</title><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}"/><text x="${(cx + (right ? r + 4 : -r - 4)).toFixed(1)}" y="${(cy + 3).toFixed(1)}" text-anchor="${right ? 'start' : 'end'}">${esc(label)}</text></g>`;
   }).join('');
-  const axes = `<text class="dp-axt" x="${L + pw / 2}" y="${H - 6}" text-anchor="middle">${esc(useCost ? 'median cost per dispatch ($, DERIVED from your price)' : 'median tokens Σ per dispatch')}${logX ? ' · log scale' : ''}</text><text class="dp-axt" transform="translate(12 ${T + ph / 2}) rotate(-90)" text-anchor="middle">${esc(yName === 'verified' ? 'verified rate (DERIVED)' : 'success rate (DERIVED)')}</text>`;
-  return `<div class="dp-cw"><svg class="dp-c" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Success rate versus cost per dispatch">${grid}${lines}${dots}${axes}</svg></div>${skipped ? `<div class="muted">${skipped} group(s) not plotted (no ${useCost ? 'price set' : 'token count'} or no finished dispatch).</div>` : ''}`;
+  const axes = `<text class="dp-axt" x="${L + pw / 2}" y="${H - 6}" text-anchor="middle">${esc(useCost ? 'median cost per dispatch ($, DERIVED from your price)' : 'median tokens Σ per dispatch')}${logX ? ' · log scale' : ''}</text><text class="dp-axt" transform="translate(12 ${T + ph / 2}) rotate(-90)" text-anchor="middle">${esc(yName === 'verified' ? 'verified rate (DERIVED)' : 'no-failure rate (DERIVED, not proof)')}</text>`;
+  return `<div class="dp-cw"><svg class="dp-c" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${yName === 'verified' ? 'Verified' : 'No-failure'} rate versus cost per dispatch">${grid}${lines}${dots}${axes}</svg></div>${skipped ? `<div class="muted">${skipped} group(s) not plotted (no ${useCost ? 'price set' : 'token count'} or no finished dispatch).</div>` : ''}`;
 }
 
 function groupTable(groups: DispatchGroup[], useCost: boolean): string {
@@ -175,15 +175,17 @@ function groupTable(groups: DispatchGroup[], useCost: boolean): string {
     const rate = (x: number | undefined, what: string) => (few ? `<span class="muted" title="n < ${MIN_N}: not enough data">${pct(x)} · n &lt; 5</span>` : `<span title="${esc(`DERIVED: ${what}`)}">${pct(x)}</span>`);
     return `<tr><td><span class="dp-ty" style="--rc:${identityColor(g.model)}">${esc(g.key === g.model ? modelText(g.key) : g.key.replace(g.model, prettyModel(g.model)))}</span></td>
 <td class="r">${g.n}</td><td class="r" title="finished with an observed end (used for the rates)">${g.finished}</td><td class="r">${g.live || ''}</td>
-<td class="r">${rate(g.successRate, `${g.ok} of ${g.finished} finished without a failure signal`)}</td>
-<td class="r">${rate(g.verifiedRate, `${g.verified} of ${g.finished} with a passing last test or a commit`)}</td>
+<td class="r">${rate(g.verifiedRate, `${g.verified} of ${g.finished} with an own passing last test or an own git commit`)}</td>
+<td class="r" title="DERIVED: finished with no failure signal and nothing that verifies it">${g.unverified}</td>
+<td class="r" title="DERIVED: failure signal recorded">${g.failed ? `<span class="dp-bad">${g.failed}</span>` : '0'}</td>
+<td class="r">${rate(g.successRate, `${g.ok} of ${g.finished} finished without a failure signal (verified + unverified; not proof of success)`)}</td>
 <td class="r" title="${esc(T_TOK)}">${g.medTokens === undefined ? '—' : compact(Math.round(g.medTokens))}</td>
 <td class="r" title="${esc(T_TOK)}">${g.p90Tokens === undefined ? '—' : compact(Math.round(g.p90Tokens))}</td>
 <td class="r" title="${esc(T_OUT)}">${g.medOutput === undefined ? '—' : compact(Math.round(g.medOutput))}</td>
 <td class="r" title="${esc(T_DUR)}">${duration(g.medDurationMs)}</td>
 ${useCost ? `<td class="r" title="${esc(T_COST)}">${g.medCost === undefined ? '—' : `${usd(g.medCost)}${g.priced < g.n - g.live ? ` <span class="muted">(${g.priced})</span>` : ''}`}</td>` : ''}</tr>`;
   }).join('');
-  return `<table class="dp-t dp-gt"><tr><th>Group</th><th class="r">n</th><th class="r">Finished</th><th class="r">Live</th><th class="r">Success</th><th class="r">Verified</th><th class="r">Median tokens Σ</th><th class="r">p90 tokens Σ</th><th class="r">Median output</th><th class="r">Median duration</th>${useCost ? '<th class="r">Median $ (your price)</th>' : ''}</tr>${rows}</table>`;
+  return `<table class="dp-t dp-gt"><tr><th>Group</th><th class="r">n</th><th class="r">Finished</th><th class="r">Live</th><th class="r">Verified</th><th class="r">Unverified</th><th class="r">Failed</th><th class="r" title="verified + unverified over finished: no failure signal, not proof of success">No failure</th><th class="r">Median tokens Σ</th><th class="r">p90 tokens Σ</th><th class="r">Median output</th><th class="r">Median duration</th>${useCost ? '<th class="r">Median $ (your price)</th>' : ''}</tr>${rows}</table>`;
 }
 
 function costView(ds: Dispatch[], st: WsState, pr: Record<string, unknown>): string {
@@ -193,7 +195,7 @@ function costView(ds: Dispatch[], st: WsState, pr: Record<string, unknown>): str
   const useCost = hasPrice && opt(st, 'dispatch.x', 'tokens') === 'cost';
   const bar = toolbar(
     seg(st, 'dispatch.by', [['model', 'Model'], ['model-effort', 'Model + effort'], ['type', 'Worker type']], 'model', 'Group dispatches by'),
-    seg(st, 'dispatch.y', [['success', 'Success'], ['verified', 'Verified']], 'success', 'Y axis'),
+    seg(st, 'dispatch.y', [['verified', 'Verified'], ['success', 'No failure signal']], 'verified', 'Y axis'),
     hasPrice ? seg(st, 'dispatch.x', [['tokens', 'Tokens'], ['cost', '$ (your price)']], 'tokens', 'X axis') : '',
     seg(st, 'dispatch.xscale', [['lin', 'Linear'], ['log', 'Log']], 'lin', 'X scale'),
   );
@@ -216,11 +218,14 @@ export function renderDispatch(d: WsData, st: WsState, snap: WorkflowsSnapshot |
   );
   const note = snap ? '' : '<div class="muted dp-note">Workflow scan pending: workflow agents not in the session list appear when it lands.</div>';
   if (!ds.length) return `${bar}${note}<div class="muted dp-empty">No dispatch in this period. A dispatch is a worker session (Claude subagent, workflow agent, Codex spawned agent) with a recorded parent.</div>`;
-  const judged = ds.filter(x => x.success !== undefined);
-  const ok = judged.filter(x => x.success).length;
+  const judged = ds.filter(x => x.finished);
+  const ver = judged.filter(x => x.state === 'verified').length;
+  const unv = judged.filter(x => x.state === 'unverified').length;
+  const failed = judged.filter(x => x.state === 'failed').length;
+  const few = judged.length < MIN_N;
   const tok = ds.filter(x => !x.live && x.tokens !== undefined).map(x => x.tokens!).sort((a, b) => a - b);
   const medTok = tok.length ? tok[Math.floor((tok.length - 1) / 2)] : undefined;
-  const k = `<div class="kpis">${kpi(ds.length, 'Dispatches')}${kpi(ds.filter(x => x.live).length, 'Running')}${kpi(judged.length, 'Finished', '', 'with an observed end')}${kpi(judged.length >= MIN_N ? pct(ok / judged.length) : `${pct(judged.length ? ok / judged.length : undefined)}`, 'Success', judged.length && judged.length < MIN_N ? 'muted' : '', `DERIVED: ${ok} of ${judged.length} finished without a failure signal${judged.length < MIN_N ? ' · n < 5: not enough data' : ''}`)}${kpi(medTok === undefined ? '—' : compact(medTok), 'Median tokens Σ', '', T_TOK)}${kpi(ds.filter(x => x.spawnMatched).length, 'Spawn matched', '', 'OBSERVED: dispatches joined with the parent’s Task / spawn call')}</div>`;
+  const k = `<div class="kpis">${kpi(ds.length, 'Dispatches')}${kpi(ds.filter(x => x.live).length, 'Running')}${kpi(judged.length, 'Finished', '', 'with an observed end')}${kpi(`${ver} / ${judged.length}`, 'Verified / finished', few && judged.length ? 'muted' : '', `DERIVED: ${ver} of ${judged.length} finished dispatches verified by their own passing test or own git commit (${pct(judged.length ? ver / judged.length : undefined)})${few ? ' · n < 5: not enough data' : ''}`)}${kpi(unv, 'Unverified', '', `DERIVED: ${unv} of ${judged.length} finished with no failure signal but nothing that verifies them`)}${kpi(failed, 'Failed', failed ? 'k-fail' : '', `DERIVED: ${failed} of ${judged.length} with a failure signal`)}${kpi(medTok === undefined ? '—' : compact(medTok), 'Median tokens Σ', '', T_TOK)}${kpi(ds.filter(x => x.spawnMatched).length, 'Spawn matched', '', 'DERIVED: dispatches joined by time with a Task / spawn call the parent recorded (latest unused spawn at or before the worker start +10 s)')}</div>`;
   const body = tab === 'cost' ? costView(ds, st, pr) : logView(ds, st, pr);
   return `${bar}${note}${k}${body}`;
 }
@@ -229,7 +234,7 @@ export const dispatchView: ExtraView = {
   id: 'dispatch',
   label: 'Dispatches',
   group: 'Usage',
-  hint: 'Every worker dispatch with the spawn it came from, the tokens it actually used and its outcome; success rate vs cost per model.',
+  hint: 'Every worker dispatch with the spawn it came from, the tokens it actually used and its outcome (verified / unverified / failed); outcome rate vs cost per model.',
   ready: true,
   feeds: [workflowsFeed as Feed],
   render: (d, st) => `<div class="dp">${renderDispatch(d, st, snapOf())}</div>`,

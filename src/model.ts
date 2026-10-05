@@ -51,10 +51,21 @@ export interface CommitObservation {
 
 /** Token accounting exactly as the provider recorded it. Nothing is priced or estimated by Agent. */
 export interface SessionUsage {
-  /** Sum over model calls of prompt tokens (incl. cache) + output tokens. */
+  /** Sum over model calls of prompt tokens (incl. cache) + output tokens. Claude: DERIVED (cache reads are re-counted
+   *  on every call); Codex: the cumulative total_tokens it records. */
   totalTokens: number;
   outputTokens: number;
+  /** Cache reads (Claude cache_read_input_tokens, Codex cached_input_tokens). */
   cachedInputTokens: number;
+  /** New (uncached) input tokens, when the provider records them apart from cache reads / writes. */
+  inputTokens?: number;
+  /** Tokens written to the prompt cache (Claude cache_creation_input_tokens, Codex cache_write_input_tokens). */
+  cacheCreationInputTokens?: number;
+  /** Claude only, when recorded: cache creation split by cache lifetime (usage.cache_creation.ephemeral_5m / _1h). */
+  cacheCreation5mTokens?: number;
+  cacheCreation1hTokens?: number;
+  /** Codex only: reasoning_output_tokens (included in outputTokens as Codex records it). */
+  reasoningOutputTokens?: number;
   /** Prompt size of the latest model call, i.e. what the context window held. */
   contextTokens?: number;
   /** Only when the provider records the window size (Codex). */
@@ -124,9 +135,29 @@ export interface SessionFacts {
   modelTokens?: Record<string, number>;
   /** Per model call: [at, promptTokens, outputTokens], capped at the latest 2000 calls (token rhythm). */
   calls?: [number, number, number][];
-  /** Permission / approval / sandbox mode as recorded by the provider. */
+  /** Claude: latest transcript permissionMode (default, acceptEdits, plan, bypassPermissions …).
+   *  Codex: legacy alias of the approval policy kept for existing screens (they label it "approval");
+   *  new code should read `approvalPolicy` / `collaborationMode`. */
   permissionMode?: string;
   sandbox?: string;
+  /** Codex only: turn_context.approval_policy (an approval policy, not a permission mode). */
+  approvalPolicy?: string;
+  /** Codex only: permission profile id as recorded (active_permission_profile / permission_profile). */
+  permissionProfile?: string;
+  /** Codex only: collaboration mode (plan / default …) from turn_context.collaboration_mode.mode or
+   *  task_started.collaboration_mode_kind. "plan" is Codex plan mode. */
+  collaborationMode?: string;
+  /** Claude only: latest `{type:"mode"}` record value (e.g. normal). */
+  sessionMode?: string;
+  /** Recorded mode changes (Claude permissionMode / mode records, Codex collaboration mode), latest 50.
+   *  `at` is the record time, or the latest activity time when the record has none. */
+  modeChanges?: { at: number; field: 'permissionMode' | 'sessionMode' | 'collaborationMode'; value: string }[];
+  /** Claude only: pull requests the provider linked to the session (`pr-link` records), latest 20. OBSERVED. */
+  prLinks?: { at: number; url: string; number?: number; repository?: string }[];
+  /** Claude only: queue-operation records (prompts queued while the agent is busy), counted by operation. */
+  queueOps?: Record<string, number>;
+  /** Per compaction, as recorded (latest 50): Claude compactMetadata trigger / pre / post tokens, Codex window number. */
+  compacts?: { at: number; trigger?: string; preTokens?: number; postTokens?: number; durationMs?: number; window?: number }[];
   /** Git branch the provider recorded in the transcript (no git call). */
   recordedBranch?: string;
   /** Context compactions recorded. */

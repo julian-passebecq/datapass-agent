@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { readNewLines } from '../src/util/jsonl';
 import { bounded, redact, safeEnv } from '../src/util/redact';
-import { deriveStatus, isVerificationCommand, commandText, commandLabel, isGitCommit, testLabel } from '../src/sessions/classify';
+import { deriveStatus, isVerificationCommand, commandText, commandLabel, isGitCommit, testLabel, checkKind, testVerdict, endInferred, statusEvidenceOf } from '../src/sessions/classify';
 import { isInside, isPlausibleLocalPath } from '../src/util/paths';
 import { tmpDir } from './helpers';
 
@@ -56,7 +56,7 @@ test('safeEnv: only allow-listed variables, never a full snapshot', () => {
 });
 
 test('classify: verification commands by what runs, not by output text', () => {
-  for (const c of ['npm test', 'npm run test:unit', 'pnpm build', 'pytest -q', 'python -m pytest', 'cargo test', 'go test ./...', 'node --test out/', 'npx tsc --noEmit', 'dotnet test']) assert.ok(isVerificationCommand(c), c);
+  for (const c of ['npm test', 'npm run test:unit', 'pytest -q', 'python -m pytest', 'cargo test', 'go test ./...', 'node --test out/', 'dotnet test', './gradlew test', 'FOO=1 npx vitest run', '& npm test']) assert.ok(isVerificationCommand(c), c);
   for (const c of ['echo tests passed', 'git status', 'cat test.txt', 'ls tests']) assert.ok(!isVerificationCommand(c), c);
   assert.equal(commandText(['powershell.exe', '-Command', 'npm test']), 'npm test');
   assert.equal(commandText(['bash', '-lc', 'pytest']), 'pytest');
@@ -66,10 +66,33 @@ test('classify: verification commands by what runs, not by output text', () => {
   assert.ok(isVerificationCommand('npm.cmd test'), 'Windows npm shim');
   assert.equal(testLabel("printf 'x' > a.js && npm test && git commit -m x"), 'npm test · in command chain');
   assert.equal(testLabel('cd "D:/x" && pytest -q'), 'pytest -q');
-  assert.equal(testLabel('npm test 2>&1 | tail -n 5'), 'npm test 2>&1 | tail -n 5 · in command chain');
+  assert.equal(testLabel('npm test 2>&1 | tail -n 5'), 'npm test 2>&1 | tail -n 5 · piped');
+  assert.equal(testLabel('cd x && npm test | tail -n 5 && git commit -m y'), 'npm test | tail -n 5 · piped');
   assert.ok(isGitCommit('git -c safe.directory=C:/x add -A; git -c safe.directory=C:/x commit -m y'));
   assert.equal(commandLabel('cd "D:/PROJ/x" && npm test'), 'npm test');
   assert.equal(commandLabel('Set-Location D:\\x; pytest'), 'pytest');
+});
+
+test('classify: program at command position only; builds, lints, type checks are not tests', () => {
+  for (const c of ['grep -rn tsc src', 'git commit -m "fix jest "', 'cat README | grep pytest', 'git log --grep="npm test"', 'echo go build ok', 'rg "go test" docs', 'npm run build:docs', 'npm run lint', 'pnpm build', 'npx tsc --noEmit', 'cargo clippy', 'go vet ./...', "echo 'npm test' && ls"]) assert.ok(!isVerificationCommand(c), c);
+  assert.ok(isVerificationCommand('git status; npm test'), 'after ;');
+  assert.ok(isVerificationCommand('ls | npm test'), 'after |');
+  assert.equal(checkKind('npm run build:docs'), 'build');
+  assert.equal(checkKind('npm run lint'), 'lint');
+  assert.equal(checkKind('npx tsc --noEmit'), 'typecheck');
+  assert.equal(checkKind('go build ./... && go test ./...'), 'test');
+  assert.equal(checkKind('grep -rn tsc src'), undefined);
+});
+
+test('classify: test verdict trusts a chain / pipe only through a recorded exit code', () => {
+  assert.deepEqual(testVerdict({ command: 'npm test · piped', outcome: 'PASS', source: 'provider-tool-error-flag' }).outcome, 'UNKNOWN');
+  assert.deepEqual(testVerdict({ command: 'npm test · in command chain', outcome: 'FAIL', source: 'provider-tool-error-flag' }).outcome, 'UNKNOWN');
+  assert.deepEqual(testVerdict({ command: 'npm test 2>&1 | tail · in command chain', outcome: 'PASS', source: 'provider-tool-error-flag' }).outcome, 'UNKNOWN', 'legacy pipe label');
+  const p = testVerdict({ command: 'npm test · piped', outcome: 'PASS', source: 'provider-exit-code' });
+  assert.equal(p.outcome, 'PASS');
+  assert.match(p.basis, /whole pipeline/);
+  assert.equal(testVerdict({ command: 'npm test', outcome: 'PASS', source: 'provider-tool-error-flag' }).outcome, 'PASS');
+  assert.equal(testVerdict({ command: 'npm test', outcome: 'UNKNOWN', source: 'provider-exit-code' }).basis, 'test ran, outcome not recorded');
 });
 
 test('status derivation is conservative', () => {
@@ -85,6 +108,13 @@ test('status derivation is conservative', () => {
   assert.equal(deriveStatus({ lastActivityAt: now - 60_000 }, now, idle).status, 'IDLE');
   assert.equal(deriveStatus({ lastActivityAt: now - 7200_000 }, now, idle).status, 'UNKNOWN', 'no end event → not ENDED');
   assert.equal(deriveStatus({ explicitEnded: true }, now, idle).status, 'ENDED');
+  const gone = deriveStatus({ providerHasRegistry: true, lastActivityAt: now - 3600_000 }, now, idle);
+  assert.ok(endInferred({ status: gone.status, statusReason: gone.reason }), 'registry absence = inferred end');
+  assert.ok(!endInferred({ status: 'ENDED', statusReason: deriveStatus({ explicitEnded: true }, now, idle).reason }));
+  assert.deepEqual([statusEvidenceOf({ status: gone.status, statusReason: gone.reason }).text, statusEvidenceOf({ status: gone.status, statusReason: gone.reason }).kind], ['no longer active (inferred)', 'INFERRED']);
+  assert.equal(statusEvidenceOf({ status: 'NEEDS_INPUT', statusReason: 'live registry: waiting', provider: 'claude' }).text, 'needs input');
+  assert.match(statusEvidenceOf({ status: 'RUNNING', statusReason: 'live registry: busy', provider: 'claude' }).basis, /pid check/);
+  assert.equal(statusEvidenceOf({ status: 'RUNNING', statusReason: 'turn started, not completed, recent activity' }).kind, 'INFERRED');
 });
 
 test('paths: traversal and injected artifact paths are rejected', () => {

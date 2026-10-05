@@ -2,7 +2,7 @@
 // (skills, subagents, commands, plugins, hooks, MCP servers, settings keys, instruction files, CLI options).
 // Data: src/feeds/catalog.ts (fs reads; `--help` / `--version` only when trusted). Read-only; open / copy actions only.
 import type { ExtraView, ActCtx } from './kit';
-import { actBtn, seg, toolbar, opt } from './kit';
+import { actBtn, loadError, loading, seg, toolbar, opt } from './kit';
 import { Feed, FeedCtx, feedValue } from './feeds';
 import { esc } from '../html';
 import { ago, bytes, kpi, prettyModel, WsData, WsState } from '../workspace';
@@ -236,7 +236,7 @@ function instructionsTab(r: CatalogReport, st: WsState): string {
 
 function cliTab(st: WsState): string {
   const fs = feedValue<CliInfo[]>(CLI_FEED);
-  if (!fs.value) return empty(fs.error ? `CLI help unavailable: ${fs.error}` : 'Reading CLI help…');
+  if (!fs.value) return fs.error ? loadError(`CLI help unavailable: ${fs.error}`, 'refresh') : loading('catalog.cli', 'Reading CLI help…', { retry: 'refresh' });
   const tool = opt(st, 'catalog.cli', 'claude');
   const c = fs.value.find(x => x.tool === tool);
   const tb = toolbar(seg(st, 'catalog.cli', fs.value.map(x => [x.tool, `${x.tool === 'claude' ? 'Claude Code' : 'Codex'} ${x.flags.length || ''}`] as [string, string]), 'claude', 'Which CLI'));
@@ -276,7 +276,7 @@ function codexTab(r: CatalogReport, st: WsState): string {
 function render(d: WsData, st: WsState): string {
   const fs = feedValue<CatalogReport>(FEED);
   const r = fs.value;
-  if (!r) return fs.error ? `<div class="empty cat-bad">Could not read the catalog: ${esc(fs.error)}</div>` : '<div class="empty">Scanning Claude Code and Codex folders…</div>';
+  if (!r) return fs.error ? loadError(`Could not read the catalog: ${fs.error}`, 'refresh') : loading('catalog', 'Scanning Claude Code and Codex folders…', { retry: 'refresh' });
   const tab = opt(st, 'catalog.tab', 'skills') as Tab;
   const active = r.items.filter(i => i.active);
   const n = (k: CatItem['kind'], p: 'claude' | 'codex' = 'claude') => active.filter(i => i.kind === k && i.provider === p).length;

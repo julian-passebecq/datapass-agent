@@ -10,7 +10,7 @@ import { base, compact, identityColor, isLive } from '../../activity/insights';
 import { esc } from '../html';
 import { hhmm } from '../views';
 import { ago, kpi, prettyModel, repoOf, titleOf, WsData, WsState } from '../workspace';
-import { actBtn, ActCtx, ExtraView, opt, seg, toolbar } from './kit';
+import { actBtn, ActCtx, ExtraView, loading, opt, seg, toolbar } from './kit';
 import { Feed, FeedCtx, feedValue } from './feeds';
 import { squarify } from './explore';
 import { isPlausibleLocalPath, normalizeCase } from '../../util/paths';
@@ -192,7 +192,7 @@ function filesTab(d: WsData, st: WsState, c: Cfg, data: ChangesData | undefined,
   } else {
     const maxL = Math.max(1, ...shown.map(r => Math.max(r.added, r.removed)));
     body = `<table class="chg-t"><tr><th>${group === 'repo' ? '' : 'Repo'}</th><th>${unit}</th>${group !== 'file' ? '<th class="r">Files</th>' : ''}<th class="r" title="${esc(EV.lines)}">+</th><th class="r" title="${esc(EV.lines)}">−</th><th title="${esc(EV.lines)}"></th><th class="r" title="${esc(EV.edits)}">Edits</th><th title="sessions that touched it (commit window or edit call)">Sessions</th><th title="${esc(EV.wt)}">Uncommitted</th><th class="r">Last</th></tr>${shown
-      .map(r => `<tr class="${pick === hid(r.id) ? 'on' : ''}" data-opt="changes.pick" data-val="${hid(r.id)}"><td class="muted">${group === 'repo' ? `<span class="chg-sw" style="background:${identityColor(r.repo)}"></span>` : `<span class="chg-sw" style="background:${identityColor(r.repo)}"></span>${esc(r.repo)}`}</td><td>${label(r)}${r.overlap ? ' <span class="chg-warn" title="sessions with partially overlapping windows in one worktree: the same commit may be counted twice">≈</span>' : ''}</td>${group !== 'file' ? `<td class="r">${r.files ?? 1}</td>` : ''}<td class="r chg-a">${r.binary && !r.added ? '<span class="chg-bin">bin</span>' : r.git ? compact(r.added) : '<span class="muted" title="no commit in its sessions\' windows">·</span>'}</td><td class="r chg-r">${r.git && !(r.binary && !r.removed) ? compact(r.removed) : ''}</td><td class="chg-dc">${r.git ? divBar(r.added, r.removed, maxL) : ''}</td><td class="r">${r.edits || '<span class="muted">·</span>'}</td><td class="chg-nw">${sessDots(r.sessions, by)}</td><td>${wtChip(r.wt)}</td><td class="r muted" title="${esc(r.lastAt ? new Date(r.lastAt).toLocaleString() : '')}">${esc(r.lastAt ? ago(d.now, r.lastAt) : '')}</td></tr>`)
+      .map(r => `<tr class="${pick === hid(r.id) ? 'on' : ''}" data-opt="changes.pick" data-val="${hid(r.id)}"><td class="muted chg-repo" title="${esc(r.repo)}">${group === 'repo' ? `<span class="chg-sw" style="background:${identityColor(r.repo)}"></span>` : `<span class="chg-sw" style="background:${identityColor(r.repo)}"></span>${esc(r.repo)}`}</td><td>${label(r)}${r.overlap ? ' <span class="chg-warn" title="sessions with partially overlapping windows in one worktree: the same commit may be counted twice">≈</span>' : ''}</td>${group !== 'file' ? `<td class="r">${r.files ?? 1}</td>` : ''}<td class="r chg-a">${r.binary && !r.added ? '<span class="chg-bin">bin</span>' : r.git ? compact(r.added) : '<span class="muted" title="no commit in its sessions\' windows">·</span>'}</td><td class="r chg-r">${r.git && !(r.binary && !r.removed) ? compact(r.removed) : ''}</td><td class="chg-dc">${r.git ? divBar(r.added, r.removed, maxL) : ''}</td><td class="r">${r.edits || '<span class="muted">·</span>'}</td><td class="chg-nw">${sessDots(r.sessions, by)}</td><td>${wtChip(r.wt)}</td><td class="r muted" title="${esc(r.lastAt ? new Date(r.lastAt).toLocaleString() : '')}">${esc(r.lastAt ? ago(d.now, r.lastAt) : '')}</td></tr>`)
       .join('')}</table>`;
   }
   const more = rows.length > shown.length || hiddenNoise ? `<div class="foot">${rows.length > shown.length ? `${rows.length - shown.length} more ${unit.toLowerCase()}(s) not shown (raise “Rows”). ` : ''}${hiddenNoise ? `${hiddenNoise} lock / build file(s) hidden.` : ''}</div>` : '';
@@ -274,7 +274,7 @@ function worktreesTab(d: WsData, st: WsState, data: ChangesData | undefined, by:
     seg(st, 'changes.wshow', [['dirty', 'With uncommitted work'], ['live', 'With live sessions'], ['all', 'All inspected']], 'dirty', 'Which worktrees'),
     seg(st, 'changes.wlayout', [['cards', 'Cards'], ['table', 'Table']], 'cards', 'Layout'),
   );
-  if (!data) return tb + `<div class="empty">Reading worktrees…</div>`;
+  if (!data) return tb + loading('changes.git', 'Reading worktrees…', { retry: 'refresh' });
   const liveOf = (w: WorktreeChanges) => w.sessions.map(k => by.get(k)).filter((s): s is AgentSessionSnapshot => !!s && isLive(s));
   const wts = data.worktrees.filter(w => (show === 'dirty' ? wtCounts(w).dirty || !!w.error : show === 'live' ? liveOf(w).length > 0 : true));
   if (!wts.length) return tb + `<div class="empty">${data.worktrees.length ? `All ${data.worktrees.length} inspected worktree(s) are clean.` : 'No worktree of a live or recently active session.'}</div>`;
@@ -379,10 +379,10 @@ function render(d: WsData, st: WsState): string {
   const src = data?.off
     ? `<span class="chg-off" title="${esc(data.off)}">git off · ${esc(data.off)}</span>`
     : fs0.error
-      ? `<span class="chg-r" title="${esc(fs0.error)}">git error</span>`
+      ? `<span class="chg-r" title="${esc(fs0.error)}">git error</span> ${actBtn('refresh', '', 'Retry', 'Run the read-only git commands again now')}`
       : data
         ? `<span class="muted" title="read-only hardened git, 5 s timeout per call">git ${data.calls} call(s) · ${data.ms} ms${data.failed ? ` · ${data.failed} failed` : ''}${data.skipped ? ` · ${data.skipped} older window(s) skipped` : ''} · ${esc(hhmm(fs0.at))}</span>`
-        : `<span class="muted">reading git…</span>`;
+        : loading('changes.git', 'reading git…', { retry: 'refresh', inline: true });
   const tb = toolbar(
     seg(st, 'changes.tab', [['files', 'Files'], ['sessions', 'Sessions'], ['worktrees', 'Uncommitted'], ['heat', 'Edit heat']], 'files', 'View'),
     seg(st, 'changes.period', [['24h', '24 h'], ['7d', '7 d'], ['all', 'All loaded']], '24h', 'Period (session last activity); uncommitted state is always now'),
@@ -432,6 +432,7 @@ export const changesView: ExtraView = {
     return String(v.worktrees.filter(w => wtCounts(w).dirty && w.sessions.some(k => live.has(k))).length || '');
   },
   actions: {
+    refresh: (_arg, ctx) => ctx.refreshFeeds(),
     open: (arg, ctx) =>
       guarded(arg, ctx, async p => {
         if (!fs.existsSync(p) || !fs.statSync(p).isFile()) return ctx.info('Changes: file no longer exists (deleted or renamed).');
@@ -442,6 +443,7 @@ export const changesView: ExtraView = {
   },
   css: `
 .chg .chg-k { margin: 4px 0 8px; }
+.chg .chg-t td.chg-repo { white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 .chg .chg-ka b, .chg .chg-a { color: var(--ok); }
 .chg .chg-kr b, .chg .chg-r { color: var(--bad); }
 .chg .chg-a, .chg .chg-r { font-variant-numeric: tabular-nums; }

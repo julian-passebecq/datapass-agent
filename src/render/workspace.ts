@@ -3,7 +3,7 @@
 import { AgentSessionSnapshot, ProviderState, SourceState, TimelineEvent } from '../model';
 import { duration, weekly } from '../activity/activity';
 import { attention, AttentionItem, base, compact, dayStart, flow, hourly, identityColor, isLive, outcome, Outcome, OUTCOME_LABEL, stages, usageSince, verification, Verification, VERIFY_LABEL, workerRole } from '../activity/insights';
-import { esc } from './html';
+import { digitOf, esc } from './html';
 import { extraViews } from './extra';
 import { hhmm, statusText } from './views';
 
@@ -111,7 +111,7 @@ export function card(s: AgentSessionSnapshot, d: WsData, sel?: string, extra = '
   const u = usageLine(s);
   const act = live && s.lastAction ? `<div class="cl act">▸ ${esc(s.lastAction)} <span class="muted">${esc(ago(d.now, s.lastActionAt))}</span></div>` : '';
   return `<div class="card${sel === s.key ? ' sel' : ''}" style="--id:${identityColor(repoOf(s))}" data-select="${esc(s.key)}" tabindex="0" title="${esc(statusText(s) + ' — ' + s.statusReason)}">
-<div class="ct"><span class="dot ${s.status}"></span><b>${esc(titleOf(s))}</b><span class="right">${esc(dur)}</span></div>
+<div class="ct"><span class="dot ${s.status}"></span><b title="${esc(titleOf(s))}">${esc(titleOf(s))}</b><span class="right">${esc(dur)}</span></div>
 <div class="cl"><span class="who">${esc(who)}</span></div><div class="cl muted">${esc(where)}</div>${u ? `<div class="cl num">${esc(u)}</div>` : ''}${ctxBar(s)}${act}${extra}<div>${stageStrip(s)}</div></div>`;
 }
 
@@ -179,7 +179,7 @@ function board(d: WsData, st: WsState): string {
     ['ENDED', 'Ended · 24 h', top.filter(s => s.status === 'ENDED' && (s.endedAt ?? s.lastActivityAt ?? 0) >= today)],
   ];
   return `<div class="board">${cols
-    .map(([k, label, list]) => `<div class="col"><div class="colh"><span class="dot ${k}"></span>${esc(label)}<span class="n">${list.length}</span></div>${list.length ? list.slice(0, 40).map(s => card(s, d, st.selected)).join('') + (list.length > 40 ? `<div class="muted">… ${list.length - 40} more</div>` : '') : '<div class="empty">—</div>'}</div>`)
+    .map(([k, label, list]) => `<div class="col"><div class="colh"><span class="dot ${k}"></span>${esc(label)}<span class="n">${list.length}</span></div>${list.length ? list.slice(0, 40).map(s => card(s, d, st.selected)).join('') + (list.length > 40 ? `<div class="muted">… ${list.length - 40} more</div>` : '') : '<div class="empty">No session in this column.</div>'}</div>`)
     .join('')}</div>`;
 }
 
@@ -214,6 +214,9 @@ function nested(k: AgentSessionSnapshot, d: WsData): string {
   const n = d.sessions.filter(c => c.parentSessionId === k.key).length;
   return n ? `<div class="cl muted">${n} nested worker(s)</div>` : '';
 }
+
+/** Minimum vertical distance (svg units, ≈ one 12 px text line) between two node labels of a Sankey column. */
+const LABEL_GAP = 14;
 
 const OUT_COLOR: Record<Outcome, string> = { live: 'var(--ok)', committed: 'var(--accent)', changed: 'var(--warn)', nochange: 'var(--quiet)' };
 
@@ -269,11 +272,16 @@ function flowView(d: WsData, st: WsState): string {
     paths += `<path class="fl${pick === id ? ' on' : ''}" data-opt="flow.pick" data-val="${pick === id ? '' : id}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" stroke="${colorOf(ci + 1, l.to)}" stroke-width="${w.toFixed(1)}" fill="none"><title>${esc(`${lab(ci, l.from)} → ${lab(ci + 1, l.to)}: ${l.value} · click to list`)}</title></path>`;
   }
   cols.forEach((c, ci) => {
+    let lastY = -Infinity;
     c.forEach((n, i) => {
       const p = pos.get(`${ci}:${n}`)!;
       const id = `c${ci}-${i}`;
       const tx = ci === 0 ? p.x - 6 : p.x + nodeW + 6;
-      nodes += `<g class="fn${pick === id ? ' on' : ''}" data-opt="flow.pick" data-val="${pick === id ? '' : id}"><rect x="${p.x}" y="${p.y}" width="${nodeW}" height="${p.h}" rx="3" fill="${colorOf(ci, n)}"/><text class="halo" x="${tx}" y="${p.y + p.h / 2 + 4}" text-anchor="${ci === 0 ? 'end' : 'start'}">${esc(lab(ci, n))} <tspan class="muted">${val(ci, n)}</tspan></text><title>${esc(lab(ci, n))}: click to list</title></g>`;
+      const ty = p.y + p.h / 2 + 4;
+      // Labels closer than one text line to the previous one are left to the tooltip (small repo nodes).
+      const text = ty - lastY >= LABEL_GAP ? `<text class="halo" x="${tx}" y="${ty}" text-anchor="${ci === 0 ? 'end' : 'start'}">${esc(lab(ci, n))} <tspan class="muted">${val(ci, n)}</tspan></text>` : '';
+      if (text) lastY = ty;
+      nodes += `<g class="fn${pick === id ? ' on' : ''}" data-opt="flow.pick" data-val="${pick === id ? '' : id}"><rect x="${p.x}" y="${p.y}" width="${nodeW}" height="${p.h}" rx="3" fill="${colorOf(ci, n)}"/>${text}<title>${esc(`${lab(ci, n)}: ${val(ci, n)} · click to list`)}</title></g>`;
     });
   });
   const heads = ['Provider', 'Repository', 'Outcome', 'Verification'].map((h, i) => `<text class="fh" x="${xs[i] + (i === 0 ? nodeW : 0)}" y="8" text-anchor="${i === 0 ? 'end' : 'start'}">${h}</text>`).join('');
@@ -474,11 +482,16 @@ export function statusStrip(d: WsData): string {
   const live = d.sessions.filter(s => isLive(s));
   const byRepo = new Map<string, AgentSessionSnapshot[]>();
   for (const s of live) byRepo.set(repoOf(s), [...(byRepo.get(repoOf(s)) ?? []), s]);
-  const ticker = [...byRepo].sort((a, b) => b[1].length - a[1].length).map(([r, ss]) => `<span class="tk" title="${esc(`${r}: ${ss.length} live (${ss.filter(x => x.isWorker).length} workers)`)}"><span class="sw" style="background:${identityColor(r)}"></span>${esc(r)} ${ss.map(x => `<span class="sd ${x.status}" title="${esc(`${titleOf(x)} · ${statusText(x)}`)}"></span>`).join('')}</span>`).join('');
+  const repos = [...byRepo].sort((a, b) => b[1].length - a[1].length);
+  const ticker = repos.slice(0, FOOT_REPOS).map(([r, ss]) => `<span class="tk" title="${esc(`${r}: ${ss.length} live (${ss.filter(x => x.isWorker).length} workers)`)}"><span class="sw" style="background:${identityColor(r)}"></span>${esc(r)} ${ss.map(x => `<span class="sd ${x.status}" title="${esc(`${titleOf(x)} · ${statusText(x)}`)}"></span>`).join('')}</span>`).join('') + (repos.length > FOOT_REPOS ? `<span class="muted" title="${esc(repos.slice(FOOT_REPOS).map(([r, ss]) => `${r}: ${ss.length} live`).join('\n'))}">+${repos.length - FOOT_REPOS}</span>` : '');
   const st = d.stats;
-  const cost = st ? `<span title="Last refresh pass (DERIVED, host-measured)">refresh ${st.refreshMs} ms · git ${st.gitMs} ms · read ${bytes(st.bytesRead)} of ${st.artifacts} artifacts · heap ${st.heapMB} MB · ${hhmm(st.at)}</span>` : '';
-  return `<footer class="strip"><span class="tkr">${live.length ? `<b>${live.length} live</b> ${ticker}` : '<span class="muted">nothing live</span>'}</span><span class="muted">${cost}</span></footer>`;
+  const costText = st ? `refresh ${st.refreshMs} ms · git ${st.gitMs} ms · read ${bytes(st.bytesRead)} of ${st.artifacts} artifacts · heap ${st.heapMB} MB · ${hhmm(st.at)}` : '';
+  const cost = st ? `<span title="${esc(`Last refresh pass (DERIVED, host-measured): ${costText}`)}">${esc(costText)}</span>` : '';
+  return `<footer class="strip"><span class="tkr" title="${esc(repos.map(([r, ss]) => `${r}: ${ss.length} live`).join('\n'))}">${live.length ? `<b>${live.length} live</b> ${ticker}` : '<span class="muted">nothing live</span>'}</span><span class="muted">${cost}</span></footer>`;
 }
+
+/** Repository chips shown in the footer strip before "+k". */
+const FOOT_REPOS = 8;
 
 const RAIL_GROUPS = ['Now', 'Sessions', 'Time', 'Git', 'Usage', 'Quality', 'System'];
 const CORE_GROUP: Record<string, string> = { overview: 'Now', attention: 'Now', board: 'Sessions', team: 'Sessions', gantt: 'Time', worktrees: 'Git', activity: 'Usage', flow: 'Usage', verify: 'Quality', providers: 'System' };
@@ -521,7 +534,10 @@ export function renderWorkspace(d0: WsData, st0: WsState): string {
   const ext = new Map(extraViews().map(x => [x.id, x]));
   const label = (v: string) => (VIEW_LABEL as Record<string, string>)[v] ?? ext.get(v)?.label ?? v;
   const hint = (v: string) => (VIEW_HINT as Record<string, string>)[v] ?? ext.get(v)?.hint ?? '';
-  const navBtn = (v: string) => `<button class="nav${st.view === v ? ' on' : ''}" data-nav="${esc(v)}">${esc(label(v))}${badge[v] ? `<span class="nb${v === 'attention' || v === 'verify' ? ' hot' : ''}">${esc(badge[v])}</span>` : ''}</button>`;
+  const navBtn = (v: string) => {
+    const dk = digitOf(v);
+    return `<button class="nav${st.view === v ? ' on' : ''}" data-nav="${esc(v)}"${dk ? ` title="Shortcut: ${dk}" aria-keyshortcuts="${dk}"` : ''}>${esc(label(v))}${badge[v] ? `<span class="nb${v === 'attention' || v === 'verify' ? ' hot' : ''}">${esc(badge[v])}</span>` : ''}${dk ? `<kbd class="dk">${dk}</kbd>` : ''}</button>`;
+  };
   // Rail: every screen (core + add-on) in one of the groups, in a fixed reading order; groups collapse.
   const groupOf = (v: string) => CORE_GROUP[v] ?? ext.get(v)?.group ?? 'System';
   const all = [...WS_VIEWS, ...extraViews().map(x => x.id)];
@@ -536,8 +552,8 @@ export function renderWorkspace(d0: WsData, st0: WsState): string {
   const rail = `<nav class="rail"><div class="brand">Agent <button class="link" data-cmd="openWorkspaceNewTab" title="Open another Agent tab (own screen and scope)">+ tab</button></div>${groups.map(railGroup).join('')}<div class="railfoot">${d.providers.map(p => `<div><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span> ${esc(PROV[p.provider])} ${esc(p.version ?? '')}</div>`).join('')}${collectorSummary(d)}<div class="muted">local · read-only</div></div></nav>`;
   const body = bodies(d, st);
   if (!body[st.view]) st = { ...st, view: 'overview' };
-  const keys = `<div class="keys"><b>1–0</b> screens <b>j/k</b> move <b>Enter</b> inspect <b>/</b> filter <b>Esc</b> clear <b>r</b> refresh <b>?</b> keys</div>`;
-  const main = `<main class="mainw"><header class="mh"><h1>${esc(label(st.view))}</h1>${st.opts?.scope ? `<button class="link scope" data-opt="scope" data-val="" title="Clear scope">scope: ${esc(st.opts.scope)} ✕</button>` : ""}<span class="muted">${esc(hint(st.view))}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}${keys}${statusStrip(d)}</main>`;
+  const keys = `<div class="keys"><b>1–0</b> screens with a number in the rail <b>Tab</b> / <b>j/k</b> move <b>Space</b> select <b>Enter</b> inspect <b>/</b> filter <b>Esc</b> clear <b>r</b> refresh <b>?</b> keys</div>`;
+  const main = `<main class="mainw"><header class="mh"><h1>${esc(label(st.view))}</h1>${st.opts?.scope ? `<button class="link scope" data-opt="scope" data-val="" title="Clear scope">scope: ${esc(st.opts.scope)} ✕</button>` : ""}<span class="muted hint" title="${esc(hint(st.view))}">${esc(hint(st.view))}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}${keys}${statusStrip(d)}</main>`;
   return `<div class="ws">${rail}${main}<aside class="side">${side(d, st.selected)}</aside></div>`;
 }
 

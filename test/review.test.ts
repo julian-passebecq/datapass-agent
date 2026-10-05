@@ -155,6 +155,28 @@ test('review: lanes from sessions, commands and PR state', () => {
   assert.equal(items[0].lane, 'needs', 'sorted by lane order');
   const steps = new Map(lane.get('claude:ready')!.steps.map(s => [s.id, s.state]));
   assert.deepEqual([steps.get('edit'), steps.get('commit'), steps.get('push'), steps.get('pr'), steps.get('ci')], ['done', 'done', 'done', 'live', 'done']);
+  // Session↔PR link by branch name only: INFERRED (the PR state itself stays the forge's).
+  const ready = lane.get('claude:ready')!;
+  assert.equal(ready.prLink!.kind, 'INFERRED');
+  assert.match(ready.prLink!.basis, /matched by branch name/);
+  assert.equal(ready.kind, 'INFERRED');
+  assert.equal(ready.steps.find(x => x.id === 'pr')!.kind, 'INFERRED');
+  assert.match(ready.steps.find(x => x.id === 'commit')!.detail, /not proof the session made them/);
+  assert.equal(lane.get('claude:w-own')!.prLink?.kind ?? 'OBSERVED', 'OBSERVED', 'own push links by command when a PR exists');
+  // Absences are DERIVED "none observed", never OBSERVED.
+  const quiet = lane.get('claude:quiet')!;
+  assert.equal(quiet.kind, 'DERIVED');
+  for (const st of quiet.steps.filter(x => x.id === 'edit' || x.id === 'test' || x.id === 'commit')) {
+    assert.equal(st.kind, 'DERIVED', st.id);
+    assert.match(st.detail, /none observed/);
+  }
+  // A test that ran with no recorded outcome is not "no test".
+  const ran = reviewItems([mk({ key: 'claude:ran', tests: [{ command: 'npm test', at: NOW - 1000, outcome: 'UNKNOWN', source: 'provider-tool-error-flag' }] })], [], NOW)[0];
+  assert.match(ran.steps.find(x => x.id === 'test')!.detail, /test ran, outcome not recorded/);
+  // A piped test with only a tool error flag does not put the session in "needs" as a failure.
+  const piped = reviewItems([mk({ key: 'claude:pp', changedFiles: ['a'], tests: [{ command: 'npm test | tail · piped', at: NOW - 1000, outcome: 'FAIL', source: 'provider-tool-error-flag' }] })], [], NOW)[0];
+  assert.notEqual(piped.lane, 'needs');
+  assert.equal(piped.steps.find(x => x.id === 'test')!.kind, 'UNKNOWN');
   // Without PR state, the created PR still shows as In review from the command.
   const off = new Map(reviewItems(S, events, NOW).map(i => [i.s.key, i]));
   assert.equal(off.get('claude:created')!.lane, 'review');

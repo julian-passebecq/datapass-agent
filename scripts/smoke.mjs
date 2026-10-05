@@ -71,8 +71,37 @@ async function shot(win, name) {
   result.screenshots.push(path.basename(p));
 }
 
+/** True while the visible screen shows a loading marker or loading text (case-insensitive, ending in an ellipsis). */
+const LOADING = () => !!document.querySelector('main [data-loading]') || /\b(loading|scanning|reading)\b[^\n]{0,120}(…|\.\.\.)/i.test(document.querySelector('main')?.innerText ?? '');
+
+/** Narrow window (700 px): every rail screen must fit without a horizontal page scrollbar (tables scroll inside). */
+async function narrowPass(app, win, ws, theme, views) {
+  const before = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    const s = w.getSize();
+    w.setSize(700, s[1]);
+    return s;
+  });
+  await win.waitForTimeout(1500);
+  const over = [];
+  let width = 0;
+  for (const [view, heading] of views) {
+    await ws.frame.evaluate(v => document.querySelector(`[data-nav="${v}"]`)?.click(), view);
+    for (const t = Date.now(); Date.now() - t < 10_000; await win.waitForTimeout(250)) if ((await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent ?? '')) === heading) break;
+    await win.waitForTimeout(400);
+    const r = await ws.frame.evaluate(() => ({ w: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth }));
+    width = r.w;
+    if (r.sw > r.w + 1) over.push(`${view} +${r.sw - r.w}px`);
+    if (view === 'overview' || view === 'changes' || view === 'board') await shot(win, `9-narrow-${view}-${theme.toLowerCase()}`);
+  }
+  result.narrow = { window: 700, webview: width, overflow: over };
+  check(`${theme}: 700 px window, no horizontal page overflow on ${views.length} screens`, over.length === 0, over.join(', ') || `webview ${width} px`);
+  await app.evaluate(({ BrowserWindow }, s) => BrowserWindow.getAllWindows()[0].setSize(s[0], s[1]), before);
+  await win.waitForTimeout(1000);
+}
+
 /** Opens the Agent Workspace from the Cockpit button and walks its views. */
-async function workspacePass(win, ck, theme, views) {
+async function workspacePass(app, win, ck, theme, views) {
   await ck.frame.evaluate(() => document.querySelector('[data-cmd="openWorkspace"]')?.click());
   const ws = await webviewText(win, 'Live agents', 30_000);
   check(`${theme}: Agent Workspace opens (Overview)`, ws, ws ? '' : 'no workspace text');
@@ -94,26 +123,30 @@ async function workspacePass(win, ck, theme, views) {
     }
     const ms = Date.now() - t1;
     await win.waitForTimeout(900); // let async feeds of this screen land before the screenshot
-    // Feeds that are still loading show "Loading…": wait for them (up to 20 s) so the screenshot shows data.
+    // Feeds still loading show a [data-loading] marker or "Loading… / Scanning… / Reading…": wait for them (up to 20 s)
+    // so the screenshot shows data; screens still loading after that are recorded, not failed.
     const tf = Date.now();
-    while (Date.now() - tf < 20_000 && await ws.frame.evaluate(() => /Loading\b/.test(document.querySelector('main')?.innerText ?? ''))) await win.waitForTimeout(500);
+    let still = true;
+    while ((still = await ws.frame.evaluate(LOADING)) && Date.now() - tf < 20_000) await win.waitForTimeout(500);
     (result.feedMs ??= {})[`${theme}:${view}`] = Date.now() - tf;
+    if (still) (result.loadingTimeouts ??= []).push(`${theme}:${view}`);
     const body = await ws.frame.evaluate(() => (document.querySelector('main')?.innerText ?? '').length);
     (result.navMs ??= {})[`${theme}:${view}`] = ms;
     check(`${theme}: workspace view ${view}`, txt === heading && body > 40, `${txt} · ${body} chars · ${ms} ms`);
     await shot(win, `${theme === 'Dark' ? 1 : 2}${String(i).padStart(2, '0')}-workspace-${view}-${theme.toLowerCase()}`);
   }
-  // Keyboard: "2" switches to Attention; "/" filter hides non-matching sessions.
+  if (theme === 'Dark') await narrowPass(app, win, ws, theme, views);
+  // Keyboard: digits map to fixed screens (the rail shows the digit); "/" filter hides non-matching sessions.
   await ws.frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true })));
   await win.waitForTimeout(800);
-  const third = await ws.frame.evaluate(() => ([...document.querySelectorAll('[data-nav].nav')][2]?.childNodes[0]?.textContent ?? '').trim());
+  const third = await ws.frame.evaluate(() => (document.querySelector('.nav[aria-keyshortcuts="3"]')?.childNodes[0]?.textContent ?? '').trim());
   await ws.frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: '3', bubbles: true })));
   let h1 = '';
   for (const t2 = Date.now(); Date.now() - t2 < 15_000; await win.waitForTimeout(250)) {
     h1 = await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent ?? '');
     if (h1 === third) break;
   }
-  check(`${theme}: keyboard 3 opens the third screen (${third})`, h1 === third, h1);
+  check(`${theme}: keyboard 3 opens the screen numbered 3 in the rail (${third})`, !!third && h1 === third, h1);
   // Rail groups collapse and expand.
   const before = await ws.frame.evaluate(() => document.querySelectorAll('[data-nav].nav').length);
   await ws.frame.evaluate(() => [...document.querySelectorAll('.rg .railg')].pop()?.click());
@@ -196,7 +229,7 @@ try {
   await shot(win, '04-activity-dark');
 
   const ck2 = await webviewText(win, 'Open Agent workspace', 20_000);
-  if (ck2) await workspacePass(win, ck2, 'Dark', 'all');
+  if (ck2) await workspacePass(app, win, ck2, 'Dark', 'all');
   else check('Dark: Agent Workspace opens (Overview)', false, 'cockpit button not found');
 
   // Reload window and confirm reactivation
@@ -233,7 +266,7 @@ try {
     await ck.frame.evaluate(() => document.querySelector('[data-open]')?.click());
     await webviewText(win, 'Evidence', 20_000);
     await shot(win, '07-inspector-light');
-    await workspacePass(win, ck, 'Light', 'all');
+    await workspacePass(app, win, ck, 'Light', 'all');
   }
 } catch (e) {
   result.errors.push(String(e?.stack ?? e));
@@ -266,6 +299,7 @@ result.activationLog = activated;
 result.agentErrors = agentErrors;
 result.shutdownCancellations = shutdownNoise;
 if (shutdownNoise.length) console.log(`NOTE ${shutdownNoise.length} cancellation(s) logged while the extension host was terminating for reload`);
+if (result.loadingTimeouts?.length) console.log(`NOTE still loading after 20 s: ${result.loadingTimeouts.join(', ')}`);
 result.passed = result.checks.every(c => c.ok) && result.errors.length === 0;
 fs.writeFileSync(path.join(shots, '..', 'smoke-result.json'), JSON.stringify(result, null, 2));
 console.log(result.passed ? 'SMOKE PASS' : 'SMOKE FAIL');

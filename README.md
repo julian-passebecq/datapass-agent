@@ -90,6 +90,43 @@ Windows Task Scheduler, every Monday 08:00 (run `npm run compile-tests` once in 
 schtasks /Create /SC WEEKLY /D MON /ST 08:00 /TN "Agent weekly history" /TR "node <checkout>\out-test\scripts\weekly.js"
 ```
 
+## Model benchmarks
+
+The *Model benchmarks* screen (group Usage) plots cost versus quality of coding models from a local, week-by-week database: cost per task in USD on a log axis, score on the other axis (cost on x, or cost on y reversed), one dot per row (colour = vendor, shape = source), the Pareto frontier of each source as a line with its models labelled, and a Trend tab across weekly snapshots. Filters: source, vendor, model name, effort, *Only models I use* (models seen in your loaded sessions, name match INFERRED), week snapshot. Agent has no benchmark numbers of its own: everything comes from the sources below.
+
+```
+npm run benchmarks                 # Local workload + manual files, no network
+npm run benchmarks -- --fetch      # also downloads the public sources (opt-in network)
+```
+
+It writes `~/.agent/benchmarks/YYYY-Www.json` (current ISO week; folder: `--out <dir>` or the setting `agent.benchmarks.dir`) = `{week, capturedAt, updatedAt, sources: [{id, name, kind, url, license, fetchedAt, metric, costBasis}], rows: [{source, model, vendor, effort?, score, scoreUnit, costPerTask?, costUnit, tokensPerTask?, n?, notes?}]}`. Rerunning in the same week replaces the rows of the sources that run refreshed and keeps the others (a failed fetch keeps the earlier rows); older weeks are never touched or deleted. Writes go through a temp file + rename.
+
+Sources:
+
+- **Local workload** (DERIVED): your own dispatches of the last 7 days (`--local-days <n>`), per model [+ effort], from the Dispatches analytics: score = % of finished dispatches verified, median tokens per dispatch, n. A cost only when you set `agent.dispatch.pricePerMTok` (DERIVED from your setting). `--no-local` skips it, `--no-git` skips git correlation (commits then do not count as verification).
+- **Public** (only with `--fetch`, one HTTPS GET per source; `--source <id>` limits it): Aider polyglot leaderboard ([polyglot_leaderboard.yml](https://raw.githubusercontent.com/Aider-AI/aider/main/aider/website/_data/polyglot_leaderboard.yml), Apache-2.0): score = `pass_rate_2`, cost per task = `total_cost / test_cases` (runs recorded with `total_cost: 0` get no cost), tokens per task when the run recorded them. Rows are OBSERVED from the source, with its URL and fetch date. New sources are parsers in `PARSERS` (`src/activity/benchmarks.ts`).
+- **Manual** (numbers you copy yourself, for example from Artificial Analysis or CursorBench): one JSON file per source in `~/.agent/benchmarks/manual/`, imported at every run (a file you delete leaves the current week at the next run). Either an array of rows or `{source, rows}`. Clearly fake example (`manual/example.json`):
+
+```json
+{
+  "source": { "name": "Example board (FAKE)", "url": "https://example.invalid/board", "license": "copied by hand", "metric": "% solved", "costBasis": "USD per task as shown on the board" },
+  "rows": [
+    { "model": "fake-model-alpha", "vendor": "FakeCo", "effort": "high", "score": 12.3, "scoreUnit": "% solved", "costPerTask": 0.42, "costUnit": "USD", "n": 100 },
+    { "model": "fake-model-beta", "score": 45.6, "scoreUnit": "% solved" }
+  ]
+}
+```
+
+Rows need `model` and a numeric `score`; `vendor` is INFERRED from the model name when missing. The script reads only `agent.dispatch.pricePerMTok` and `agent.benchmarks.dir` from your VS Code user settings (`--settings <file>` for another file); `--dry` prints without writing.
+
+Weekly, next to the weekly history task (Monday 08:10, after `npm run compile-tests` once in the checkout):
+
+```
+schtasks /Create /SC WEEKLY /D MON /ST 08:10 /TN "Agent weekly benchmarks" /TR "node <checkout>\out-test\scripts\benchmarks.js"
+```
+
+Add ` --fetch` at the end of the `/TR` command to include the public sources, or run both in the existing task: `/TR "cmd /c node <checkout>\out-test\scripts\weekly.js & node <checkout>\out-test\scripts\benchmarks.js"`.
+
 ## Daily archive (nothing disappears)
 
 Claude Code deletes transcripts older than `cleanupPeriodDays` (default 30) and Codex rotates its data, so Agent keeps its own durable archive:

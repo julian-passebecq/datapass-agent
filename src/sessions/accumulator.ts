@@ -40,7 +40,7 @@ export class SessionAccumulator {
   usage?: SessionUsage;
   lastAction?: string;
   lastActionAt?: number;
-  private lastUsage?: { id: string; total: number; out: number; cached: number };
+  private lastUsage?: { id: string; total: number; out: number; cached: number; extra: CallUsageExtra };
   malformed = 0;
   seenIds = new Set<string>();
   /** Long-lived one-shot markers (e.g. "start", "meta"); never trimmed. */
@@ -84,17 +84,20 @@ export class SessionAccumulator {
   }
 
   /** Adds one model call's usage. A repeated id (one message split over several records) replaces its earlier contribution. */
-  addCallUsage(id: string, prompt: number, out: number, cached: number): void {
+  addCallUsage(id: string, prompt: number, out: number, cached: number, extra: CallUsageExtra = {}): void {
     const u = (this.usage ??= { totalTokens: 0, outputTokens: 0, cachedInputTokens: 0 });
     if (this.lastUsage?.id === id) {
       u.totalTokens -= this.lastUsage.total;
       u.outputTokens -= this.lastUsage.out;
       u.cachedInputTokens -= this.lastUsage.cached;
+      for (const k of EXTRA_KEYS) if (this.lastUsage.extra[k] !== undefined) u[k] = (u[k] ?? 0) - this.lastUsage.extra[k]!;
     }
-    this.lastUsage = { id, total: prompt + out, out, cached };
+    this.lastUsage = { id, total: prompt + out, out, cached, extra: { ...extra } };
     u.totalTokens += prompt + out;
     u.outputTokens += out;
     u.cachedInputTokens += cached;
+    // Optional fields exist only once the provider recorded them at least once.
+    for (const k of EXTRA_KEYS) if (extra[k] !== undefined) u[k] = (u[k] ?? 0) + extra[k]!;
     u.contextTokens = prompt;
   }
 
@@ -248,14 +251,57 @@ export class SessionAccumulator {
     this.fx.v++;
   }
 
-  /** Latest recorded value of a string fact (permission mode, sandbox, entrypoint, branch). */
-  setFact(field: 'permissionMode' | 'sandbox' | 'entrypoint' | 'recordedBranch', value: unknown, max = 60): void {
+  /** Latest recorded value of a string fact (permission mode, sandbox, entrypoint, branch …).
+   *  Mode fields also keep a bounded list of changes (`at` = record time, else the latest activity time). */
+  setFact(field: StringFact, value: unknown, max = 60, at?: number): void {
     if (typeof value !== 'string' || !value) return;
     const v = bounded(value, max);
-    if (this.fx.strings[field] !== v) {
-      this.fx.strings[field] = v;
-      this.fx.v++;
+    const prev = this.fx.strings[field];
+    if (prev === v) return;
+    this.fx.strings[field] = v;
+    this.fx.v++;
+    if (field === 'permissionMode' || field === 'sessionMode' || field === 'collaborationMode') {
+      const when = at ?? this.lastActivityAt;
+      if (when === undefined) return;
+      this.fx.modeChanges.push({ at: when, field, value: v });
+      if (this.fx.modeChanges.length > MAX_MODE_CHANGES * 1.5) this.fx.modeChanges = this.fx.modeChanges.slice(-MAX_MODE_CHANGES);
+      if (prev !== undefined) this.event(when, 'SESSION_ACTIVITY', `${MODE_LABEL[field]} → ${v}`, 'OBSERVED');
     }
+  }
+
+  /** A pull request the provider linked to this session (Claude `pr-link`). Deduplicated by URL, latest 20 kept. */
+  prLink(at: number | undefined, url: unknown, num: unknown, repo: unknown): void {
+    if (typeof url !== 'string' || !/^https?:\/\/[^\s<>"]{1,300}$/.test(url)) return;
+    const fx = this.fx;
+    const i = fx.prLinks.findIndex(p => p.url === url);
+    if (i >= 0) fx.prLinks.splice(i, 1);
+    const n = typeof num === 'number' && Number.isInteger(num) && num > 0 ? num : undefined;
+    const r = typeof repo === 'string' && repo ? bounded(repo, 120) : undefined;
+    fx.prLinks.push({ at: at ?? this.lastActivityAt ?? 0, url, ...(n !== undefined ? { number: n } : {}), ...(r ? { repository: r } : {}) });
+    if (fx.prLinks.length > MAX_PR_LINKS) fx.prLinks.splice(0, fx.prLinks.length - MAX_PR_LINKS);
+    fx.v++;
+  }
+
+  /** One queue-operation record (enqueue / dequeue / remove …), counted by operation (at most 10 keys). */
+  queueOp(op: unknown): void {
+    const k = typeof op === 'string' && /^[a-z_-]{1,20}$/i.test(op) ? op : 'other';
+    const q = this.fx.queue;
+    if (!(k in q) && Object.keys(q).length >= 10) return;
+    q[k] = (q[k] ?? 0) + 1;
+    this.fx.v++;
+  }
+
+  /** One context compaction with what the provider recorded about it (latest 50 kept). */
+  compactInfo(c: CompactInfo): void {
+    const e: CompactInfo = { at: c.at };
+    if (typeof c.trigger === 'string' && c.trigger) e.trigger = bounded(c.trigger, 20);
+    for (const k of ['preTokens', 'postTokens', 'durationMs', 'window'] as const) {
+      const x = c[k];
+      if (typeof x === 'number' && Number.isFinite(x) && x >= 0) e[k] = x;
+    }
+    this.fx.compacts.push(e);
+    if (this.fx.compacts.length > MAX_COMPACTS * 1.5) this.fx.compacts = this.fx.compacts.slice(-MAX_COMPACTS);
+    this.fx.v++;
   }
 
   /** Latest provider rate-limit sample (Codex token_count.rate_limits); keeps a short used-% history. */
@@ -362,6 +408,14 @@ export class SessionAccumulator {
       calls: fx.calls.length ? fx.calls.slice(-MAX_CALLS) : undefined,
       permissionMode: fx.strings.permissionMode,
       sandbox: fx.strings.sandbox,
+      approvalPolicy: fx.strings.approvalPolicy,
+      permissionProfile: fx.strings.permissionProfile,
+      collaborationMode: fx.strings.collaborationMode,
+      sessionMode: fx.strings.sessionMode,
+      modeChanges: fx.modeChanges.length ? fx.modeChanges.slice(-MAX_MODE_CHANGES).map(m => ({ ...m })) : undefined,
+      prLinks: fx.prLinks.length ? fx.prLinks.map(p => ({ ...p })) : undefined,
+      queueOps: Object.keys(fx.queue).length ? { ...fx.queue } : undefined,
+      compacts: fx.compacts.length ? fx.compacts.slice(-MAX_COMPACTS).map(c => ({ ...c })) : undefined,
       recordedBranch: fx.strings.recordedBranch,
       compactions: alt('compactions'),
       spawns: fx.spawns.length ? fx.spawns.slice() : undefined,
@@ -442,6 +496,17 @@ export const MAX_RESULT_SAMPLES = 200;
 const MAX_RESULT_NAMES = 500;
 
 type AltField = 'prompts' | 'replies' | 'compactions' | 'web';
+type StringFact = 'permissionMode' | 'sandbox' | 'entrypoint' | 'recordedBranch' | 'approvalPolicy' | 'permissionProfile' | 'collaborationMode' | 'sessionMode';
+type ModeField = 'permissionMode' | 'sessionMode' | 'collaborationMode';
+type CompactInfo = { at: number; trigger?: string; preTokens?: number; postTokens?: number; durationMs?: number; window?: number };
+const MODE_LABEL: Record<ModeField, string> = { permissionMode: 'permission mode', sessionMode: 'mode', collaborationMode: 'collaboration mode' };
+const MAX_MODE_CHANGES = 50;
+const MAX_PR_LINKS = 20;
+const MAX_COMPACTS = 50;
+
+/** Optional per-call usage fields, summed only when the provider recorded them. */
+export type CallUsageExtra = Partial<Pick<SessionUsage, 'inputTokens' | 'cacheCreationInputTokens' | 'cacheCreation5mTokens' | 'cacheCreation1hTokens' | 'reasoningOutputTokens'>>;
+const EXTRA_KEYS = ['inputTokens', 'cacheCreationInputTokens', 'cacheCreation5mTokens', 'cacheCreation1hTokens', 'reasoningOutputTokens'] as const;
 
 class FactsState {
   /** Bumped on every change; the built SessionFacts object is cached per version. */
@@ -456,7 +521,11 @@ class FactsState {
   lastCall?: { id: string; model: string; total: number; idx: number };
   spawns: { at: number; type: string; description: string }[] = [];
   mcp = new Map<string, number>();
-  strings: { permissionMode?: string; sandbox?: string; entrypoint?: string; recordedBranch?: string } = {};
+  strings: Partial<Record<StringFact, string>> = {};
+  modeChanges: { at: number; field: ModeField; value: string }[] = [];
+  prLinks: { at: number; url: string; number?: number; repository?: string }[] = [];
+  queue: Record<string, number> = {};
+  compacts: CompactInfo[] = [];
   agentDoneAt?: number;
   waitMaxMs = 0;
   waitTotalMs = 0;
