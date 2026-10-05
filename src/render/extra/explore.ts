@@ -5,6 +5,7 @@ import {
   cross, Dim, DIM_LABEL, DIMS, fmtMetric, Gran, Group, isDim, isMetric, isPeriod, Metric, METRIC_INFO, METRICS, naturalOrder,
   Period, pivot, pivotCsv, series, slug, TIME_DIMS, topN,
 } from '../../activity/explore';
+import { endObserved } from '../../activity/audit';
 import { identityColor } from '../../activity/insights';
 import { esc } from '../html';
 import type { WsData, WsState } from '../workspace';
@@ -73,6 +74,20 @@ function colorOf(dim: Dim, key: string): string {
 
 const evTitle = (m: Metric) => `${METRIC_INFO[m].kind}: ${METRIC_INFO[m].basis}`;
 
+/**
+ * "≥ " when the metric is a duration and one of the sessions has no recorded end: its time stops at the last
+ * recorded activity (or now while live), so the value is a lower bound (audit A3 P2-15).
+ */
+export function atLeast(m: Metric, keys: Iterable<string>, by: Map<string, AgentSessionSnapshot>): string {
+  if (m !== 'active') return '';
+  for (const k of keys) {
+    const s = by.get(k);
+    if (s && !endObserved(s)) return '≥ ';
+  }
+  return '';
+}
+const GE_NOTE = '; ≥ = at least one session has no recorded end, its time stops at the last recorded activity';
+
 function valTitle(c: Cfg, g: Group, total: number): string {
   const share = total > 0 ? ` · ${((100 * g.value) / total).toFixed(1)} %` : '';
   return `${DIM_LABEL[c.dim]} ${g.key}: ${fmtMetric(c.metric, g.value)} ${METRIC_INFO[c.metric].label.toLowerCase()}${share} · ${g.sessions.length} session(s) · ${METRIC_INFO[c.metric].kind}`;
@@ -106,8 +121,8 @@ function table(c: Cfg, groups: Group[], total: number, sessionsBy: Map<string, A
   const max = Math.max(...groups.map(g => g.value), 0) || 1;
   const repos = (g: Group) => new Set(g.sessions.map(k => sessionsBy.get(k)).filter(Boolean).map(s => repoOf(s!))).size;
   return `<table class="ex-t"><tr><th>${esc(DIM_LABEL[c.dim])}</th><th class="r" title="${esc(evTitle(c.metric))}">${esc(METRIC_INFO[c.metric].label)}</th><th></th><th class="r">Share</th><th class="r">Sessions</th><th class="r">Per session</th><th class="r">Repos</th></tr>${groups
-    .map(g => `<tr class="${c.pick === slug(g.key) ? 'on' : ''}"${pickAttr(c, g.key)} title="${esc(valTitle(c, g, total))}"><td><span class="ex-sw" style="background:${colorOf(c.dim, g.key)}"></span>${esc(g.key)}</td><td class="r"><b>${esc(fmtMetric(c.metric, g.value))}</b></td><td class="ex-tb"><i style="width:${((100 * g.value) / max).toFixed(2)}%;background:${colorOf(c.dim, g.key)}"></i></td><td class="r muted">${total > 0 ? ((100 * g.value) / total).toFixed(1) + ' %' : '—'}</td><td class="r">${g.sessions.length}</td><td class="r muted">${g.sessions.length ? esc(fmtMetric(c.metric, g.value / g.sessions.length)) : '—'}</td><td class="r muted">${repos(g)}</td></tr>`)
-    .join('')}<tr class="ex-tot"><td>Total</td><td class="r"><b>${esc(fmtMetric(c.metric, total))}</b></td><td></td><td></td><td class="r">${new Set(groups.flatMap(g => g.sessions)).size}</td><td></td><td></td></tr></table>`;
+    .map(g => `<tr class="${c.pick === slug(g.key) ? 'on' : ''}"${pickAttr(c, g.key)} title="${esc(valTitle(c, g, total))}"><td><span class="ex-sw" style="background:${colorOf(c.dim, g.key)}"></span>${esc(g.key)}</td><td class="r"><b>${esc(atLeast(c.metric, g.sessions, sessionsBy) + fmtMetric(c.metric, g.value))}</b></td><td class="ex-tb"><i style="width:${((100 * g.value) / max).toFixed(2)}%;background:${colorOf(c.dim, g.key)}"></i></td><td class="r muted">${total > 0 ? ((100 * g.value) / total).toFixed(1) + ' %' : '—'}</td><td class="r">${g.sessions.length}</td><td class="r muted">${g.sessions.length ? esc(fmtMetric(c.metric, g.value / g.sessions.length)) : '—'}</td><td class="r muted">${repos(g)}</td></tr>`)
+    .join('')}<tr class="ex-tot"><td>Total</td><td class="r"><b>${esc(atLeast(c.metric, groups.flatMap(g => g.sessions), sessionsBy) + fmtMetric(c.metric, total))}</b></td><td></td><td></td><td class="r">${new Set(groups.flatMap(g => g.sessions)).size}</td><td></td><td></td></tr></table>`;
 }
 
 interface Rect {
@@ -248,7 +263,7 @@ function drill(c: Cfg, g: Group | undefined, d: WsData, st: WsState): string {
   const rows = list.map(s => ({ s, v: val(s) })).sort((a, b) => b.v - a.v || (b.s.lastActivityAt ?? 0) - (a.s.lastActivityAt ?? 0));
   return `<h2>${esc(DIM_LABEL[c.dim])} · ${esc(g.key)} · ${list.length} session(s) <button class="link" data-opt="explore.pick" data-val="">✕</button></h2><table class="ex-t ex-dr">${rows
     .slice(0, 40)
-    .map(({ s, v }) => `<tr class="${st.selected === s.key ? 'sel' : ''}" data-select="${esc(s.key)}" tabindex="0"><td><span class="dot ${esc(s.status)}"></span> ${esc(titleOf(s).slice(0, 60))}${s.isWorker ? ' <span class="muted">worker</span>' : ''}</td><td class="muted"><span class="ex-sw" style="background:${identityColor(repoOf(s))}"></span>${esc(repoOf(s))}</td><td class="muted">${esc(s.provider)}</td><td class="r"><b>${esc(fmtMetric(c.metric, v))}</b></td></tr>`)
+    .map(({ s, v }) => `<tr class="${st.selected === s.key ? 'sel' : ''}" data-select="${esc(s.key)}" tabindex="0"><td><span class="dot ${esc(s.status)}"></span> ${esc(titleOf(s).slice(0, 60))}${s.isWorker ? ' <span class="muted">worker</span>' : ''}</td><td class="muted"><span class="ex-sw" style="background:${identityColor(repoOf(s))}"></span>${esc(repoOf(s))}</td><td class="muted">${esc(s.provider)}</td><td class="r"><b>${esc(atLeast(c.metric, [s.key], by) + fmtMetric(c.metric, v))}</b></td></tr>`)
     .join('')}</table>${rows.length > 40 ? `<div class="muted">… ${rows.length - 40} more</div>` : ''}`;
 }
 
@@ -286,7 +301,8 @@ function render(d: WsData, st: WsState): string {
   const sessionsBy = new Map(d.sessions.map(s => [s.key, s]));
   const info = METRIC_INFO[c.metric];
   const lead = p.groups.length ? [...p.groups].sort((a, b) => b.value - a.value)[0] : undefined;
-  const kpis = `<div class="kpis ex-k"><div class="kpi" title="${esc(evTitle(c.metric))}"><b>${esc(fmtMetric(c.metric, p.total))}</b><span>${esc(info.label)}</span></div><div class="kpi" title="DERIVED: sessions whose last activity falls in the period"><b>${p.sessionCount}</b><span>Sessions in period</span></div><div class="kpi" title="DERIVED: distinct ${esc(DIM_LABEL[c.dim].toLowerCase())} values with a non-zero piece"><b>${p.groups.length}</b><span>${esc(DIM_LABEL[c.dim])} groups</span></div>${lead && p.total > 0 ? `<div class="kpi" title="${esc(valTitle(c, lead, p.total))}"><b>${((100 * lead.value) / p.total).toFixed(0)} %</b><span>top: ${esc(lead.key.slice(0, 24))}</span></div>` : ''}</div>`;
+  const geTotal = atLeast(c.metric, p.groups.flatMap(g => g.sessions), sessionsBy);
+  const kpis = `<div class="kpis ex-k"><div class="kpi" title="${esc(evTitle(c.metric) + (geTotal ? GE_NOTE : ''))}"><b>${esc(geTotal + fmtMetric(c.metric, p.total))}</b><span>${esc(info.label)}</span></div><div class="kpi" title="DERIVED: sessions whose last activity falls in the period"><b>${p.sessionCount}</b><span>Sessions in period</span></div><div class="kpi" title="DERIVED: distinct ${esc(DIM_LABEL[c.dim].toLowerCase())} values with a non-zero piece"><b>${p.groups.length}</b><span>${esc(DIM_LABEL[c.dim])} groups</span></div>${lead && p.total > 0 ? `<div class="kpi" title="${esc(`DERIVED: share of the largest group · ${valTitle(c, lead, p.total)}`)}"><b>${((100 * lead.value) / p.total).toFixed(0)} %</b><span>top: ${esc(lead.key.slice(0, 24))}</span></div>` : ''}</div>`;
 
   let body: string;
   if (!p.sessionCount) body = `<div class="empty">No session active in this period. Try a longer period or All loaded (loaded history follows <code>agent.historyDays</code>).</div>`;

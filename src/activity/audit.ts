@@ -85,6 +85,21 @@ export function statusEvidence(s: AgentSessionSnapshot): { kind: EvidenceKind; s
 }
 
 /**
+ * True when the session's end is recorded by the provider (OBSERVED end time). Durations of any other
+ * session stop at its last recorded activity (or now while live), so they are lower bounds: show them with "≥".
+ */
+export function endObserved(s: AgentSessionSnapshot): boolean {
+  return s.status === 'ENDED' && s.endedAt !== undefined && statusEvidence(s).kind === 'OBSERVED';
+}
+
+/** The status rests on an alive check (registry pid signal-0, or an end inferred from a gone registry entry). */
+export function aliveInferred(s: AgentSessionSnapshot, st = statusEvidence(s)): boolean {
+  if (s.evidence.some(e => e.field === 'status.alive' && e.kind === 'INFERRED')) return true;
+  if (/process alive: inferred/i.test(st.source)) return true;
+  return s.status === 'ENDED' && st.kind === 'INFERRED';
+}
+
+/**
  * Every transition of the given sessions, newest first. `events` may hold events of other sessions
  * (they are ignored). Sessions give start / end / status / commits / tests (complete lists); events
  * give workers, git commit commands, failed commands, provider errors and compactions.
@@ -141,11 +156,13 @@ export function transitions(sessions: AgentSessionSnapshot[], events: TimelineEv
     push(s, startAt, s.isWorker ? 'worker-started' : 'started', s.isWorker ? `worker ${s.workerLabel ?? ''}`.trim() : 'session started', os ? 'OBSERVED' : 'DERIVED', os ? 'first session record' : 'earliest record timestamp');
 
     const st = statusEvidence(s);
+    // Transitions that rest on an alive check carry an "(inferred)" suffix (audit A3 P2-15).
+    const inf = aliveInferred(s, st) ? ' (inferred)' : '';
     if (s.status === 'ENDED') {
-      if (s.endedAt) push(s, s.endedAt, s.isWorker ? 'worker-ended' : 'ended', s.isWorker ? 'worker ended' : 'session ended', st.kind, st.source);
-      else push(s, s.lastActivityAt, s.isWorker ? 'worker-ended' : 'ended', 'ended (time of last record)', 'INFERRED', st.source);
-    } else if (s.status === 'NEEDS_INPUT') push(s, s.lastActivityAt, 'needs-input', 'waiting for you since the last record', st.kind, st.source);
-    else if (s.status === 'IDLE') push(s, s.lastActivityAt, 'idle', 'turn completed; thread open', st.kind, st.source);
+      if (s.endedAt) push(s, s.endedAt, s.isWorker ? 'worker-ended' : 'ended', (s.isWorker ? 'worker ended' : 'session ended') + inf, st.kind, st.source);
+      else push(s, s.lastActivityAt, s.isWorker ? 'worker-ended' : 'ended', 'ended at the time of the last record (inferred)', 'INFERRED', st.source);
+    } else if (s.status === 'NEEDS_INPUT') push(s, s.lastActivityAt, 'needs-input', 'waiting for you since the last record' + inf, st.kind, st.source);
+    else if (s.status === 'IDLE') push(s, s.lastActivityAt, 'idle', 'turn completed; thread open' + inf, st.kind, st.source);
     else if (s.status === 'UNKNOWN') push(s, s.lastActivityAt, 'stalled', s.statusReason, 'INFERRED', st.source);
 
     for (const c of s.commits)
