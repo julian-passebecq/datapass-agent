@@ -9,6 +9,7 @@ import { forecastView } from './forecast';
 import { healthView } from './health';
 import { historyView } from './history';
 import { launcherView } from './launcher';
+import { limitsView } from './limits';
 import { liveView } from './live';
 import { pipelinesView } from './pipelines';
 import { projectsView } from './projects';
@@ -38,6 +39,7 @@ export function allExtra(): ExtraView[] {
   healthView,
   historyView,
   launcherView,
+  limitsView,
   liveView,
   pipelinesView,
   projectsView,

@@ -1,8 +1,9 @@
 import * as path from 'path';
-import { AgentSessionSnapshot, SessionFacts, SessionUsage, Evidence, EventType, EvidenceKind, Provider, TestObservation, TimelineEvent, sessionKey } from '../model';
+import { AgentSessionSnapshot, RateLimits, SessionFacts, SessionUsage, Evidence, EventType, EvidenceKind, Provider, TestObservation, TimelineEvent, sessionKey } from '../model';
 import { Cursor } from '../util/jsonl';
 import { bounded } from '../util/redact';
 import { LiveSignal } from './classify';
+import { windowKind } from '../activity/limits';
 
 export const MAX_EVENTS = 400;
 export const MAX_FILES = 500;
@@ -232,6 +233,28 @@ export class SessionAccumulator {
     }
   }
 
+  /** Latest provider rate-limit sample (Codex token_count.rate_limits); keeps a short used-% history. */
+  rateLimits(rl: RateLimits): void {
+    const fx = this.fx;
+    const prev = fx.rate;
+    if (prev && rl.at < prev.at) return;
+    const hist = prev?.history ?? [];
+    let p: number | null = null, q: number | null = null;
+    for (const slot of ['primary', 'secondary'] as const) {
+      const w = rl[slot];
+      const k = w && windowKind(w, slot);
+      if (k === '5h') p = w!.usedPercent;
+      else if (k === 'weekly') q = w!.usedPercent;
+    }
+    const last = hist[hist.length - 1];
+    if (!last || last[1] !== p || last[2] !== q) {
+      hist.push([rl.at, p, q]);
+      if (hist.length > 360) hist.splice(0, hist.length - 300);
+    }
+    fx.rate = { ...rl, history: hist };
+    fx.v++;
+  }
+
   /** Read-only view for tests and adapters. */
   get pendingToolCount(): number {
     return this.fx.pending.size;
@@ -269,6 +292,7 @@ export class SessionAccumulator {
       waitTotalMs: fx.waitTotalMs || undefined,
       activeMs: fx.lastTick !== undefined ? fx.activeMs : undefined,
       entrypoint: fx.strings.entrypoint,
+      rateLimits: fx.rate && { ...fx.rate, history: fx.rate.history?.slice(-300) },
     };
     for (const k of Object.keys(facts) as (keyof SessionFacts)[]) if (facts[k] === undefined) delete facts[k];
     this.factsCache = { v: fx.v, cwd, facts };
@@ -344,6 +368,7 @@ class FactsState {
   waitTotalMs = 0;
   activeMs = 0;
   lastTick?: number;
+  rate?: RateLimits;
 }
 
 /** Evidence for the facts block: what is read vs computed. */

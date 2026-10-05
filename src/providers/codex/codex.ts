@@ -8,6 +8,7 @@ import { readNewLines, safeParse, toMs } from '../../util/jsonl';
 import { isInside, isPlausibleLocalPath } from '../../util/paths';
 import { bounded } from '../../util/redact';
 import { ArtifactRef, ProviderAdapter } from '../types';
+import { parseRateLimits } from '../../activity/limits';
 import { cmpVersion } from '../claude/claude';
 
 const MAX_PARSE_LINE = 512 * 1024;
@@ -244,6 +245,8 @@ export class CodexAdapter implements ProviderAdapter {
         return;
       }
       case 'token_count': {
+        const rl = at !== undefined ? parseRateLimits(p.rate_limits, at) : undefined;
+        if (rl) acc.rateLimits(rl);
         const t = p.info?.total_token_usage, l = p.info?.last_token_usage;
         const n = (x: unknown) => (typeof x === 'number' && x >= 0 ? x : 0);
         if (!t || typeof t !== 'object') return;
