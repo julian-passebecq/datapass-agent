@@ -188,7 +188,25 @@ export function parseCommits(out: string): CommitInfo[] {
 
 export const isDirty = (d?: DirtyCounts) => !!d && d.staged + d.unstaged + d.untracked + d.conflicts > 0;
 
-const norm = (p: string) => path.resolve(p).replace(/[\\/]+$/, '').toLowerCase();
+// Canonical form of an existing path: Windows 8.3 short names (C:\Users\RUNNER~1), junctions and symlinks are
+// expanded, so a session cwd under %TEMP% and the long path Git records for a linked worktree compare equal.
+const canonCache = new Map<string, string>();
+function canonical(p: string): string {
+  const abs = path.resolve(p);
+  let c = canonCache.get(abs);
+  if (c === undefined) {
+    try {
+      c = fs.realpathSync.native(abs);
+    } catch {
+      c = abs;
+    }
+    if (canonCache.size > 500) canonCache.clear();
+    canonCache.set(abs, c);
+  }
+  return c;
+}
+
+const norm = (p: string) => canonical(p).replace(/[\\/]+$/, '').toLowerCase();
 
 /** Worktree (longest path prefix) a session works in, or undefined. */
 export function worktreeOf(s: AgentSessionSnapshot, worktrees: { path: string }[]): string | undefined {
@@ -225,7 +243,7 @@ async function pool<T, R>(items: T[], n: number, fn: (t: T) => Promise<R>): Prom
 async function rootOf(run: GitRunner, cwd: string): Promise<string | undefined> {
   const out = await run(cwd, ['rev-parse', '--git-common-dir']);
   if (!out) return undefined;
-  const common = path.resolve(cwd, out.trim());
+  const common = canonical(path.resolve(cwd, out.trim()));
   return path.basename(common) === '.git' ? path.dirname(common) : common;
 }
 

@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
+import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AgentSessionSnapshot } from '../src/model';
@@ -81,10 +82,11 @@ test('loadRepos reads a real repo with a linked worktree, dirty state and upstre
   git(repo, ['stash', 'push', '-q', '-m', 'one']);
   const live = snap({ key: 'claude:live', status: 'RUNNING', cwd: wt, lastActivityAt: Date.now() });
   const snapR = await loadRepos([live, snap({ key: 'codex:b', provider: 'codex', cwd: repo, lastActivityAt: Date.now() - 1000 })], { ...REPOS_DEFAULTS, timeoutMs: 15_000 });
-  assert.equal(snapR.repos.length, 1);
+  const seen = JSON.stringify(snapR.repos.map(x => ({ repository: x.repository, error: x.error, worktrees: x.worktrees.map(w => w.path) })));
+  assert.equal(snapR.repos.length, 1, `one repository for the main checkout and its worktree: ${seen}`);
   const r = snapR.repos[0];
-  assert.equal(r.error, undefined);
-  assert.equal(r.worktrees.length, 2);
+  assert.equal(r.error, undefined, seen);
+  assert.equal(r.worktrees.length, 2, seen);
   const main = r.worktrees.find(w => w.main)!;
   const feat = r.worktrees.find(w => !w.main)!;
   assert.equal(feat.branch, 'feat');
@@ -108,6 +110,30 @@ test('loadRepos reads a real repo with a linked worktree, dirty state and upstre
   }
   assert.equal(reposView.badge!(d as never), '2');
   clearFeeds();
+});
+
+/** Windows 8.3 short form of an existing path (as os.tmpdir() returns on CI runners), or the path itself. */
+function shortPath(p: string): string {
+  if (process.platform !== 'win32') return p;
+  try {
+    return execSync(`for %I in ("${p}") do @echo %~sI`, { windowsHide: true, shell: 'cmd.exe' }).toString().trim() || p;
+  } catch {
+    return p;
+  }
+}
+
+test('loadRepos groups a checkout and its worktree when session paths use 8.3 short names', { skip: process.platform !== 'win32' }, async () => {
+  const { repo } = makeRepo();
+  const wt = path.join(tmpDir('wt'), 'long-worktree-name');
+  git(repo, ['worktree', 'add', '-q', '-b', 'feat', wt]);
+  const sRepo = shortPath(repo);
+  const sWt = shortPath(wt);
+  if (sRepo === repo && sWt === wt) return; // 8.3 names disabled on this volume
+  const live = snap({ key: 'claude:live', status: 'RUNNING', cwd: sWt, lastActivityAt: Date.now() });
+  const snapR = await loadRepos([live, snap({ key: 'codex:b', provider: 'codex', cwd: sRepo, lastActivityAt: 1 })], { ...REPOS_DEFAULTS, timeoutMs: 15_000 });
+  assert.equal(snapR.repos.length, 1, JSON.stringify(snapR.repos.map(x => x.repository)));
+  const feat = snapR.repos[0].worktrees.find(w => !w.main)!;
+  assert.equal(worktreeOf(live, snapR.repos[0].worktrees), feat.path);
 });
 
 test('repos screen escapes branch names and handles empty / untrusted states', () => {
