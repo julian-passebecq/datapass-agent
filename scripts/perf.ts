@@ -24,6 +24,7 @@ interface Row {
   bytes: number;
   ingested: number;
   longestMs: number;
+  storeSyncMs?: number;
   firstEmitMs?: number;
   emits: number;
   rssMB: number;
@@ -55,6 +56,7 @@ async function pass(store: SessionStore, label: string): Promise<Row> {
     bytes: st.bytesRead,
     ingested: st.ingested,
     longestMs: Math.round(h.max / 1e6),
+    storeSyncMs: st.longestSyncMs,
     firstEmitMs,
     emits,
     rssMB: Math.round(process.memoryUsage().rss / 2 ** 20),
@@ -137,6 +139,7 @@ function table(rows: Row[]): string {
     ['ingested', r => r.ingested],
     ['read', r => (r.bytes > 1e6 ? `${(r.bytes / 1e6).toFixed(1)} MB` : `${r.bytes} B`)],
     ['longest', r => `${r.longestMs} ms`],
+    ['storeSync', r => `${r.storeSyncMs ?? '-'} ms`],
     ['emits', r => r.emits],
     ['rss', r => `${r.rssMB} MB`],
   ];
