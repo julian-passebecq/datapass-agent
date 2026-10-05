@@ -4,6 +4,7 @@ import { ExtraView, KIT_CSS } from './kit';
 import { auditView } from './audit';
 import { backlogView } from './backlog';
 import { changesView } from './changes';
+import { codexView } from './codex';
 import { exploreView } from './explore';
 import { forecastView } from './forecast';
 import { healthView } from './health';
@@ -34,6 +35,7 @@ export function allExtra(): ExtraView[] {
   auditView,
   backlogView,
   changesView,
+  codexView,
   exploreView,
   forecastView,
   healthView,
