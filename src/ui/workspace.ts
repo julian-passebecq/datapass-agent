@@ -33,6 +33,14 @@ export class WorkspacePanel implements vscode.Disposable {
     return !!this.panel;
   }
 
+  /** Whether this panel is on screen (git correlation of ended sessions pauses while no Agent view is). */
+  get visible(): boolean {
+    return !!this.panel?.visible;
+  }
+
+  /** Called when the panel shows, hides or closes. */
+  onVisibility?: () => void;
+
   open(view?: WsView, selected?: string, opts?: Record<string, string>): void {
     if (view) this.state.view = view;
     if (selected) this.state.selected = selected;
@@ -64,14 +72,24 @@ export class WorkspacePanel implements vscode.Disposable {
         this.state.selected = msg.key;
         return this.render();
       }
+      if (msg.type === 'clear') {
+        if (this.state.selected === undefined) return;
+        this.state.selected = undefined;
+        return this.render();
+      }
       this.onMessage(msg);
     });
-    p.onDidChangeViewState(e => e.webviewPanel.visible && this.render(true));
+    p.onDidChangeViewState(e => {
+      if (e.webviewPanel.visible) this.render(true);
+      this.onVisibility?.();
+    });
     p.onDidDispose(() => {
       this.panel = undefined;
+      this.onVisibility?.();
       this.onClosed?.(this);
     });
     this.panel = p;
+    this.onVisibility?.();
     this.updateTitle();
     p.webview.html = page(p.webview.cspSource, this.body(), { filter: true, css: extraCss() });
   }
@@ -159,7 +177,7 @@ export class WorkspacePanel implements vscode.Disposable {
     const full = visibleViews(this.state.view, this.state.opts, allViews()).includes('activity');
     const events = full ? this.store.timeline(undefined, 200_000) : this.state.selected ? this.store.timeline(this.state.selected) : [];
     this.pumpFeeds();
-    return renderWorkspace({ sessions: this.store.all(), providers: this.store.providerStates, events, now: Date.now(), ternAvailable: this.ternAvailable(), git: { enabled: this.store.opts.git, lastMs: this.store.lastStats?.gitMs, at: this.store.lastStats?.at }, idleAlertMinutes: vscode.workspace.getConfiguration('agent').get<number>('idleAlertMinutes', 30), timeline: (k, n) => this.store.timeline(k, n), stats: this.stats(), config: (k, f) => vscode.workspace.getConfiguration('agent').get(k.replace(/^agent\./, ''), f) }, this.state);
+    return renderWorkspace({ sessions: this.store.all(), providers: this.store.providerStates, events, now: Date.now(), ternAvailable: this.ternAvailable(), git: { enabled: this.store.opts.git, lastMs: this.store.lastStats?.gitMs, at: this.store.lastStats?.at, progress: { ...this.store.gitProgress } }, idleAlertMinutes: vscode.workspace.getConfiguration('agent').get<number>('idleAlertMinutes', 30), timeline: (k, n) => this.store.timeline(k, n), stats: this.stats(), config: (k, f) => vscode.workspace.getConfiguration('agent').get(k.replace(/^agent\./, ''), f) }, this.state);
   }
 
   private stats() {

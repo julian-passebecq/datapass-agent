@@ -246,7 +246,11 @@ document.addEventListener('keydown', e => {
   if (e.key === '?') { root.querySelector('.keys')?.scrollIntoView({ block: 'end' }); return; }
   if (e.key === 'Escape') {
     if (q && q.value) { q.value = ''; applyFilter(); decorate(); }
-    else if (document.activeElement && root.contains(document.activeElement)) document.activeElement.blur();
+    else {
+      if (document.activeElement && root.contains(document.activeElement)) document.activeElement.blur();
+      // Esc with no filter to clear: drop the selection (the host re-renders without it).
+      vscode.postMessage({ type: 'clear', key: '' });
+    }
     return;
   }
   if (['j', 'k', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
@@ -307,6 +311,7 @@ export type WebviewMessage =
   | { type: 'ready'; key: '' }
   | { type: 'open'; key: string }
   | { type: 'select'; key: string }
+  | { type: 'clear'; key: '' }
   | { type: 'nav'; view: string; key: '' }
   | { type: 'opt'; name: string; value: string; key: string }
   | { type: 'act'; name: string; arg: string; key: '' }
@@ -323,6 +328,7 @@ export function validateMessage(m: unknown, knownKey: (k: string) => boolean): W
   if (o.type === 'ready' && key === '') return { type: 'ready', key: '' };
   if (o.type === 'open' && knownKey(key)) return { type: 'open', key };
   if (o.type === 'select' && knownKey(key)) return { type: 'select', key };
+  if (o.type === 'clear' && key === '') return { type: 'clear', key: '' };
   if (o.type === 'nav' && key === '' && typeof o.view === 'string' && ((NAV_VIEWS as readonly string[]).includes(o.view) || EXTRA_NAV.has(o.view))) return { type: 'nav', view: o.view, key: '' };
   if (o.type === 'opt' && typeof o.name === 'string' && /^[a-z0-9.-]{1,40}$/.test(o.name) && typeof o.value === 'string' && /^[a-z0-9._:-]{0,40}$/.test(o.value) && (key === '' || knownKey(key))) return { type: 'opt', name: o.name, value: o.value, key };
   if (o.type === 'act' && key === '' && typeof o.name === 'string' && /^[a-z0-9.-]{1,40}$/.test(o.name) && typeof o.arg === 'string' && o.arg.length <= 1000) return { type: 'act', name: o.name, arg: o.arg, key: '' };

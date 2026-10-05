@@ -6,6 +6,7 @@ import { attention, AttentionItem, base, compact, dayStart, flow, hourly, identi
 import { digitOf, esc } from './html';
 import { extraViews } from './extra';
 import { hhmm, statusText } from './views';
+import { endInferred } from '../sessions/classify';
 
 export const WS_VIEWS = ['overview', 'attention', 'board', 'team', 'flow', 'worktrees', 'gantt', 'verify', 'activity', 'providers'] as const;
 export type CoreView = (typeof WS_VIEWS)[number];
@@ -32,7 +33,7 @@ export interface WsData {
   ternAvailable: boolean;
   idleAlertMinutes?: number;
   /** Git correlation collector state (from the store). */
-  git?: { enabled: boolean; lastMs?: number; at?: number };
+  git?: { enabled: boolean; lastMs?: number; at?: number; progress?: { done: number; total: number } };
   /** Lazy access to the store's event history for screens that need more than `events`. */
   timeline?: (key?: string, limit?: number) => TimelineEvent[];
   /** Reads an `agent.*` setting at render time ("agent.x" or "x"). */
@@ -105,13 +106,13 @@ export function ctxBar(s: AgentSessionSnapshot): string {
 
 export function card(s: AgentSessionSnapshot, d: WsData, sel?: string, extra = ''): string {
   const live = isLive(s);
-  const dur = live ? duration(d.now - (s.startedAt ?? d.now)) : hhmm(s.endedAt ?? s.lastActivityAt);
+  const dur = live ? duration(d.now - (s.startedAt ?? d.now)) : endTime(s);
   const who = [PROV[s.provider], prettyModel(s.model), s.effort].filter(Boolean).join(' · ');
   const where = [repoOf(s), s.branch ?? (s.detachedHead ? 'detached' : ''), s.isLinkedWorktree ? `wt ${base(s.worktree)}` : ''].filter(Boolean).join(' · ');
   const u = usageLine(s);
   const act = live && s.lastAction ? `<div class="cl act">▸ ${esc(s.lastAction)} <span class="muted">${esc(ago(d.now, s.lastActionAt))}</span></div>` : '';
   return `<div class="card${sel === s.key ? ' sel' : ''}" style="--id:${identityColor(repoOf(s))}" data-select="${esc(s.key)}" tabindex="0" title="${esc(statusText(s) + ' — ' + s.statusReason)}">
-<div class="ct"><span class="dot ${s.status}"></span><b title="${esc(titleOf(s))}">${esc(titleOf(s))}</b><span class="right">${esc(dur)}</span></div>
+<div class="ct"><span class="dot ${s.status}"></span><b title="${esc(titleOf(s))}">${esc(titleOf(s))}</b><span class="right"${!live && endInferred(s) ? ` title="${esc(END_INFERRED_TIP)}"` : ''}>${esc(dur)}</span></div>
 <div class="cl"><span class="who">${esc(who)}</span></div><div class="cl muted">${esc(where)}</div>${u ? `<div class="cl num">${esc(u)}</div>` : ''}${ctxBar(s)}${act}${extra}<div>${stageStrip(s)}</div></div>`;
 }
 
@@ -133,7 +134,7 @@ function overview(d: WsData, st: WsState): string {
   const commits = new Set(d.sessions.flatMap(s => s.commits).filter(c => c.at >= today).map(c => c.sha));
   const u = usageSince(d.sessions, today);
   const workers = d.sessions.filter(s => s.isWorker && isLive(s)).length;
-  let h = `<div class="kpis big">${kpi(live.filter(s => s.status === 'RUNNING').length, 'Running', 'k-run')}${kpi(live.filter(s => s.status === 'NEEDS_INPUT').length, 'Needs input', 'k-need')}${kpi(live.filter(s => s.status === 'IDLE').length, 'Idle', 'k-idle')}${kpi(workers, 'Live workers')}${kpi(att.filter(a => a.severity !== 'low').length, 'Attention', att.some(a => a.severity === 'high') ? 'k-need' : '')}${kpi(todays.length, 'Sessions 24 h')}${kpi(commits.size, 'Commits 24 h')}${kpi(`${tests.filter(t => t.outcome === 'PASS').length}/${tests.length}`, 'Tests pass 24 h', tests.some(t => t.outcome === 'FAIL') ? 'k-fail' : '', 'observed test/build commands in the last 24 hours')}${kpi(compact(u.tokens), 'Tokens 24 h', '', `provider-recorded tokens of ${u.sessions} session(s) active in the last 24 hours (whole-session totals)`)}${u.costSessions ? kpi(`$${u.costUSD.toFixed(2)}`, 'Cost recorded', '', `sum of Claude Code cost-state over ${u.costSessions} session(s) active in the last 24 hours (whole-session totals); Codex records no cost`) : ''}</div>`;
+  let h = `<div class="kpis big">${kpi(live.filter(s => s.status === 'RUNNING').length, 'Running', 'k-run')}${kpi(live.filter(s => s.status === 'NEEDS_INPUT').length, 'Needs input', 'k-need')}${kpi(live.filter(s => s.status === 'IDLE').length, 'Idle', 'k-idle')}${kpi(workers, 'Live workers')}${kpi(att.filter(a => a.severity !== 'low').length, 'Attention', att.some(a => a.severity === 'high') ? 'k-need' : '')}${kpi(todays.length, 'Sessions 24 h')}${kpi(commits.size, 'Commits 24 h', '', COMMIT_CAVEAT)}${kpi(`${tests.filter(t => t.outcome === 'PASS').length}/${tests.length}`, 'Tests pass 24 h', tests.some(t => t.outcome === 'FAIL') ? 'k-fail' : '', 'observed test/build commands in the last 24 hours')}${kpi(compact(u.tokens), 'Tokens 24 h', '', `provider-recorded tokens of ${u.sessions} session(s) active in the last 24 hours (whole-session totals)`)}${u.costSessions ? kpi(`$${u.costUSD.toFixed(2)}`, 'Cost recorded', '', `sum of Claude Code cost-state over ${u.costSessions} session(s) active in the last 24 hours (whole-session totals); Codex records no cost`) : ''}</div>`;
   h += `<div class="cols"><div><h2>Live agents · ${live.length}</h2>${live.length ? `<div class="grid">${live.map(s => card(s, d, st.selected, workersLine(s, d))).join('')}</div>` : '<div class="empty">No live session. Ended sessions are on the Board.</div>'}</div>`;
   h += `<div><h2>Needs attention · ${att.length}</h2>${att.length ? attList(att.slice(0, 6), d, st) : '<div class="empty">Nothing needs you.</div>'}${att.length > 6 ? `<button class="link" data-nav="attention">all ${att.length} items →</button>` : ''}</div></div>`;
   h += `<h2>Last 24 hours</h2>${gantt(d, st, 14)}`;
@@ -430,6 +431,30 @@ export function side(d: WsData, key: string | undefined): string {
   return h + resultCard(s, d.now) + sideRest(d, s, kids, parent);
 }
 
+/** Tooltip of an end time that is only inferred (no end event recorded; the registry entry is gone). */
+export const END_INFERRED_TIP = 'INFERRED: no end recorded by the provider; this is the time of the last record';
+
+/** End time of a non-live session; an inferred end is shown as "inactive HH:MM", never as an observed end. */
+export function endTime(s: AgentSessionSnapshot): string {
+  return endInferred(s) ? `inactive ${hhmm(s.lastActivityAt)}` : hhmm(s.endedAt ?? s.lastActivityAt);
+}
+
+/** Caveat on commit counts: commits in a session's time window are not proof the session made them. */
+export const COMMIT_CAVEAT = 'DERIVED from git: commits made in the repository during the session window. Not proof the session made them (only a recorded `git commit` by the session is).';
+
+/** Commit count with its caveat: how many the session itself ran, the rest only fall in its time window. */
+export function commitCount(s: AgentSessionSnapshot): string {
+  const n = s.commits.length;
+  if (!n) return '0';
+  const own = s.commits.filter(c => c.attribution === 'session-ran-git-commit').length;
+  return `<span title="${esc(COMMIT_CAVEAT)}">${n}${own < n ? '<sup>*</sup>' : ''}</span>${own < n ? `<span class="caveat muted" style="display:block;font-size:10px;font-weight:400">${own ? `${own} ran by session; ` : ''}${n - own} in window, not proof</span>` : ''}`;
+}
+
+/** Inspector jump bar: opens the workspace on a per-session screen with this session selected. */
+export function inspectorJumps(key: string): string {
+  return `<div class="jumps" data-key="${esc(key)}">Workspace: <button class="link" data-nav="replay" title="Open the Replay screen for this session">Replay</button> · <button class="link" data-nav="hud" title="Open the HUD screen with this session selected">HUD</button></div>`;
+}
+
 /** Session result: duration, model, HEAD before→after, commits, files, lines, tests, tokens, cost, context, stages. */
 export function resultCard(s: AgentSessionSnapshot, now: number): string {
   const pass = s.tests.filter(t => t.outcome === 'PASS').length, fail = s.tests.filter(t => t.outcome === 'FAIL').length;
@@ -437,7 +462,7 @@ export function resultCard(s: AgentSessionSnapshot, now: number): string {
   const cell = (label: string, v: string, cls = '') => `<div class="rc ${cls}"><span>${esc(label)}</span><b>${v}</b></div>`;
   const u = s.usage;
   let h = '';
-  h += `<div class="rcard">${cell('Duration', esc(duration((live ? now : (s.lastActivityAt ?? now)) - (s.startedAt ?? now))))}${cell('Model', esc([prettyModel(s.model), s.effort].filter(Boolean).join(' · ') || '—'))}${cell('HEAD', `<code>${esc(s.headBefore?.slice(0, 7) ?? '?')}</code> → <code>${esc(s.headAfter?.slice(0, 7) ?? '?')}</code>`)}${cell('Commits', String(s.commits.length), s.commits.length ? 'ok' : '')}${cell('Files', String(s.changedFiles.length))}${cell('Lines', s.linesAdded !== undefined ? `<span class="pass">+${s.linesAdded}</span> <span class="fail">−${s.linesRemoved ?? 0}</span>` : '—')}${cell('Tests', s.tests.length ? `<span class="pass">${pass}✓</span> <span class="fail">${fail}✗</span>` : '—', fail && s.tests[s.tests.length - 1].outcome === 'FAIL' ? 'bad' : '')}${cell('Tokens', u ? esc(compact(u.totalTokens)) : '—')}${u?.costUSD !== undefined ? cell('Cost (recorded)', `$${u.costUSD.toFixed(2)}`) : ''}${u?.contextTokens ? cell('Context', esc(u.contextWindow ? `${Math.round((100 * u.contextTokens) / u.contextWindow)}%` : compact(u.contextTokens))) : ''}</div>${ctxBar(s)}`;
+  h += `<div class="rcard">${cell(!live && endInferred(s) ? 'Duration (to last record)' : 'Duration', esc(duration((live ? now : (s.lastActivityAt ?? now)) - (s.startedAt ?? now))))}${cell('Model', esc([prettyModel(s.model), s.effort].filter(Boolean).join(' · ') || '—'))}${cell('HEAD', `<code>${esc(s.headBefore?.slice(0, 7) ?? '?')}</code> → <code>${esc(s.headAfter?.slice(0, 7) ?? '?')}</code>`)}${cell('Commits', commitCount(s), s.commits.length ? 'ok' : '')}${cell('Files', String(s.changedFiles.length))}${cell('Lines', s.linesAdded !== undefined ? `<span class="pass">+${s.linesAdded}</span> <span class="fail">−${s.linesRemoved ?? 0}</span>` : '—')}${cell('Tests', s.tests.length ? `<span class="pass">${pass}✓</span> <span class="fail">${fail}✗</span>` : '—', fail && s.tests[s.tests.length - 1].outcome === 'FAIL' ? 'bad' : '')}${cell('Tokens', u ? esc(compact(u.totalTokens)) : '—')}${u?.costUSD !== undefined ? cell('Cost (recorded)', `$${u.costUSD.toFixed(2)}`) : ''}${u?.contextTokens ? cell('Context', esc(u.contextWindow ? `${Math.round((100 * u.contextTokens) / u.contextWindow)}%` : compact(u.contextTokens))) : ''}</div>${ctxBar(s)}`;
   h += `<div class="sidestages">${stageStrip(s)}</div>`;
   return h;
 }
@@ -487,7 +512,10 @@ export function statusStrip(d: WsData): string {
   const st = d.stats;
   const costText = st ? `refresh ${st.refreshMs} ms · git ${st.gitMs} ms · read ${bytes(st.bytesRead)} of ${st.artifacts} artifacts · heap ${st.heapMB} MB · ${hhmm(st.at)}` : '';
   const cost = st ? `<span title="${esc(`Last refresh pass (DERIVED, host-measured): ${costText}`)}">${esc(costText)}</span>` : '';
-  return `<footer class="strip"><span class="tkr" title="${esc(repos.map(([r, ss]) => `${r}: ${ss.length} live`).join('\n'))}">${live.length ? `<b>${live.length} live</b> ${ticker}` : '<span class="muted">nothing live</span>'}</span><span class="muted">${cost}</span></footer>`;
+  // Git correlation progress while a pass runs (OBSERVED: counted by the store); nothing when idle.
+  const gp = d.git?.progress;
+  const prog = gp && gp.total > 0 && gp.done < gp.total ? `<span class="gitp" title="${esc(`Git correlation in progress (OBSERVED, counted while it runs): ${gp.done} of ${gp.total} sessions`)}">git ${gp.done}/${gp.total}</span> · ` : '';
+  return `<footer class="strip"><span class="tkr" title="${esc(repos.map(([r, ss]) => `${r}: ${ss.length} live`).join('\n'))}">${live.length ? `<b>${live.length} live</b> ${ticker}` : '<span class="muted">nothing live</span>'}</span><span class="muted">${prog}${cost}</span></footer>`;
 }
 
 /** Repository chips shown in the footer strip before "+k". */

@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
-import { SessionStore } from '../sessions/store';
+import { SessionStore, viewNeedsRender } from '../sessions/store';
 import { weekly } from '../activity/activity';
 import { page, validateMessage, WebviewMessage } from '../render/html';
 import { renderActivity, renderCockpit, renderInspector, renderTimeline } from '../render/views';
+import { inspectorJumps } from '../render/workspace';
 
 type Kind = 'cockpit' | 'timeline' | 'activity';
 
@@ -11,15 +12,35 @@ function post(w: vscode.Webview, html: string): void {
   void w.postMessage({ type: 'render', html });
 }
 
-/** Sidebar webview views. Rendering is throttled; hidden views are not rendered. */
+/** Last build of a view: store version and wall time (see `viewNeedsRender`). */
+interface Built {
+  version: number;
+  at: number;
+}
+
+/** Sidebar webview views. Rendering is throttled; hidden views and idle store notifications build no page. */
 export class AgentView implements vscode.WebviewViewProvider, vscode.Disposable {
   private view?: vscode.WebviewView;
   private timer?: NodeJS.Timeout;
   private sub: { dispose(): void };
+  private built: Built = { version: -1, at: 0 };
   focusKey?: string;
+  /** Called when the view shows or hides. */
+  onVisibility?: () => void;
 
   constructor(private kind: Kind, private store: SessionStore, private onMessage: (m: WebviewMessage) => void) {
-    this.sub = store.onDidChange(() => this.schedule());
+    this.sub = store.onDidChange(() => this.storeChanged());
+  }
+
+  get visible(): boolean {
+    return !!this.view?.visible;
+  }
+
+  /** A store notification: nothing to do while hidden or when the projection did not move (idle refresh). */
+  private storeChanged(): void {
+    if (!this.view?.visible) return;
+    if (!viewNeedsRender({ version: this.store.version, renderedVersion: this.built.version, renderedAt: this.built.at, feedPending: false, now: Date.now() })) return;
+    this.schedule();
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -31,8 +52,16 @@ export class AgentView implements vscode.WebviewViewProvider, vscode.Disposable 
       if (msg.type === 'ready') this.render(true);
       else this.onMessage(msg);
     });
-    view.onDidChangeVisibility(() => view.visible && this.render(true));
+    view.onDidChangeVisibility(() => {
+      if (view.visible) this.render(true);
+      this.onVisibility?.();
+    });
+    view.onDidDispose(() => {
+      this.view = undefined;
+      this.onVisibility?.();
+    });
     view.webview.html = page(view.webview.cspSource, this.body());
+    this.onVisibility?.();
   }
 
   schedule(): void {
@@ -64,6 +93,7 @@ export class AgentView implements vscode.WebviewViewProvider, vscode.Disposable 
   render(force = false): void {
     const v = this.view;
     if (!v || !v.visible) return;
+    this.built = { version: this.store.version, at: Date.now() };
     const html = this.body();
     if (!force && html === this.last) return;
     this.last = html;
@@ -76,15 +106,26 @@ export class AgentView implements vscode.WebviewViewProvider, vscode.Disposable 
   }
 }
 
-/** One inspector panel per session, reused. */
+/** One inspector panel per session, reused. Hidden panels and idle store notifications build no page. */
 export class Inspector implements vscode.Disposable {
   private panels = new Map<string, vscode.WebviewPanel>();
+  private built = new Map<string, Built>();
   private sub: { dispose(): void };
+  /** Called when a panel shows, hides or closes. */
+  onVisibility?: () => void;
 
-  constructor(private store: SessionStore, private onMessage: (m: WebviewMessage) => void, private ternAvailable: () => boolean) {
+  /** `onNav` opens the workspace on a screen with the inspected session selected (Replay, HUD buttons). */
+  constructor(private store: SessionStore, private onMessage: (m: WebviewMessage) => void, private ternAvailable: () => boolean, private onNav?: (view: string, key: string) => void) {
     this.sub = store.onDidChange(() => {
-      for (const k of this.panels.keys()) this.render(k);
+      for (const [k, p] of this.panels) {
+        const b = this.built.get(k) ?? { version: -1, at: 0 };
+        if (p.visible && viewNeedsRender({ version: store.version, renderedVersion: b.version, renderedAt: b.at, feedPending: false, now: Date.now() })) this.render(k);
+      }
     });
+  }
+
+  get visible(): boolean {
+    return [...this.panels.values()].some(p => p.visible);
   }
 
   open(key: string): void {
@@ -101,11 +142,20 @@ export class Inspector implements vscode.Disposable {
       const msg = validateMessage(m, k => !!this.store.get(k));
       if (!msg) return;
       if (msg.type === 'ready') this.render(key);
+      else if (msg.type === 'nav' && this.onNav) this.onNav(msg.view, key);
       else this.onMessage(msg);
     });
-    p.onDidChangeViewState(e => e.webviewPanel.visible && this.render(key));
-    p.onDidDispose(() => this.panels.delete(key));
+    p.onDidChangeViewState(e => {
+      if (e.webviewPanel.visible) this.render(key);
+      this.onVisibility?.();
+    });
+    p.onDidDispose(() => {
+      this.panels.delete(key);
+      this.built.delete(key);
+      this.onVisibility?.();
+    });
     this.panels.set(key, p);
+    this.onVisibility?.();
     p.webview.html = page(p.webview.cspSource, this.body(key) ?? '');
   }
 
@@ -113,13 +163,15 @@ export class Inspector implements vscode.Disposable {
     const s = this.store.get(key);
     if (!s) return undefined;
     const parent = s.parentSessionId ? this.store.get(s.parentSessionId) : undefined;
-    return renderInspector(s, this.store.children(key), parent, this.store.timeline(key), this.ternAvailable());
+    return inspectorJumps(key) + renderInspector(s, this.store.children(key), parent, this.store.timeline(key), this.ternAvailable());
   }
 
   private render(key: string): void {
     const p = this.panels.get(key);
+    if (!p || !p.visible) return;
+    this.built.set(key, { version: this.store.version, at: Date.now() });
     const html = this.body(key);
-    if (p && p.visible && html !== undefined) post(p.webview, html);
+    if (html !== undefined) post(p.webview, html);
   }
 
   dispose(): void {
