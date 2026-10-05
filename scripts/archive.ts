@@ -10,6 +10,7 @@
 //                --no-git            skip git correlation (faster; commits are then not recorded)
 //                --no-backlog        skip the plan-file snapshot
 //                --raw               also gzip-copy transcripts / rollouts into raw/ (setting agent.archive.rawTranscripts)
+//                                    (copies are owner-only: chmod 0600 on POSIX; on Windows they inherit the ACL of ~/.agent)
 //                --raw-max-gb <n>    cap for raw/ (setting agent.archive.rawMaxGB, default 5)
 //                --settings <file>   VS Code settings.json to read agent.archive.* from (default: the user's Code settings)
 //                --dry               compute and print, write nothing
