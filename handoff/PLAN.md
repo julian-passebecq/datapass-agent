@@ -60,4 +60,10 @@ Left: the session log (real timeline events with t+offset). Centre: the session 
 - Into **P8**: compact context readout "17.5k / 272k · 6 %" in cards (CodeAlta status bar).
 - Skipped: the Effect TS layer tree and AGENTS.md tweet (not UI), mermaid rendering and tabs (VS Code already has these), and the trading widgets themselves.
 
+### Re-check of all 20 photos sent directly (2026-10-05)
+
+Every photo maps to a package above or a skip. Two details from the nested-thread screenshot (devbook / Marlies) were missing:
+- Into **P13**: an "Uncommitted · N files, +x −y" chip on live session cards (git `diff --shortstat` on the worktree, read-only).
+- Into **P14**: the running tool with its elapsed time ("Running run_batch · 48m 48s") on live cards and in the strip, from the last open tool call (OBSERVED start time, DERIVED duration).
+
 Order: P1 → P2 → P3 → P4 → P5–P14 (P5 is the only one that reaches the network, and only on opt-in) (P1 and P2 touch different files and can run in parallel).
