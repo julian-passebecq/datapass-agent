@@ -536,7 +536,8 @@
     "smoke": "node scripts/smoke.mjs",
     "perf": "npm run compile-tests && node out-test/scripts/perf.js",
     "weekly": "npm run compile-tests && node out-test/scripts/weekly.js",
-    "archive": "npm run compile-tests && node out-test/scripts/archive.js"
+    "archive": "npm run compile-tests && node out-test/scripts/archive.js",
+    "benchmarks": "npm run compile-tests && node out-test/scripts/benchmarks.js"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
