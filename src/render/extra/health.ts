@@ -143,7 +143,7 @@ function kpis(c: Cfg, t: HealthRow, live: AgentSessionSnapshot[]): string {
     k(String(t.overMarker), `≥ ${tok(c.marker)}`, t.overMarker ? 'hl-warn' : '', `DERIVED: sessions whose largest recorded prompt reached the ${tok(c.marker)} reference marker`),
     k(String(t.compactions), 'Compactions', '', 'OBSERVED: context compactions recorded by the provider'),
     k(pct(t.toolErrorRate, 1), 'Tool errors', t.toolErrorRate && t.toolErrorRate > 0.1 ? 'hl-warn' : '', `DERIVED: ${t.toolErrors} tool results flagged as error ÷ ${t.tools} tool calls (provider flag)`),
-    hottest ? k(ctxLabel(hottest.c), `Hottest live · ${titleOf(hottest.s).slice(0, 18)}`, ctxCls(hottest.c.pct, c.warn), `OBSERVED context of the latest model call; window ${hottest.c.windowSource === 'OBSERVED' ? 'recorded' : 'reference'}`) : '',
+    hottest ? k(ctxLabel(hottest.c), `Hottest live · ${titleOf(hottest.s).slice(0, 18)}`, ctxCls(hottest.c.pct, c.warn), `OBSERVED: context of the latest model call; window ${hottest.c.windowSource === 'OBSERVED' ? 'recorded' : 'reference'}`) : '',
   ].join('')}</div>`;
 }
 
@@ -219,7 +219,7 @@ function table(c: Cfg, rows: HealthRow[], d: WsData, st: WsState): string {
   if (!rows.length) return '';
   const by = new Map(d.sessions.map(s => [s.key, s]));
   const per = c.group === 'session';
-  const head = `<tr><th>${per ? 'Session' : esc(c.group[0].toUpperCase() + c.group.slice(1))}</th>${per ? '<th>Repo</th>' : '<th class="r">Sessions</th>'}<th class="r" title="OBSERVED test / build runs with a result">Tests</th><th title="DERIVED: passing ÷ decided runs">Pass rate</th><th class="r" title="OBSERVED: commits in the period">Commits</th>${per ? '' : '<th class="r" title="DERIVED: commits ÷ lead sessions">/ session</th>'}<th title="${esc(per ? 'OBSERVED latest prompt size / window' : 'DERIVED: mean and max of per-session peak ÷ window')}">Context</th>${per ? '<th>Trend</th>' : `<th class="r" title="sessions whose peak reached ${esc(tok(c.marker))}">≥ ${esc(tok(c.marker))}</th>`}<th class="r" title="OBSERVED compactions">⟲</th><th class="r" title="DERIVED: tool results flagged error ÷ tool calls">Tool err</th><th class="r">Last</th></tr>`;
+  const head = `<tr><th>${per ? 'Session' : esc(c.group[0].toUpperCase() + c.group.slice(1))}</th>${per ? '<th>Repo</th>' : '<th class="r">Sessions</th>'}<th class="r" title="OBSERVED: test / build runs with a result">Tests</th><th title="DERIVED: passing ÷ decided runs">Pass rate</th><th class="r" title="OBSERVED: commits in the period">Commits</th>${per ? '' : '<th class="r" title="DERIVED: commits ÷ lead sessions">/ session</th>'}<th title="${esc(per ? 'OBSERVED: latest prompt size / window' : 'DERIVED: mean and max of per-session peak ÷ window')}">Context</th>${per ? '<th>Trend</th>' : `<th class="r" title="DERIVED: sessions whose peak reached ${esc(tok(c.marker))}">≥ ${esc(tok(c.marker))}</th>`}<th class="r" title="OBSERVED: compactions recorded by the provider">⟲</th><th class="r" title="DERIVED: tool results flagged error ÷ tool calls">Tool err</th><th class="r" title="OBSERVED: time of the last recorded activity">Last</th></tr>`;
   const body = sortRows(rows, c.sort)
     .slice(0, per ? c.top * 2 : 200)
     .map(r => {
