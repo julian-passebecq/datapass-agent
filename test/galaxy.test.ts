@@ -69,6 +69,8 @@ test('observation: no prompt, title, command, commit subject, todo, file name or
   assert.deepEqual(o.repo, pathRef('C:\\Users\\julia\\repo'));
   assert.equal(o.repo?.name, 'repo');
   assert.equal(o.worktree?.linked, true);
+  const w = toObservation(snap({ isWorker: true, workerLabel: `Explore · ${SECRET}` }), [], { capturedAt: NOW });
+  assert.equal(w.workerLabel, 'Explore', 'subagent type kept, task description dropped');
   assert.equal(pathRef('C:\\Users\\Julia\\Repo\\')?.hash, pathRef('c:/users/julia/repo')?.hash, 'hash ignores case and separators');
 });
 
