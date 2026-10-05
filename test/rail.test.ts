@@ -44,5 +44,5 @@ test('every rail group header carries its question as a tooltip', () => {
   for (const g of RAIL_GROUPS) assert.ok(RAIL_GROUP_HINT[g], g);
   const html = renderWorkspace(data, { view: 'overview' });
   for (const g of RAIL_GROUPS) assert.ok(html.includes(`Collapse ${g} · `), g);
-  assert.ok(html.includes('first ten screens'), 'keyboard hint says 1-0 covers only the first ten screens');
+  assert.ok(html.includes('screens with a number in the rail'), 'keyboard hint says 1-0 covers only the numbered screens');
 });
