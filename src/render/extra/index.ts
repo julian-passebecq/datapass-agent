@@ -6,6 +6,7 @@ import { backlogView } from './backlog';
 import { catalogView } from './catalog';
 import { changesView } from './changes';
 import { codexView } from './codex';
+import { ctxcostView } from './ctxcost';
 import { dispatchView } from './dispatch';
 import { exploreView } from './explore';
 import { forecastView } from './forecast';
@@ -43,6 +44,7 @@ export function allExtra(): ExtraView[] {
   catalogView,
   changesView,
   codexView,
+  ctxcostView,
   dispatchView,
   exploreView,
   forecastView,
