@@ -83,20 +83,42 @@ async function workspacePass(win, ck, theme, views) {
   if (views === 'all') views = await ws.frame.evaluate(() => [...document.querySelectorAll('[data-nav].nav')].map(b => [b.dataset.nav, (b.childNodes[0]?.textContent ?? '').trim()]));
   check(`${theme}: rail lists ${views.length} screens`, views.length >= 10, String(views.length));
   for (const [i, [view, heading]] of views.entries()) {
+    // Poll until the screen is on (the host may still be loading history after a reload); record latency.
+    const t1 = Date.now();
     await ws.frame.evaluate(v => document.querySelector(`[data-nav="${v}"]`)?.click(), view);
-    await win.waitForTimeout(2500);
-    const txt = await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent ?? '');
+    let txt = '';
+    while (Date.now() - t1 < 20_000) {
+      txt = await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent ?? '');
+      if (txt === heading) break;
+      await win.waitForTimeout(250);
+    }
+    const ms = Date.now() - t1;
+    await win.waitForTimeout(900); // let async feeds of this screen land before the screenshot
     const body = await ws.frame.evaluate(() => (document.querySelector('main')?.innerText ?? '').length);
-    check(`${theme}: workspace view ${view}`, txt === heading && body > 40, `${txt} · ${body} chars`);
+    (result.navMs ??= {})[`${theme}:${view}`] = ms;
+    check(`${theme}: workspace view ${view}`, txt === heading && body > 40, `${txt} · ${body} chars · ${ms} ms`);
     await shot(win, `${theme === 'Dark' ? 1 : 2}${String(i).padStart(2, '0')}-workspace-${view}-${theme.toLowerCase()}`);
   }
   // Keyboard: "2" switches to Attention; "/" filter hides non-matching sessions.
   await ws.frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true })));
   await win.waitForTimeout(800);
+  const third = await ws.frame.evaluate(() => ([...document.querySelectorAll('[data-nav].nav')][2]?.childNodes[0]?.textContent ?? '').trim());
   await ws.frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: '3', bubbles: true })));
-  await win.waitForTimeout(1000);
-  const h1 = await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent ?? '');
-  check(`${theme}: keyboard 3 opens Board`, h1 === 'Board', h1);
+  let h1 = '';
+  for (const t2 = Date.now(); Date.now() - t2 < 15_000; await win.waitForTimeout(250)) {
+    h1 = await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent ?? '');
+    if (h1 === third) break;
+  }
+  check(`${theme}: keyboard 3 opens the third screen (${third})`, h1 === third, h1);
+  // Rail groups collapse and expand.
+  const before = await ws.frame.evaluate(() => document.querySelectorAll('[data-nav].nav').length);
+  await ws.frame.evaluate(() => [...document.querySelectorAll('.rg .railg')].pop()?.click());
+  let after = before;
+  for (const t3 = Date.now(); Date.now() - t3 < 10_000 && after === before; await win.waitForTimeout(250)) after = await ws.frame.evaluate(() => document.querySelectorAll('[data-nav].nav').length);
+  await ws.frame.evaluate(() => document.querySelector('.rg.closed .railg')?.click());
+  await win.waitForTimeout(1500);
+  const again = await ws.frame.evaluate(() => document.querySelectorAll('[data-nav].nav').length);
+  check(`${theme}: rail group collapses and expands`, after < before && again === before, `${before} → ${after} → ${again}`);
   const filt = await ws.frame.evaluate(() => {
     const q = document.getElementById('q');
     const all = document.querySelectorAll('main [data-select]').length;

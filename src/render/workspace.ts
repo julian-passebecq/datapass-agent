@@ -480,6 +480,11 @@ export function statusStrip(d: WsData): string {
   return `<footer class="strip"><span class="tkr">${live.length ? `<b>${live.length} live</b> ${ticker}` : '<span class="muted">nothing live</span>'}</span><span class="muted">${cost}</span></footer>`;
 }
 
+const RAIL_GROUPS = ['Now', 'Sessions', 'Time', 'Git', 'Usage', 'Quality', 'System'];
+const CORE_GROUP: Record<string, string> = { overview: 'Now', attention: 'Now', board: 'Sessions', team: 'Sessions', gantt: 'Time', worktrees: 'Git', activity: 'Usage', flow: 'Usage', verify: 'Quality', providers: 'System' };
+/** Reading order inside groups; screens not listed go last in their group. */
+const RAIL_ORDER = ['overview', 'attention', 'live', 'workflows', 'codex', 'projects', 'board', 'team', 'topology', 'roles', 'transcript', 'replay', 'gantt', 'week', 'runs', 'forecast', 'history', 'worktrees', 'repos', 'changes', 'review', 'pipelines', 'tokens', 'limits', 'explore', 'activity', 'flow', 'verify', 'signals', 'health', 'backlog', 'providers', 'settings', 'catalog', 'audit', 'launcher'];
+
 export function renderWorkspace(d0: WsData, st0: WsState): string {
   let st = st0;
   const d = scoped(d0, st0.opts?.scope);
@@ -495,8 +500,18 @@ export function renderWorkspace(d0: WsData, st0: WsState): string {
   const label = (v: string) => (VIEW_LABEL as Record<string, string>)[v] ?? ext.get(v)?.label ?? v;
   const hint = (v: string) => (VIEW_HINT as Record<string, string>)[v] ?? ext.get(v)?.hint ?? '';
   const navBtn = (v: string) => `<button class="nav${st.view === v ? ' on' : ''}" data-nav="${esc(v)}">${esc(label(v))}${badge[v] ? `<span class="nb${v === 'attention' || v === 'verify' ? ' hot' : ''}">${esc(badge[v])}</span>` : ''}</button>`;
-  const groups = ['Now', 'Sessions', 'Time', 'Git', 'Usage', 'Quality', 'System'].map(g => [g, extraViews().filter(x => x.group === g)] as const).filter(([, xs]) => xs.length);
-  const rail = `<nav class="rail"><div class="brand">Agent <button class="link" data-cmd="openWorkspaceNewTab" title="Open another Agent tab (own screen and scope)">+ tab</button></div>${WS_VIEWS.map(navBtn).join('')}${groups.map(([g, xs]) => `<div class="railg">${esc(g)}</div>${xs.map(x => navBtn(x.id)).join('')}`).join('')}<div class="railfoot">${d.providers.map(p => `<div><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span> ${esc(PROV[p.provider])} ${esc(p.version ?? '')}</div>`).join('')}${collectorSummary(d)}<div class="muted">local · read-only</div></div></nav>`;
+  // Rail: every screen (core + add-on) in one of the groups, in a fixed reading order; groups collapse.
+  const groupOf = (v: string) => CORE_GROUP[v] ?? ext.get(v)?.group ?? 'System';
+  const all = [...WS_VIEWS, ...extraViews().map(x => x.id)];
+  const rank = (v: string) => (RAIL_ORDER.indexOf(v) < 0 ? 999 : RAIL_ORDER.indexOf(v));
+  const groups = RAIL_GROUPS.map(g => [g, all.filter(v => groupOf(v) === g).sort((a, b) => rank(a) - rank(b))] as const).filter(([, vs]) => vs.length);
+  const railGroup = ([g, vs]: readonly [string, string[]]) => {
+    const name = `rail.${g.toLowerCase()}`;
+    const closed = st.opts?.[name] === 'closed' && !vs.includes(st.view);
+    const hot = vs.reduce((n, v) => n + (Number(badge[v]) || 0), 0);
+    return `<div class="rg${closed ? ' closed' : ''}"><button class="railg" data-opt="${name}" data-val="${closed ? '' : 'closed'}" title="${closed ? 'Expand' : 'Collapse'} ${esc(g)}"><span class="chev">${closed ? '▸' : '▾'}</span>${esc(g)}<span class="rgc">${closed && hot ? esc(String(hot)) : vs.length}</span></button>${closed ? '' : vs.map(navBtn).join('')}</div>`;
+  };
+  const rail = `<nav class="rail"><div class="brand">Agent <button class="link" data-cmd="openWorkspaceNewTab" title="Open another Agent tab (own screen and scope)">+ tab</button></div>${groups.map(railGroup).join('')}<div class="railfoot">${d.providers.map(p => `<div><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span> ${esc(PROV[p.provider])} ${esc(p.version ?? '')}</div>`).join('')}${collectorSummary(d)}<div class="muted">local · read-only</div></div></nav>`;
   const body: Record<string, () => string> = {
     overview: () => overview(d, st), attention: () => attentionView(d, st), board: () => board(d, st), team: () => team(d, st), flow: () => flowView(d, st), worktrees: () => worktrees(d, st), gantt: () => gantt(d, st), verify: () => verify(d, st), activity: () => activity(d), providers: () => providersView(d, st),
   };
