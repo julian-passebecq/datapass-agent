@@ -1,3 +1,5 @@
+> **Historical: night build brief of 4–5 Oct 2026, kept as evidence; not current.** The rules below (ready: false, files owned by the PM, night/<id> branches, wave order) no longer apply. Current state: handoff/PLAN.md; architecture: docs/ARCHITECTURE.md.
+
 # Night build 2026-10-05 → 06: brief for every coder
 
 Julian (5 Oct, evening): "integrate as many useful things as possible tonight; screens, filters, different views and chart types, granularity, horizontal / vertical / depth; real-time Codex + Claude (how many agents, conversations, who does what, tokens); pipelines (local GitLab runners, GitHub cloud); backlog; weekly scripts over the archives. Julian picks what to keep tomorrow." Julian gave full merge rights on this repo.

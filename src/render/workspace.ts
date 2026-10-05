@@ -493,10 +493,21 @@ export function statusStrip(d: WsData): string {
 /** Repository chips shown in the footer strip before "+k". */
 const FOOT_REPOS = 8;
 
-const RAIL_GROUPS = ['Now', 'Sessions', 'Time', 'Git', 'Usage', 'Quality', 'System'];
+export const RAIL_GROUPS = ['Now', 'Sessions', 'Time', 'Git', 'Usage', 'Quality', 'System'];
 const CORE_GROUP: Record<string, string> = { overview: 'Now', attention: 'Now', board: 'Sessions', team: 'Sessions', gantt: 'Time', worktrees: 'Git', activity: 'Usage', flow: 'Usage', verify: 'Quality', providers: 'System' };
-/** Reading order inside groups; screens not listed go last in their group. */
-const RAIL_ORDER = ['overview', 'attention', 'panes', 'live', 'workflows', 'codex', 'projects', 'board', 'team', 'topology', 'roles', 'transcript', 'replay', 'gantt', 'week', 'runs', 'forecast', 'history', 'worktrees', 'repos', 'changes', 'review', 'pipelines', 'tokens', 'limits', 'explore', 'activity', 'flow', 'verify', 'signals', 'health', 'backlog', 'providers', 'settings', 'catalog', 'audit', 'launcher'];
+/** Reading order inside groups; screens not listed go last in their group. Ids that are not registered screens are
+ *  ignored (rank only sorts screens that exist), so a planned id such as 'benchmarks' is harmless. */
+export const RAIL_ORDER = ['overview', 'attention', 'panes', 'live', 'hud', 'workflows', 'codex', 'projects', 'board', 'team', 'topology', 'roles', 'transcript', 'replay', 'lifecycle', 'gantt', 'week', 'runs', 'forecast', 'history', 'worktrees', 'repos', 'changes', 'review', 'pipelines', 'tokens', 'ctxcost', 'limits', 'dispatch', 'explore', 'benchmarks', 'activity', 'flow', 'verify', 'signals', 'health', 'backlog', 'scope', 'providers', 'settings', 'catalog', 'audit', 'launcher'];
+/** The question each rail group answers (group header tooltip). */
+export const RAIL_GROUP_HINT: Record<string, string> = {
+  Now: 'What is going on right now, and what needs me?',
+  Sessions: 'Who worked under whom, and what did one session do?',
+  Time: 'When, and how often, did agents run?',
+  Git: 'What changed, where, and what is the PR / CI state?',
+  Usage: 'How much budget did agents use, and what did it buy?',
+  Quality: 'Do tests pass, what looks wrong, and what is still planned?',
+  System: 'Configuration, collectors, and the screens that run a process (Catalog CLI probe, Launcher).',
+};
 
 function bodies(d: WsData, st: WsState): Record<string, () => string> {
   const body: Record<string, () => string> = {
@@ -547,7 +558,7 @@ export function renderWorkspace(d0: WsData, st0: WsState): string {
     const name = `rail.${g.toLowerCase()}`;
     const closed = st.opts?.[name] === 'closed' && !vs.includes(st.view);
     const hot = vs.reduce((n, v) => n + (Number(badge[v]) || 0), 0);
-    return `<div class="rg${closed ? ' closed' : ''}"><button class="railg" data-opt="${name}" data-val="${closed ? '' : 'closed'}" title="${closed ? 'Expand' : 'Collapse'} ${esc(g)}"><span class="chev">${closed ? '▸' : '▾'}</span>${esc(g)}<span class="rgc">${closed && hot ? esc(String(hot)) : vs.length}</span></button>${closed ? '' : vs.map(navBtn).join('')}</div>`;
+    return `<div class="rg${closed ? ' closed' : ''}"><button class="railg" data-opt="${name}" data-val="${closed ? '' : 'closed'}" title="${esc(`${closed ? 'Expand' : 'Collapse'} ${g}${RAIL_GROUP_HINT[g] ? ` · ${RAIL_GROUP_HINT[g]}` : ''}`)}"><span class="chev">${closed ? '▸' : '▾'}</span>${esc(g)}<span class="rgc">${closed && hot ? esc(String(hot)) : vs.length}</span></button>${closed ? '' : vs.map(navBtn).join('')}</div>`;
   };
   const rail = `<nav class="rail"><div class="brand">Agent <button class="link" data-cmd="openWorkspaceNewTab" title="Open another Agent tab (own screen and scope)">+ tab</button></div>${groups.map(railGroup).join('')}<div class="railfoot">${d.providers.map(p => `<div><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span> ${esc(PROV[p.provider])} ${esc(p.version ?? '')}</div>`).join('')}${collectorSummary(d)}<div class="muted">local · read-only</div></div></nav>`;
   const body = bodies(d, st);

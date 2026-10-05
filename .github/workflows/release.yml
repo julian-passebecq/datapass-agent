@@ -1,0 +1,99 @@
+name: release-qualification
+
+# Release gate: full qualification of the packaged VSIX, run by hand or on a version tag.
+# ci.yml stays the fast per-push check; this workflow adds the installed-VSIX smoke (scripts/smoke.mjs),
+# which needs a real VS Code: it is downloaded with @vscode/test-electron (no repo dependency change).
+# If VS Code cannot be downloaded or launched, the smoke step is skipped with a clear notice unless
+# `require_smoke` is true (the default for tags).
+
+on:
+  workflow_dispatch:
+    inputs:
+      require_smoke:
+        description: Fail the run when VS Code is unavailable for the smoke (instead of skipping it)
+        type: boolean
+        default: false
+      vscode_version:
+        description: VS Code version for the smoke (stable, insiders or x.y.z)
+        type: string
+        default: stable
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      REQUIRE_SMOKE: ${{ github.event_name == 'push' || inputs.require_smoke == true }}
+      VSCODE_VERSION: ${{ inputs.vscode_version || 'stable' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - run: npm run package
+      - name: VSIX hash
+        shell: pwsh
+        run: Get-FileHash agent-vscode-*.vsix -Algorithm SHA256 | Tee-Object -FilePath vsix-sha256.txt | Format-List
+
+      - name: Download VS Code for the smoke
+        id: vscode
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'vscode-test'
+          npm install --no-save --no-package-lock --prefix $dir @vscode/test-electron@^2 | Out-Null
+          $env:NODE_PATH = Join-Path $dir 'node_modules'
+          $js = "require('@vscode/test-electron').downloadAndUnzipVSCode({ version: process.env.VSCODE_VERSION, cachePath: process.argv[1] }).then(p => console.log(p)).catch(e => { console.error(e.message); process.exit(1); })"
+          $exe = node -e $js (Join-Path $dir 'cache') | Select-Object -Last 1
+          if ($LASTEXITCODE -ne 0 -or -not $exe -or -not (Test-Path $exe)) { Write-Error 'VS Code download failed'; exit 1 }
+          $codeDir = Split-Path $exe -Parent
+          Write-Host "VS Code at $codeDir"
+          "VSCODE_DIR=$codeDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "available=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Smoke skipped (VS Code unavailable)
+        if: steps.vscode.outputs.available != 'true'
+        shell: pwsh
+        run: |
+          $msg = 'SMOKE SKIPPED: VS Code could not be downloaded on this runner, so the installed-VSIX smoke (scripts/smoke.mjs) did not run. Run `npm run smoke` locally before releasing.'
+          Write-Host "::warning title=Smoke skipped::$msg"
+          "## Smoke skipped`n$msg" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          if ($env:REQUIRE_SMOKE -eq 'true') { Write-Error 'require_smoke is on: failing the release gate'; exit 1 }
+
+      - name: Installed-VSIX smoke (Playwright _electron, dark + light, every screen)
+        if: steps.vscode.outputs.available == 'true'
+        shell: pwsh
+        run: node scripts/smoke.mjs .smoke/screenshots
+
+      - name: Smoke summary
+        if: always() && steps.vscode.outputs.available == 'true'
+        shell: pwsh
+        run: |
+          $f = '.smoke/smoke-result.json'
+          if (Test-Path $f) {
+            $r = Get-Content $f -Raw | ConvertFrom-Json
+            $failed = @($r.checks | Where-Object { -not $_.ok })
+            "## Smoke: $(if ($r.passed) { 'PASS' } else { 'FAIL' })`n$($r.checks.Count) checks, $($failed.Count) failed, $($r.screenshots.Count) screenshots" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            foreach ($c in $failed) { "- FAIL $($c.name): $($c.detail)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
+          } else { 'No smoke-result.json written.' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-vscode-release-${{ github.ref_name }}-${{ github.run_number }}
+          path: |
+            agent-vscode-*.vsix
+            vsix-sha256.txt
+            .smoke/screenshots/*.png
+            .smoke/smoke-result.json
+          if-no-files-found: warn
