@@ -74,14 +74,18 @@ async function shot(win, name) {
 /** True while the visible screen shows a loading marker or loading text (case-insensitive, ending in an ellipsis). */
 const LOADING = () => !!document.querySelector('main [data-loading]') || /\b(loading|scanning|reading)\b[^\n]{0,120}(…|\.\.\.)/i.test(document.querySelector('main')?.innerText ?? '');
 
-/** Narrow window (700 px): every rail screen must fit without a horizontal page scrollbar (tables scroll inside). */
-async function narrowPass(app, win, ws, theme, views) {
-  const before = await app.evaluate(({ BrowserWindow }) => {
+/** Narrow windows (600, 700 and 900 px): every rail screen must fit without a horizontal page scrollbar (tables scroll inside). */
+const NARROW_WIDTHS = [600, 700, 900];
+async function narrowPass(app, win, ws, theme, views, px) {
+  const before = await app.evaluate(({ BrowserWindow }, w0) => {
     const w = BrowserWindow.getAllWindows()[0];
     const s = w.getSize();
-    w.setSize(700, s[1]);
+    if (w.isMaximized()) w.unmaximize();
+    w.setSize(w0, s[1]);
     return s;
-  });
+  }, px);
+  // launch() pins a 1500 px viewport (Playwright emulation), which wins over the window size: narrow it too.
+  await win.setViewportSize?.({ width: px, height: 950 }).catch(() => {});
   await win.waitForTimeout(1500);
   const over = [];
   let width = 0;
@@ -92,12 +96,45 @@ async function narrowPass(app, win, ws, theme, views) {
     const r = await ws.frame.evaluate(() => ({ w: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth }));
     width = r.w;
     if (r.sw > r.w + 1) over.push(`${view} +${r.sw - r.w}px`);
-    if (view === 'overview' || view === 'changes' || view === 'board') await shot(win, `9-narrow-${view}-${theme.toLowerCase()}`);
+    if (view === 'overview' || view === 'changes' || view === 'board') await shot(win, `9-narrow${px === 700 ? '' : px}-${view}-${theme.toLowerCase()}`);
   }
-  result.narrow = { window: 700, webview: width, overflow: over };
-  check(`${theme}: 700 px window, no horizontal page overflow on ${views.length} screens`, over.length === 0, over.join(', ') || `webview ${width} px`);
+  (result.narrowPasses ??= []).push({ window: px, webview: width, overflow: over });
+  if (px === 700) result.narrow = { window: 700, webview: width, overflow: over };
+  // The webview must really be narrower than the window, or the pass proves nothing.
+  check(`${theme}: ${px} px window, no horizontal page overflow on ${views.length} screens`, over.length === 0 && width > 0 && width < px, over.join(', ') || `webview ${width} px`);
   await app.evaluate(({ BrowserWindow }, s) => BrowserWindow.getAllWindows()[0].setSize(s[0], s[1]), before);
+  await win.setViewportSize?.({ width: 1500, height: 950 }).catch(() => {});
   await win.waitForTimeout(1000);
+}
+
+/** Panes screen: the 2 x 2 and 1 + 2 layouts render every cell without a render error; the layout is restored after. */
+async function panesPass(win, ws, theme, views) {
+  if (!views.some(([v]) => v === 'panes')) { check(`${theme}: Panes screen in the rail`, false, 'no panes entry'); return; }
+  await ws.frame.evaluate(() => document.querySelector('[data-nav="panes"]')?.click());
+  for (const t = Date.now(); Date.now() - t < 10_000; await win.waitForTimeout(250)) if (await ws.frame.evaluate(() => !!document.querySelector('main .pn'))) break;
+  const initial = await ws.frame.evaluate(() => /pn-(\S+)/.exec(document.querySelector('main .pn')?.className ?? '')?.[1] ?? '');
+  const out = {};
+  for (const [layout, label, n] of [['2x2', '2 x 2', 4], ['1p2', '1 + 2', 3]]) {
+    await ws.frame.evaluate(l => document.querySelector(`[data-opt="panes.layout"][data-val="${l}"]`)?.click(), layout);
+    let cells = [];
+    for (const t = Date.now(); Date.now() - t < 15_000; await win.waitForTimeout(250)) {
+      cells = await ws.frame.evaluate(l => document.querySelector(`main .pn.pn-${l}`) ? [...document.querySelectorAll('main .pn > .pn-c')].map(c => ({
+        name: c.getAttribute('aria-label') ?? '',
+        chars: (c.querySelector('.pn-b')?.innerText ?? '').trim().length,
+        failed: /This screen failed to render/.test(c.querySelector('.pn-b')?.textContent ?? ''),
+        h: Math.round(c.getBoundingClientRect().height),
+      })) : [], layout);
+      if (cells.length === n && cells.every(c => c.chars > 0 && !c.failed)) break;
+    }
+    await win.waitForTimeout(600);
+    out[layout] = cells;
+    const bad = cells.filter(c => c.failed || c.chars === 0 || c.h < 40).map(c => `${c.name}${c.failed ? ' failed' : c.chars === 0 ? ' empty' : ` ${c.h}px`}`);
+    check(`${theme}: Panes ${label} renders ${n} panes without error`, cells.length === n && bad.length === 0, `${cells.length} panes${bad.length ? ': ' + bad.join(', ') : ' · ' + cells.map(c => `${c.name} ${c.chars} chars`).join(', ')}`);
+    await shot(win, `9-panes-${layout}-${theme.toLowerCase()}`);
+  }
+  result.panes = out;
+  if (initial && initial !== '1p2') await ws.frame.evaluate(l => document.querySelector(`[data-opt="panes.layout"][data-val="${l}"]`)?.click(), initial);
+  await win.waitForTimeout(500);
 }
 
 /** Opens the Agent Workspace from the Cockpit button and walks its views. */
@@ -135,7 +172,10 @@ async function workspacePass(app, win, ck, theme, views) {
     check(`${theme}: workspace view ${view}`, txt === heading && body > 40, `${txt} · ${body} chars · ${ms} ms`);
     await shot(win, `${theme === 'Dark' ? 1 : 2}${String(i).padStart(2, '0')}-workspace-${view}-${theme.toLowerCase()}`);
   }
-  if (theme === 'Dark') await narrowPass(app, win, ws, theme, views);
+  if (theme === 'Dark') {
+    for (const px of NARROW_WIDTHS) await narrowPass(app, win, ws, theme, views, px);
+    await panesPass(win, ws, theme, views);
+  }
   // Keyboard: digits map to fixed screens (the rail shows the digit); "/" filter hides non-matching sessions.
   await ws.frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true })));
   await win.waitForTimeout(800);
