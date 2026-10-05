@@ -6,6 +6,7 @@ import type { Forge, PrInfo } from '../feeds/review';
 import { isLive } from './insights';
 import { duration } from './activity';
 import { normalizeCase } from '../util/paths';
+import { testVerdict } from '../sessions/classify';
 
 export type Lane = 'needs' | 'working' | 'cifail' | 'review' | 'ready' | 'local' | 'merged' | 'quiet';
 export const LANES: Lane[] = ['needs', 'working', 'cifail', 'review', 'ready', 'local', 'merged', 'quiet'];
@@ -163,7 +164,11 @@ export interface ReviewItem {
   workers: number;
   liveWorkers: number;
   files: number;
+  /** Distinct commits in the session window (git log, DERIVED), of which `ownCommits` the session ran git commit for. */
   commits: number;
+  ownCommits: number;
+  /** How the PR is linked to this session: OBSERVED by its own push / PR command of that head, else INFERRED by branch name. */
+  prLink?: { kind: EvidenceKind; basis: string };
   /** Last activity of the session and its rolled-up workers. */
   at: number;
   steps: Step[];
@@ -173,6 +178,14 @@ export interface ReviewOpts {
   idleAlertMinutes?: number;
   /** undefined: PR state not loaded (opt-in off, untrusted, or not loaded yet). */
   prs?: PrInfo[];
+}
+
+/** Session↔PR link: the PR state is the forge's (OBSERVED), the link is only as strong as how it was matched. */
+export function prLinkOf(s: AgentSessionSnapshot, marks: CmdMark[], pr: PrInfo): { kind: EvidenceKind; basis: string } {
+  const own = marks.find(m => !m.failed && (m.kind === 'pr-create' || m.kind === 'push') && m.head === pr.head);
+  if (own) return { kind: 'OBSERVED', basis: `linked by the session's own ${own.kind === 'push' ? 'push' : 'PR create'} command of ${pr.head}` };
+  const gitNow = !s.facts?.recordedBranch && s.branch === pr.head && !isLive(s);
+  return { kind: 'INFERRED', basis: `matched by branch name ${pr.head}${gitNow ? ' (branch read from git now; the session has ended, it may have worked on another branch)' : ''}` };
 }
 
 const BASE_BRANCHES = new Set(['main', 'master', 'develop', 'dev', 'trunk', 'HEAD']);
@@ -203,48 +216,62 @@ export function matchPrs(s: AgentSessionSnapshot, marks: CmdMark[], prs: PrInfo[
     .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 }
 
-function steps(files: number, commits: number, lastTest: AgentSessionSnapshot['tests'][number] | undefined, marks: CmdMark[], pr: PrInfo | undefined, prsLoaded: boolean): Step[] {
+function steps(files: number, commits: number, ownCommits: number, lastTest: AgentSessionSnapshot['tests'][number] | undefined, marks: CmdMark[], pr: PrInfo | undefined, prsLoaded: boolean, link: EvidenceKind = 'OBSERVED'): Step[] {
   const push = [...marks].reverse().find(m => m.kind === 'push');
   const create = [...marks].reverse().find(m => m.kind === 'pr-create');
   const merge = [...marks].reverse().find(m => m.kind === 'pr-merge');
   const tm = (t: number) => new Date(t).toLocaleString();
-  const prDetail = pr ? `${pr.forge === 'gitlab' ? 'MR !' : 'PR #'}${pr.number} ${pr.state} on ${pr.remote} (${pr.slug})` : '';
+  const prDetail = pr ? `${pr.forge === 'gitlab' ? 'MR !' : 'PR #'}${pr.number} ${pr.state} on ${pr.remote} (${pr.slug})${link === 'INFERRED' ? ' · linked by branch name (inferred)' : ''}` : '';
+  const prKind: EvidenceKind = link === 'INFERRED' ? 'INFERRED' : 'OBSERVED';
+  const tv = lastTest ? testVerdict(lastTest) : undefined;
   const out: Step[] = [
-    { id: 'edit', label: 'Edit', state: files ? 'done' : 'none', detail: files ? `${files} file(s) edited` : 'no file edit observed', kind: files ? 'OBSERVED' : 'UNKNOWN' },
+    { id: 'edit', label: 'Edit', state: files ? 'done' : 'none', detail: files ? `${files} file(s) edited` : 'none observed (edit tools only; shell edits are invisible)', kind: files ? 'OBSERVED' : 'DERIVED' },
     {
-      id: 'test', label: 'Test', state: !lastTest ? 'none' : lastTest.outcome === 'PASS' ? 'done' : lastTest.outcome === 'FAIL' ? 'fail' : 'none',
-      detail: lastTest ? `last: ${lastTest.command} → ${lastTest.outcome}` : 'no test / build command observed', kind: lastTest ? 'OBSERVED' : 'UNKNOWN',
+      id: 'test', label: 'Test', state: !tv ? 'none' : tv.outcome === 'PASS' ? 'done' : tv.outcome === 'FAIL' ? 'fail' : 'none',
+      detail: lastTest && tv ? (tv.outcome === 'UNKNOWN' && lastTest.outcome === 'UNKNOWN' ? `last: ${lastTest.command} → test ran, outcome not recorded` : `last: ${lastTest.command} → ${tv.outcome} (${tv.basis})`) : 'none observed (no test command in the loaded records)',
+      kind: tv ? tv.kind : 'DERIVED',
     },
-    { id: 'commit', label: 'Commit', state: commits ? 'done' : 'none', detail: commits ? `${commits} commit(s) in the session window (git log)` : 'no commit observed', kind: commits ? 'DERIVED' : 'UNKNOWN' },
+    {
+      id: 'commit', label: 'Commit', state: commits ? 'done' : 'none',
+      detail: commits ? (ownCommits ? `${ownCommits} commit(s) by the session's own git commit${commits > ownCommits ? ` + ${commits - ownCommits} in its window (not proof the session made them)` : ''}` : `${commits} commit(s) in the session window (git log; not proof the session made them)`) : 'none observed in the session window',
+      kind: commits ? (ownCommits === commits ? 'OBSERVED' : 'DERIVED') : 'DERIVED',
+    },
     {
       id: 'push', label: 'Push', state: push ? (push.failed ? 'fail' : 'done') : pr ? 'done' : 'none',
-      detail: push ? `${push.label} · ${tm(push.at)}${push.failed ? ' · command failed' : ''}` : pr ? `branch on ${pr.remote} (PR exists)` : 'no push command observed',
-      kind: push ? 'OBSERVED' : pr ? 'DERIVED' : 'UNKNOWN',
+      detail: push ? `${push.label} · ${tm(push.at)}${push.failed ? ' · command failed' : ''}` : pr ? `branch on ${pr.remote} (PR exists)` : 'none observed (no push command)',
+      kind: push ? 'OBSERVED' : pr ? (link === 'INFERRED' ? 'INFERRED' : 'DERIVED') : 'DERIVED',
     },
     {
       id: 'pr', label: 'PR', state: pr ? (pr.state === 'merged' ? 'done' : pr.state === 'closed' ? 'fail' : 'live') : create ? (create.failed ? 'fail' : 'done') : 'none',
       detail: pr ? `${prDetail}: ${pr.title}` : create ? `${create.label} · ${tm(create.at)}${create.failed ? ' · command failed' : prsLoaded ? ' · no matching PR found on the forge' : ' · PR state not loaded'}` : 'no PR / MR found or created',
-      kind: pr ? 'OBSERVED' : create ? 'OBSERVED' : 'UNKNOWN',
+      kind: pr ? prKind : create ? 'OBSERVED' : 'UNKNOWN',
     },
     {
       id: 'ci', label: 'CI', state: !pr ? 'none' : pr.ci === 'pass' ? 'done' : pr.ci === 'fail' ? 'fail' : pr.ci === 'pending' ? 'live' : 'none',
       detail: !pr ? 'no PR state' : pr.ci === 'none' ? 'no check reported' : `${pr.ci}${pr.failing.length ? ` · failing: ${pr.failing.join(', ')}` : ''}${pr.pending.length ? ` · pending: ${pr.pending.join(', ')}` : ''}`,
-      kind: pr ? 'OBSERVED' : 'UNKNOWN',
+      kind: pr ? prKind : 'UNKNOWN',
     },
     {
       id: 'review', label: 'Review', state: !pr ? 'none' : pr.review === 'approved' ? 'done' : pr.review === 'changes' ? 'fail' : pr.review === 'required' ? 'live' : 'none',
-      detail: !pr ? 'no PR state' : pr.review === 'none' ? 'no review decision recorded' : `review ${pr.review}`, kind: pr ? 'OBSERVED' : 'UNKNOWN',
+      detail: !pr ? 'no PR state' : pr.review === 'none' ? 'no review decision recorded' : `review ${pr.review}`, kind: pr ? prKind : 'UNKNOWN',
     },
     {
       id: 'merge', label: 'Merge', state: pr?.state === 'merged' || (merge && !merge.failed && !pr) ? 'done' : pr && pr.mergeable === 'conflict' ? 'fail' : 'none',
       detail: pr?.state === 'merged' ? `merged${pr.mergedAt ? ' ' + tm(pr.mergedAt) : ''}` : merge && !pr ? `${merge.label} · ${tm(merge.at)}` : pr ? `mergeable: ${pr.mergeDetail ?? pr.mergeable}` : 'not merged',
-      kind: pr ? 'OBSERVED' : merge ? 'OBSERVED' : 'UNKNOWN',
+      kind: pr ? prKind : merge ? 'OBSERVED' : 'UNKNOWN',
     },
   ];
   return out;
 }
 
 function laneOf(it: Omit<ReviewItem, 'lane' | 'reason' | 'basis' | 'kind'>, s: AgentSessionSnapshot, lastTest: AgentSessionSnapshot['tests'][number] | undefined, now: number, opts: ReviewOpts): { lane: Lane; reason: string; basis: string; kind: EvidenceKind } {
+  const r = laneOf0(it, s, lastTest, now, opts);
+  // A lane decided by the PR is only as strong as the session↔PR link.
+  if (it.pr && it.prLink?.kind === 'INFERRED' && /^(PR #|MR !)/.test(r.reason) && r.kind === 'OBSERVED') return { ...r, kind: 'INFERRED', basis: `${r.basis} · ${it.prLink.basis}` };
+  return r;
+}
+
+function laneOf0(it: Omit<ReviewItem, 'lane' | 'reason' | 'basis' | 'kind'>, s: AgentSessionSnapshot, lastTest: AgentSessionSnapshot['tests'][number] | undefined, now: number, opts: ReviewOpts): { lane: Lane; reason: string; basis: string; kind: EvidenceKind } {
   const pr = it.pr;
   if (s.status === 'NEEDS_INPUT') return { lane: 'needs', reason: 'Waiting for your input', basis: s.statusReason, kind: 'INFERRED' };
   if (s.status === 'RUNNING' || it.liveWorkers > 0) {
@@ -275,12 +302,12 @@ function laneOf(it: Omit<ReviewItem, 'lane' | 'reason' | 'basis' | 'kind'>, s: A
   if (s.status === 'UNKNOWN' && !s.isWorker && now - it.at < 86400_000) return { lane: 'needs', reason: 'Open turn, no recent activity', basis: s.statusReason, kind: 'INFERRED' };
   if (merge && (!create || merge.at >= create.at)) return { lane: 'merged', reason: `Merge command observed${merge.number !== undefined ? ` (#${merge.number})` : ''}`, basis: merge.label, kind: 'OBSERVED' };
   if (create) return { lane: 'review', reason: `${create.forge === 'gitlab' ? 'MR' : 'PR'} created${create.head ? ` from ${create.head}` : ''}${opts.prs ? ', not found on the forge' : '; state not loaded'}`, basis: create.label, kind: 'OBSERVED' };
-  if (lastTest?.outcome === 'FAIL') return { lane: 'needs', reason: `Last test failed: ${lastTest.command}`, basis: lastTest.exitCode !== undefined ? `exit code ${lastTest.exitCode}` : 'provider tool error flag', kind: 'OBSERVED' };
+  if (lastTest && testVerdict(lastTest).outcome === 'FAIL') return { lane: 'needs', reason: `Last test failed: ${lastTest.command}`, basis: lastTest.exitCode !== undefined ? `exit code ${lastTest.exitCode}` : 'provider tool error flag', kind: 'OBSERVED' };
   const pushed = it.marks.some(m => m.kind === 'push' && !m.failed);
-  if (it.commits) return { lane: 'local', reason: `${it.commits} commit(s)${pushed ? ', pushed' : ''}, no PR / MR${opts.prs ? ' on the forge' : ' observed'}${pr ? ` (PR #${pr.number} closed)` : ''}`, basis: pushed ? 'git log in session window + push command' : 'git log in session window', kind: 'DERIVED' };
+  if (it.commits) return { lane: 'local', reason: `${it.commits} commit(s)${pushed ? ', pushed' : ''}, no PR / MR${opts.prs ? ' on the forge' : ' observed'}${pr ? ` (PR #${pr.number} closed)` : ''}`, basis: `${pushed ? 'git log in session window + push command' : 'git log in session window'}${it.ownCommits < it.commits ? ' (window commits are not proof the session made them)' : ''}`, kind: 'DERIVED' };
   if (it.files) return { lane: 'local', reason: `${it.files} file(s) edited, no commit observed`, basis: 'provider file edits; git log over session window', kind: 'OBSERVED' };
   if (isLive(s)) return { lane: 'working', reason: s.lastAction ?? 'live', basis: s.statusReason, kind: 'INFERRED' };
-  return { lane: 'quiet', reason: 'No file change observed', basis: 'provider file edits; git log', kind: 'OBSERVED' };
+  return { lane: 'quiet', reason: 'No file change observed', basis: 'none observed: no edit-tool call and no commit in the session window (shell edits are invisible to edit tools)', kind: 'DERIVED' };
 }
 
 /**
@@ -321,13 +348,15 @@ export function reviewItems(sessions: AgentSessionSnapshot[], events: TimelineEv
     const pr = matched.find(p => p.state === 'open' || p.state === 'draft') ?? matched[0];
     const files = new Set(all.flatMap(x => x.changedFiles)).size;
     const commits = new Set(all.flatMap(x => x.commits.map(c => c.sha))).size;
+    const ownCommits = new Set(all.flatMap(x => x.commits.filter(c => c.attribution === 'session-ran-git-commit').map(c => c.sha))).size;
+    const prLink = pr ? prLinkOf(s, m, pr) : undefined;
     const tests = all.flatMap(x => x.tests).sort((a, b) => a.at - b.at);
     const lastTest = tests[tests.length - 1];
     const at = Math.max(...all.map(x => x.lastActivityAt ?? x.startedAt ?? 0));
     const base = {
       s, branch: branchesOf(s, m)[0] ?? s.branch, pr, otherPrs: matched.filter(p => p !== pr), marks: m,
-      workers: ks.length, liveWorkers: ks.filter(k => k.status === 'RUNNING').length, files, commits, at,
-      steps: steps(files, commits, lastTest, m, pr, opts.prs !== undefined),
+      workers: ks.length, liveWorkers: ks.filter(k => k.status === 'RUNNING').length, files, commits, ownCommits, prLink, at,
+      steps: steps(files, commits, ownCommits, lastTest, m, pr, opts.prs !== undefined, prLink?.kind),
     };
     out.push({ ...base, ...laneOf(base, s, lastTest, now, opts) });
   }

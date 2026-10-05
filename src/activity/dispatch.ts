@@ -5,9 +5,15 @@ import type { AgentSessionSnapshot, EvidenceKind } from '../model';
 import type { WfAgent, WfRun, WorkflowsSnapshot } from '../providers/claude/workflows';
 import { base, isLive, workerRole } from './insights';
 import { quantile } from './forecast';
+import { testVerdict } from '../sessions/classify';
 
 export type DispatchKind = 'subagent' | 'workflow' | 'codex';
-export type DispatchState = 'live' | 'ok' | 'failed' | 'unknown';
+/**
+ * live: still running. verified: finished and its OWN last test passed (outcome trusted, see testVerdict) or it
+ * ran a git commit itself. unverified: finished with no failure signal but nothing verifies it. failed: a
+ * failure signal was recorded. unknown: the end was not observed.
+ */
+export type DispatchState = 'live' | 'verified' | 'unverified' | 'failed' | 'unknown';
 
 export interface Dispatch {
   key: string;
@@ -35,19 +41,23 @@ export interface Dispatch {
   output?: number;
   tools: number;
   toolErrors: number;
+  /** Test commands of this worker by trusted outcome (testVerdict): chained / piped without exit code are neither. */
   pass: number;
   fail: number;
+  /** OBSERVED: commits this worker made with its own git commit command. */
   commits: number;
+  /** INFERRED: commits by anyone inside the worker's time window in a shared cwd (correlated, not attributed). */
+  correlatedCommits: number;
   files: number;
   repo: string;
   runName?: string;
   state: DispatchState;
   /** Why state is failed / unknown (evidence text). */
   reasons: string[];
-  /** DERIVED: finished without a failure signal. undefined while live or when the end is not observed. */
-  success?: boolean;
-  /** DERIVED: finished, no failure signal, and a passing last test or a commit observed. */
-  verified?: boolean;
+  /** DERIVED: true when the end is observed (verified, unverified or failed); false while live or end unknown. */
+  finished: boolean;
+  /** DERIVED: state === 'verified'. */
+  verified: boolean;
   session?: AgentSessionSnapshot;
 }
 
@@ -88,11 +98,15 @@ function lastTest(s: AgentSessionSnapshot) {
   return s.tests[s.tests.length - 1];
 }
 
-function judge(d: Pick<Dispatch, 'live' | 'end' | 'pass' | 'fail' | 'commits'>, fails: string[], lastTestPass: boolean, ended: boolean): Pick<Dispatch, 'state' | 'success' | 'verified' | 'reasons'> {
-  if (d.live) return { state: 'live', reasons: [] };
-  if (fails.length) return { state: 'failed', success: false, verified: false, reasons: fails };
-  if (!ended) return { state: 'unknown', reasons: ['end not observed'] };
-  return { state: 'ok', success: true, verified: lastTestPass || d.commits > 0, reasons: [] };
+type Judged = Pick<Dispatch, 'state' | 'finished' | 'verified' | 'reasons'>;
+
+function judge(live: boolean, fails: string[], ownPass: string | undefined, ownCommits: number, ended: boolean): Judged {
+  if (live) return { state: 'live', finished: false, verified: false, reasons: [] };
+  if (fails.length) return { state: 'failed', finished: true, verified: false, reasons: fails };
+  if (!ended) return { state: 'unknown', finished: false, verified: false, reasons: ['end not observed'] };
+  if (ownPass) return { state: 'verified', finished: true, verified: true, reasons: [`own last test passed: ${ownPass}`] };
+  if (ownCommits) return { state: 'verified', finished: true, verified: true, reasons: [`ran git commit itself (${ownCommits})`] };
+  return { state: 'unverified', finished: true, verified: false, reasons: ['finished with no failure signal; no passing own test and no own commit observed'] };
 }
 
 function fromSession(s: AgentSessionSnapshot, byKey: Map<string, AgentSessionSnapshot>, spawn: { at: number; type: string; description: string } | undefined, wf: { run: WfRun; agent: WfAgent } | undefined, now: number): Dispatch {
@@ -106,19 +120,23 @@ function fromSession(s: AgentSessionSnapshot, byKey: Map<string, AgentSessionSna
   let typeKind: EvidenceKind = 'OBSERVED';
   if (wf?.agent.agentType) type = wf.agent.agentType;
   else if (s.provider === 'claude' && s.workerLabel && !/^a?[0-9a-f]{12,}$/i.test(workerRole(s))) type = workerRole(s);
-  else if (spawn?.type) type = spawn.type;
+  else if (spawn?.type) { type = spawn.type; typeKind = 'DERIVED'; }
   else if (s.provider === 'codex' && s.workerLabel) type = workerRole(s);
   else { type = 'worker'; typeKind = 'UNKNOWN'; }
   const t = lastTest(s);
+  const tv = t ? testVerdict(t) : undefined;
   const fails: string[] = [];
-  if (t?.outcome === 'FAIL') fails.push(`last test failed: ${bound(t.command, 60)}${t.exitCode !== undefined ? ` (exit ${t.exitCode})` : ''}`);
+  if (tv?.outcome === 'FAIL') fails.push(`last test failed: ${bound(t.command, 60)}${t.exitCode !== undefined ? ` (exit ${t.exitCode})` : ''}`);
   if (wf?.agent.status === 'failed') fails.push(`workflow agent failed (${bound(wf.agent.statusBasis, 60) ?? 'journal'})`);
   const ended = s.status === 'ENDED' || wf?.agent.status === 'done' || wf?.agent.status === 'failed';
+  const verdicts = s.tests.map(x => testVerdict(x).outcome);
+  const own = s.commits.filter(c => c.attribution === 'session-ran-git-commit').length;
   const base0 = {
     live,
-    pass: s.tests.filter(x => x.outcome === 'PASS').length,
-    fail: s.tests.filter(x => x.outcome === 'FAIL').length,
-    commits: s.commits.length,
+    pass: verdicts.filter(x => x === 'PASS').length,
+    fail: verdicts.filter(x => x === 'FAIL').length,
+    commits: own,
+    correlatedCommits: s.commits.length - own,
   };
   return {
     key: s.key,
@@ -145,7 +163,7 @@ function fromSession(s: AgentSessionSnapshot, byKey: Map<string, AgentSessionSna
     runName: wf?.run.name,
     session: s,
     ...base0,
-    ...judge(base0, fails, t?.outcome === 'PASS', ended),
+    ...judge(live, fails, tv?.outcome === 'PASS' ? bound(t!.command, 60) : undefined, own, ended),
   };
 }
 
@@ -155,7 +173,7 @@ function fromAgent(a: WfAgent, r: WfRun, byKey: Map<string, AgentSessionSnapshot
   const end = live ? now : (a.lastAt ?? undefined);
   const parent = byKey.get(r.parentKey);
   const fails = a.status === 'failed' ? [`workflow agent failed (${bound(a.statusBasis, 60) || 'journal'})`] : [];
-  const base0 = { live, end, pass: 0, fail: 0, commits: 0 };
+  const base0 = { live, end, pass: 0, fail: 0, commits: 0, correlatedCommits: 0 };
   return {
     key: a.sessionKey,
     provider: 'claude',
@@ -179,7 +197,7 @@ function fromAgent(a: WfAgent, r: WfRun, byKey: Map<string, AgentSessionSnapshot
     repo: (parent ? base(parent.repository) || base(parent.cwd) : '') || '(no repo)',
     runName: r.name,
     ...base0,
-    ...judge(base0, fails, false, a.status === 'done' || a.status === 'failed'),
+    ...judge(live, fails, undefined, 0, a.status === 'done' || a.status === 'failed'),
   };
 }
 
@@ -246,9 +264,12 @@ export interface DispatchGroup {
   n: number;
   finished: number;
   live: number;
+  /** Finished without a failure signal (verified + unverified). Not proof of success. */
   ok: number;
   verified: number;
-  /** DERIVED rates over finished dispatches with a known end (undefined when none). */
+  unverified: number;
+  failed: number;
+  /** DERIVED rates over finished dispatches with an observed end (undefined when none). successRate = no failure signal. */
   successRate?: number;
   verifiedRate?: number;
   medTokens?: number;
@@ -272,12 +293,13 @@ export function groupStats(ds: Dispatch[], by: GroupBy, prices: Record<string, u
   }
   const out: DispatchGroup[] = [];
   for (const [key, list] of m) {
-    const judged = list.filter(d => d.success !== undefined);
+    const judged = list.filter(d => d.finished);
     const fin = list.filter(d => !d.live);
     const tok = fin.map(d => d.tokens).filter((x): x is number => x !== undefined);
     const costs = fin.map(d => costOf(d, prices)).filter((x): x is number => x !== undefined);
-    const ok = judged.filter(d => d.success).length;
-    const ver = judged.filter(d => d.verified).length;
+    const ver = judged.filter(d => d.state === 'verified').length;
+    const unv = judged.filter(d => d.state === 'unverified').length;
+    const ok = ver + unv;
     out.push({
       key,
       model: by === 'type' ? key : (list[0].model ?? '(model not recorded)'),
@@ -286,6 +308,8 @@ export function groupStats(ds: Dispatch[], by: GroupBy, prices: Record<string, u
       live: list.filter(d => d.live).length,
       ok,
       verified: ver,
+      unverified: unv,
+      failed: judged.length - ok,
       successRate: judged.length ? ok / judged.length : undefined,
       verifiedRate: judged.length ? ver / judged.length : undefined,
       medTokens: med(tok),

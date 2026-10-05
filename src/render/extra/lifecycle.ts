@@ -106,6 +106,13 @@ function evTip(e: Partial<Record<EvidenceKind, number>>): string {
   return (Object.keys(e) as EvidenceKind[]).map(k => `${e[k]} ${k}`).join(', ');
 }
 
+/** Weakest evidence kind among an edge's transitions: drives its stroke (solid / dashed / dotted). */
+export function edgeKind(e: Partial<Record<EvidenceKind, number>>): EvidenceKind {
+  return (['UNKNOWN', 'INFERRED', 'DERIVED', 'OBSERVED'] as EvidenceKind[]).find(k => (e[k] ?? 0) > 0) ?? 'UNKNOWN';
+}
+
+const EDGE_LEGEND = '<div class="legend lc-el"><i class="lc-ls"></i> OBSERVED / DERIVED · <i class="lc-ls lc-li"></i> INFERRED (dashed, lighter) · <i class="lc-ls lc-lu"></i> UNKNOWN (dotted). An edge takes the weakest kind among its transitions.</div>';
+
 function diagram(m: Machine, specs: Record<string, Spec>, order: string[], current: Map<string, number>, pickName: string, pick: string, aria: string, prefix: string): string {
   const cols = Math.max(...order.map(id => specs[id].col)) + 1;
   const rows = Math.max(...order.map(id => specs[id].row)) + 1;
@@ -124,7 +131,8 @@ function diagram(m: Machine, specs: Record<string, Spec>, order: string[], curre
       const w = 1 + (5 * e.count) / maxC;
       const lx = 0.25 * p0.x + 0.5 * cx + 0.25 * p2.x, ly = 0.25 * p0.y + 0.5 * cy + 0.25 * p2.y;
       const tip = esc(`${specs[e.from].label} → ${specs[e.to].label}: ${e.count} transition(s) · median ${dwell(e.medianMs)} in ${specs[e.from].label} before it (DERIVED) · evidence: ${evTip(e.evidence)}`);
-      return `<g class="${prefix}-e"><title>${tip}</title><path d="M${p0.x.toFixed(1)},${p0.y.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}" stroke-width="${w.toFixed(1)}" marker-end="url(#${prefix}-ar)"/><text x="${lx.toFixed(0)}" y="${(ly + 3).toFixed(0)}">${e.count} · ${esc(dwell(e.medianMs))}</text></g>`;
+      const k = edgeKind(e.evidence);
+      return `<g class="${prefix}-e lc-k-${k.toLowerCase()}"><title>${tip}</title><path d="M${p0.x.toFixed(1)},${p0.y.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}" stroke-width="${w.toFixed(1)}" marker-end="url(#${prefix}-ar)"/><text x="${lx.toFixed(0)}" y="${(ly + 3).toFixed(0)}">${e.count} · ${esc(dwell(e.medianMs))}</text></g>`;
     })
     .join('');
   const boxes = order
@@ -138,7 +146,7 @@ function diagram(m: Machine, specs: Record<string, Spec>, order: string[], curre
       return `<g class="${prefix}-n${on ? ' on' : ''}${n || cur ? '' : ' zero'}" data-opt="${esc(pickName)}" data-val="${esc(on ? '' : id)}" style="--sc:${sp.color}"><title>${tip}</title><rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="8"/><text class="t" x="${x + NW / 2}" y="${y + 18}">${esc(sp.label)}</text><text class="s" x="${x + NW / 2}" y="${y + 35}">now ${cur} · ${esc(dwell(n?.medianMs))}</text></g>`;
     })
     .join('');
-  return `<div class="${prefix}-gw"><svg class="${prefix}-g" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(aria)}"><defs><marker id="${prefix}-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>${paths}${boxes}</svg></div>`;
+  return `<div class="${prefix}-gw"><svg class="${prefix}-g" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(aria)}"><defs><marker id="${prefix}-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>${paths}${boxes}</svg></div>${EDGE_LEGEND}`;
 }
 
 function edgeTable(m: Machine, specs: Record<string, Spec>): string {
@@ -260,7 +268,7 @@ export function renderLifecycle(d: WsData, st: WsState): string {
   }
   const gaps = b.noEvents ? `<div class="muted lc-note">${b.noEvents} session(s) have no event history loaded: status shows start and current status only, work loop empty.</div>` : '';
   const foot = `<div class="legend lc-foot">
-<b>Evidence.</b> OBSERVED = read from a provider record (first record, tool call, file edit, test exit code / error flag, git commit command, Codex “turn completed”). DERIVED = computed from records (Running from record timestamps, commits found by git log in the session window, every median dwell / edge time). INFERRED = assumed: Idle between records when no record for ≥ 5 min, Reply before the next prompt for Claude, edit → fail → edit cycles and fixes. UNKNOWN = not exposed. Providers do not record status history, so only start and the current status are evidence-backed; the moves in between are reconstructed.
+<b>Evidence.</b> OBSERVED = read from a provider record (first record, tool call, file edit, test exit code / error flag, git commit command, Codex “turn completed”). DERIVED = computed from records (commits found by git log in the session window, every median dwell / edge time). INFERRED = assumed: Running from record timestamps (a record does not prove the process was running), Idle between records when no record for ≥ 5 min, Reply before the next prompt for Claude, edit → fail → edit cycles and fixes. UNKNOWN = not exposed. Providers do not record status history, so only start and the current status are evidence-backed (for a Claude lead the current RUNNING / IDLE is the live registry, with the process alive inferred from a pid check, and ENDED without an end record is inferred from the registry entry being gone); the moves in between are reconstructed. Inferred edges are drawn dashed and lighter, unknown ones dotted.
 <br>Node: “now N” = sessions in that state now (status machine) or whose last work state it is (work loop) · median dwell. Edge: count · median time in the source state; width ∝ count. Shell commands that are neither read-only nor tests are not loop states. No prompt text is read.</div>`;
   return `${bar}${picker}${k}${gaps}${body}${foot}`;
 }
@@ -286,6 +294,10 @@ export const lifecycleView: ExtraView = {
 .lc .lcs-n text.t, .lc .lcw-n text.t { font-weight: 600; }
 .lc .lcs-n text.s, .lc .lcw-n text.s { fill: var(--vscode-descriptionForeground); font-size: 10px; }
 .lc .lcs-e path, .lc .lcw-e path { fill: none; stroke: var(--vscode-descriptionForeground); opacity: .65; }
+.lc .lc-k-inferred path { stroke-dasharray: 6 4; opacity: .4; }
+.lc .lc-k-unknown path { stroke-dasharray: 1 4; stroke-linecap: round; opacity: .35; }
+.lc .lc-ls { display: inline-block; width: 26px; vertical-align: middle; border-top: 2px solid var(--vscode-descriptionForeground); opacity: .65; }
+.lc .lc-ls.lc-li { border-top-style: dashed; opacity: .4; } .lc .lc-ls.lc-lu { border-top-style: dotted; opacity: .35; }
 .lc .lcs-e:hover path, .lc .lcw-e:hover path { opacity: 1; stroke: var(--accent); }
 .lc .lcs-e text, .lc .lcw-e text { fill: var(--vscode-foreground); font-size: 10px; text-anchor: middle; paint-order: stroke; stroke: var(--raise); stroke-width: 3px; }
 .lc .lcs-g marker path, .lc .lcw-g marker path { fill: var(--vscode-descriptionForeground); }

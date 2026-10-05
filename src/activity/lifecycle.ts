@@ -78,7 +78,8 @@ function add<S extends string>(path: Visit<S>[], state: S, at: number, evidence:
 
 /**
  * Status path of one session, oldest first. `events` may hold other sessions' events (ignored).
- * STARTED = first record (OBSERVED / DERIVED as in the audit trail); RUNNING from the second record (DERIVED);
+ * STARTED = first record (OBSERVED / DERIVED as in the audit trail); RUNNING from the second record (INFERRED:
+ * a record timestamp does not prove the process was running);
  * a gap ≥ idleGapMs between records = IDLE then RUNNING again (INFERRED); last state = the current status
  * with its evidence. The last visit stays open until `now` unless it is ENDED.
  */
@@ -93,7 +94,7 @@ export function statusPath(s: AgentSessionSnapshot, events: TimelineEvent[], o: 
     .filter(t => Number.isFinite(t) && t > start.at)
     .sort((a, b) => a - b);
   if (times.length) {
-    add(path, 'RUNNING', times[0], 'DERIVED');
+    add(path, 'RUNNING', times[0], 'INFERRED');
     for (let i = 0; i + 1 < times.length; i++) {
       if (times[i + 1] - times[i] >= gap) {
         add(path, 'IDLE', times[i], 'INFERRED');
@@ -108,7 +109,7 @@ export function statusPath(s: AgentSessionSnapshot, events: TimelineEvent[], o: 
     if (last.state === fin) {
       if (end) last.evidence = end.evidence;
     } else if (end) add(path, fin, end.at, end.evidence);
-    else add(path, fin, s.lastActivityAt ?? last.at, 'DERIVED');
+    else add(path, fin, s.lastActivityAt ?? last.at, 'INFERRED');
   }
   const last = path[path.length - 1];
   if (last.state !== 'ENDED') last.until = Math.max(o.now, last.at);
