@@ -300,6 +300,32 @@
           "minimum": 20,
           "description": "Transcript screen: entries per page."
         },
+        "agent.roles.patterns": {
+          "type": "array",
+          "default": [
+            { "match": "^PM\\b|\\bPM\\b", "role": "PM" },
+            { "match": "coordinat", "role": "coordinator" },
+            { "match": "architect", "role": "architect" },
+            { "match": "review", "role": "reviewer" }
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "match": {
+                "type": "string",
+                "description": "Case-insensitive regular expression tested on the session title."
+              },
+              "role": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "match",
+              "role"
+            ]
+          },
+          "description": "Roles screen: title patterns that name a session's role when no worker / subagent / workflow agent type is recorded. First match wins; the result is shown as INFERRED."
+        },
         "agent.parallelTarget": {
           "type": "number",
           "default": 0,

@@ -15,6 +15,7 @@ import { projectsView } from './projects';
 import { replayView } from './replay';
 import { reposView } from './repos';
 import { reviewView } from './review';
+import { rolesView } from './roles';
 import { runsView } from './runs';
 import { settingsView } from './settings';
 import { signalsView } from './signals';
@@ -43,6 +44,7 @@ export function allExtra(): ExtraView[] {
   replayView,
   reposView,
   reviewView,
+  rolesView,
   runsView,
   settingsView,
   signalsView,
