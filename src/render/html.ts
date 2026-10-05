@@ -203,9 +203,9 @@ export type WebviewMessage =
   | { type: 'nav'; view: string; key: '' }
   | { type: 'opt'; name: string; value: string; key: string }
   | { type: 'act'; name: string; arg: string; key: '' }
-  | { type: 'cmd'; cmd: 'refresh' | 'timelineAll' | 'revealWorktree' | 'copySessionId' | 'openTimeline' | 'openInTern' | 'openArtifactFolder' | 'openWorkspace' | 'openWorkspaceNewTab'; key: string };
+  | { type: 'cmd'; cmd: 'refresh' | 'timelineAll' | 'revealWorktree' | 'copySessionId' | 'openTimeline' | 'openInTern' | 'openArtifactFolder' | 'openWorkspace' | 'openWorkspaceNewTab' | 'readTranscript'; key: string };
 
-const CMDS = new Set(['refresh', 'timelineAll', 'revealWorktree', 'copySessionId', 'openTimeline', 'openInTern', 'openArtifactFolder', 'openWorkspace', 'openWorkspaceNewTab']);
+const CMDS = new Set(['refresh', 'timelineAll', 'revealWorktree', 'copySessionId', 'openTimeline', 'openInTern', 'openArtifactFolder', 'openWorkspace', 'openWorkspaceNewTab', 'readTranscript']);
 
 /** Strict validation of anything a webview posts back. Unknown shapes are dropped. */
 export function validateMessage(m: unknown, knownKey: (k: string) => boolean): WebviewMessage | undefined {
