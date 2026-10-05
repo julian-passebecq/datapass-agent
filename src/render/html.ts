@@ -94,7 +94,7 @@ table.vt tr { cursor: pointer; } table.vt td:nth-child(1), table.vt td:nth-child
 .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; } .wd { display: grid; justify-items: center; gap: 2px; font-size: 11px; } .wd b { font-size: 14px; }
 .stack { height: 90px; width: 26px; display: flex; flex-direction: column-reverse; border-radius: 4px; overflow: hidden; background: var(--raise); border: 1px solid var(--line); } .stack i { display: block; width: 100%; } .stack i.claude { background: var(--claude); } .stack i.codex { background: var(--codex); }
 .heat { display: grid; grid-template-columns: 34px repeat(24, 1fr); gap: 2px; font-size: 10px; } .heat i { display: block; height: 15px; border-radius: 2px; background: var(--accent); } .hx, .hy { color: var(--vscode-descriptionForeground); }
-.sd { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; } .sd.ready { background: var(--ok); } .sd.partial { background: var(--warn); } .sd.missing { background: var(--bad); } .sd.off { border: 1px solid var(--quiet); }
+.sd { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; } .sd.ready { background: var(--ok); } .sd.partial { background: var(--warn); } .sd.missing { background: var(--bad); } .sd.off { border: 1px solid var(--quiet); } .sd.RUNNING { background: var(--ok); } .sd.NEEDS_INPUT { background: var(--warn); } .sd.IDLE { background: var(--accent); } .sd.UNKNOWN, .sd.ENDED { background: var(--quiet); }
 .st-ready { color: var(--ok); } .st-partial { color: var(--warn); } .st-missing { color: var(--bad); } .st-off { color: var(--quiet); } td.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .split { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 2px 0 8px; } .split i.claude { background: var(--claude); } .split i.codex { background: var(--codex); }
 .szbar { display: block; height: 8px; border-radius: 2px; background: var(--claude); } .szbar.codex { background: var(--codex); }
@@ -121,6 +121,14 @@ dt { color: var(--vscode-descriptionForeground); } dd { margin: 0; overflow-wrap
 button.link { background: none; border: none; color: var(--vscode-textLink-foreground); cursor: pointer; padding: 0; font: inherit; }
 .filter { display: flex; gap: 6px; align-items: center; margin: 2px 0 6px; font-size: 11px; }
 .empty { color: var(--vscode-descriptionForeground); padding: 8px 0; }
+footer.strip { position: sticky; bottom: 0; display: flex; gap: 12px; justify-content: space-between; align-items: center; padding: 3px 8px; margin: 8px -8px -12px; border-top: 1px solid var(--line); background: var(--vscode-editor-background); font-size: 11px; font-variant-numeric: tabular-nums; }
+footer.strip .tkr { display: flex; gap: 10px; overflow: hidden; white-space: nowrap; min-width: 0; } footer.strip .tk { display: inline-flex; gap: 3px; align-items: center; }
+footer.strip .sw { width: 8px; height: 8px; border-radius: 2px; display: inline-block; } footer.strip > .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+svg .fl { opacity: .4; cursor: pointer; } svg .fl:hover, svg .fl.on { opacity: .8; }
+svg .fn { cursor: pointer; } svg .fn.on rect { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+svg .fh { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; fill: var(--vscode-descriptionForeground); }
+table.ft { width: 100%; border-collapse: collapse; font-size: 12px; } table.ft th { text-align: left; font-weight: 600; color: var(--vscode-descriptionForeground); border-bottom: 1px solid var(--line); padding: 3px 6px; }
+table.ft td { padding: 3px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; } table.ft tr[data-select] { cursor: pointer; } table.ft tr[data-select]:hover, table.ft tr.sel { background: var(--vscode-list-hoverBackground); }
 `;
 
 /** Client script: renders host-escaped HTML into #root (keeps scroll), forwards clicks on [data-open]/[data-cmd]. */
