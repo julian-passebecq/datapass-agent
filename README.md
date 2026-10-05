@@ -2,7 +2,9 @@
 
 Agent answers one question inside VS Code: **what are my coding agents doing, where, and what did they actually change?**
 
-It **observes** provider-native sessions. It does not schedule, steer, stop or route agents, and it adds no hooks to the providers. The one exception is the Launcher screen, which starts or resumes a session in a terminal only after you confirm the exact folder and command.
+Source: [github.com/julian-passebecq/agent-vscode](https://github.com/julian-passebecq/agent-vscode) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Galaxy seams: [docs/GALAXY.md](docs/GALAXY.md)
+
+It **observes** provider-native sessions. It does not schedule, steer, stop or route agents, and it adds no hooks to the providers. Agent is not a harness: no dispatch, no auto-merge, no "start next". The one exception is the Launcher screen, the only screen that starts a provider session: it starts or resumes one in a terminal only after you confirm the exact folder and command. Other processes Agent runs are read-only probes, listed under [Processes and network](#processes-and-network).
 
 - **Cockpit**: live sessions per provider, ended today, recent sessions.
 - **Sessions**: tree grouped by provider, with workers nested under their parent where the provider exposes the link.
@@ -12,7 +14,7 @@ It **observes** provider-native sessions. It does not schedule, steer, stop or r
 
 ### Agent Workspace (`Agent: Open Workspace`, or the button in the Cockpit)
 
-One editor panel: a navigation rail, the main surface, and a result card for the selected session on the right. Click selects; double-click or Enter opens the Inspector. Keyboard: `1`–`0` switch screens, `j`/`k` or arrows move the selection, Enter inspects, `/` filters sessions on the current screen, Esc clears, `r` refreshes. The rail shows a collector summary (for example *9 ready · 1 partial*).
+One editor panel: a navigation rail, the main surface, and a result card for the selected session on the right. Click selects; double-click or Enter opens the Inspector. Keyboard: `1`–`0` open the first ten screens of the rail (collapsed groups are skipped; click the rail for the others), `j`/`k` or arrows move the selection, Enter inspects, `/` filters sessions on the current screen, Esc clears, `r` refreshes. The rail shows a collector summary (for example *9 ready · 1 partial*).
 
 | Screen | What it shows |
 |---|---|
@@ -33,14 +35,18 @@ Agent stands alone. It needs no DataPass, Tern, Factory, MongoDB or cloud backen
 
 ## Screens
 
-Add-on screens sit in the rail under group headings. Every value shows its evidence kind (OBSERVED, DERIVED, INFERRED, UNKNOWN) in a tooltip or legend. "Git" means read-only hardened git in repositories the agents used. "gh / glab" means the GitHub / GitLab CLI, run only when the opt-in setting is on and the workspace is trusted. Nothing else starts a process or uses the network, except the Launcher (after your confirmation) and the Catalog CLI probe (`agent.catalog.runCli`). No LLM runs in Agent.
+Agent 0.6.0 has **42 screens**: the 10 core screens above and 32 add-on screens below. Add-on screens sit in the rail under group headings (Now, Sessions, Time, Git, Usage, Quality, System); each group header's tooltip says the question its screens answer. Every value shows its evidence kind (OBSERVED, DERIVED, INFERRED, UNKNOWN, see [Evidence grammar](#evidence-grammar)) in a tooltip or legend. "Git" means read-only hardened git in repositories the agents used. "gh / glab" means the GitHub / GitLab CLI, run only when the opt-in setting is on and the workspace is trusted. The only other processes are the read-only CLI probes (Catalog `--help` / `--version`, provider `--version`) and the Launcher (after your confirmation); see [Processes and network](#processes-and-network). No LLM runs in Agent.
+
+A **Model benchmarks** screen is being built in a separate pull request; it is not part of this version.
 
 | Group | Screen | What it shows | Source | Evidence | Git | gh / glab |
 |---|---|---|---|---|---|---|
+| Now | Panes | 2 to 4 other screens side by side in one tab; pick the layout and the screen of each pane. Adds no number of its own: each pane keeps the evidence labels of its screen | the screens shown | as each pane's screen | as each pane | as each pane |
 | Now | Live | Every live session and worker: current tool, tokens per minute, pace | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
+| Now | Session HUD | One terminal-style card per live session (plus one pinned): plan / permission mode, subagents running / idle / ended, todo checklist and progress, tests, CI state, context use, lessons-rule count of the repository, tail of the last events | provider artifacts, lessons file of the repository (`handoff/MEMORY.md`, `tasks/lessons.md` or a CLAUDE.md "Lessons" section, read-only, 256 KB cap), Pipelines feed for CI | OBSERVED, DERIVED, INFERRED | no | CI only via Pipelines, opt-in (`agent.pipelines.enabled`) |
 | Now | Workflows | Claude Code workflow runs: phases, agents, model, time, tokens; background subagents and Codex workers | workflow files, transcripts | OBSERVED, DERIVED, INFERRED | no | no |
 | Now | Projects | Company, project, repository, sessions tree; click sets the scope for every screen | sessions + `agent.projects` | OBSERVED, DERIVED, INFERRED | no | no |
-| Now | Codex | Codex app state: threads, projects, sub-agents, automations, goals, queue, turn timing. Labelled "Codex app state (undocumented, may change)" | sqlite copies read from `~/.codex` | OBSERVED | no | no |
+| Now | Codex | Codex app state: threads, projects, sub-agents, automations, goals, queue, turn timing. Labelled "Codex app state (undocumented, may change)" | `~/.codex` sqlite files, copied to the OS temp folder and opened read-only (whitelisted non-text columns only) | OBSERVED | no | no |
 | Sessions | Roles | Which role each session played (recorded type, else title pattern) and how each role performs: table, scorecard, hand-off graph, file overlap, wave Gantt. Patterns in `agent.roles.patterns` | sessions, workflow runs, titles | OBSERVED, DERIVED, INFERRED | no | no |
 | Sessions | Topology | Lead, workers and nested workers as a tree with rolled-up tokens, cost, time | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
 | Sessions | Transcript | One session as a conversation (prompts, replies, tool calls), redacted | one transcript / rollout, read on demand | OBSERVED, DERIVED, INFERRED | no | no |
@@ -56,15 +62,19 @@ Add-on screens sit in the rail under group headings. Every value shows its evide
 | Usage | Explore | Pivot sessions by dimension and metric as bars, table, treemap, heatmap or line; CSV export | loaded sessions | DERIVED | no | no |
 | Usage | Limits | Codex 5 h / weekly used %, reset countdown and trend as recorded in rollouts; Claude 5-hour blocks derived from per-call tokens and compared with your own past blocks. Claude records no limit, so no official quota is claimed. Thresholds `agent.limits.warnPercent` (70) and `agent.limits.alertPercent` (90) | Codex rollouts, Claude per-call usage | OBSERVED (Codex), DERIVED, INFERRED (Claude projection) | no | no |
 | Usage | Token rhythm | Tokens per minute, hour or day by provider, model, repo or session; peaks, context growth | provider usage records | OBSERVED, DERIVED | no | no |
+| Usage | Context cost | How many tokens each tool puts back into the context: median / p90 per call or total, log-scale bars against the context window, a table and one data-only tip per tool. Sizes are recorded characters of tool results (content never kept); tokens are estimated as chars / 4 | `facts.toolResultChars` | OBSERVED (chars), INFERRED (≈ tokens) | no | no |
+| Usage | Dispatches | Every worker a lead sent off, joined with the spawn call it came from, the tokens it actually used and its outcome (Log); outcome rate vs tokens per model / effort / worker type (Cost vs outcome). Money only from your own `agent.dispatch.pricePerMTok`, never priced by Agent | provider artifacts, workflow runs | OBSERVED, DERIVED, INFERRED | no | no |
 | Quality | Signals | Unsolved, blocked, permissions, swallowed, looping, each with its basis | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
 | Quality | Health | Test pass rate, commits per session, context use against a reference window | provider artifacts | OBSERVED, DERIVED | no | no |
+| Quality | Lifecycle | Two state machines rebuilt from snapshots and the event timeline: session status (started → running / idle / needs input → ended / unknown) and the prompt → read → edit → test → commit loop, with counts and median times; click a state to list its sessions. Each edge carries its weakest evidence kind | snapshots, timeline | OBSERVED, DERIVED, INFERRED | no | no |
 | Quality | Backlog | Packages and checklist items from `handoff/PLAN.md`, `ROADMAP.md`, `TODO.md` with the sessions that mention them; *+ Daily archive* keeps closed or removed items visible | plan files (read-only, size cap), `~/.agent/archive` | OBSERVED, DERIVED, INFERRED | no | no |
+| Quality | Scope map | Each project's plan as milestones → sections → items coloured by state, done / total per milestone, what is left, linked sessions, and what changed since the archive snapshot of about a week ago | plan files (same parser as Backlog), `~/.agent/archive/backlog` | OBSERVED, DERIVED, INFERRED | no | no |
 | System | Audit trail | Observed transitions, filters, local JSONL export | provider artifacts | OBSERVED, DERIVED, INFERRED | no | no |
-| System | Catalog | Everything Claude Code and Codex have installed: skills, agents, commands, plugins, hooks, MCP servers, settings keys, instruction files, CLI options. Read-only; open and copy actions only. `agent.catalog.runCli` (default on, trusted workspace only) runs `claude --help` / `--version` and `codex --help`, 5 s timeout, cached one day | provider folders, repositories used, CLI help | OBSERVED | no | no |
+| System | Catalog | Everything Claude Code and Codex have installed: skills, agents, commands, plugins, hooks, MCP servers, settings keys, instruction files, CLI options. Read-only; open and copy actions only. **Process exec, default on**: `agent.catalog.runCli` (trusted workspace only) runs `claude --help` / `--version` and `codex --help`, 5 s timeout, cached one day; no network | provider folders, repositories used, CLI help | OBSERVED | no | no |
 | System | Launcher | Start or resume a Claude Code / Codex session in a terminal Agent owns. Documented flags only; permission modes limited to default, plan, acceptEdits (never bypassPermissions); nothing starts until you confirm the exact folder and command | your choice, session list | OBSERVED (sessions to resume) | no | no |
 | System | Settings | Effective Claude Code and Codex configuration layers, agents, hooks (read-only, redacted) | settings files, `config.toml` | OBSERVED | no | no |
 
-The Launcher is the only screen that starts a process, and never without your confirmation. The daily archive (`npm run archive`, scheduled by `scripts/install-archive-task.ps1`, which you run yourself) is described under Daily archive below.
+The Launcher is the only screen that starts a provider session, and never without your confirmation. Read-only processes are also started by Git correlation, Repositories and Changes (git), the Catalog CLI probe and the provider version probe (`--help` / `--version`), and, only when you opt in, Review and Pipelines (gh / glab). The daily archive (`npm run archive`, scheduled by `scripts/install-archive-task.ps1`, which you run yourself) is described under Daily archive below.
 
 ### Multiple tabs and project scope
 
@@ -172,6 +182,7 @@ Defined in `package.json`. Commands are in the Command Palette under "Agent:".
 | `agent.roles.patterns` | list | 4 rules | Roles screen: case-insensitive regex on the session title mapped to a role (defaults: PM, coordinator, architect, reviewer). |
 | `agent.limits.warnPercent` | number | `70` | Limits screen: warning threshold (%). |
 | `agent.limits.alertPercent` | number | `90` | Limits screen: alert threshold (%); also drives the rail badge. |
+| `agent.dispatch.pricePerMTok` | object | `{}` | Dispatches screen: optional price per million tokens by model id (e.g. `{"claude-opus-5-5": 1.5}`). Agent never prices tokens by itself; any $ shown is DERIVED from this setting. Empty = no money shown. |
 | `agent.archive.dir` | string | `""` | Daily archive folder (empty = ~/.agent/archive). Written by npm run archive; read by the History and Backlog screens. |
 | `agent.archive.maxDays` | number | `400` | History / Backlog screens: how many of the newest daily archive files are read. |
 | `agent.archive.rawTranscripts` | boolean | `false` | Daily archive: also keep gzip copies of transcripts and rollouts in <archive>/raw (full text, local only; auth / secret files never copied). |
@@ -180,6 +191,19 @@ Defined in `package.json`. Commands are in the Command Palette under "Agent:".
 ## No AI
 
 Agent uses no LLM. Every number is read from a provider artifact or computed by a fixed rule from those artifacts. Estimates (Forecast) are medians of your own past durations, labelled INFERRED with their basis. Nothing leaves the machine, except the read-only `gh` / `glab` calls you turn on yourself in Review and Pipelines.
+
+## Evidence grammar
+
+Every value Agent shows carries one evidence kind, in a tooltip, a legend or a chip:
+
+| Kind | Meaning | Example |
+|---|---|---|
+| OBSERVED | Recorded by the source itself (provider artifact, git object, gh / glab answer, archive line of that day) | Claude `message.model`, Codex `exit_code`, commit sha |
+| DERIVED | A deterministic calculation over observed values | duration, token sums, commits in the session window, `$` from your price table |
+| INFERRED | A heuristic: recency, process presence, medians of your own history, chars / 4 | RUNNING vs IDLE for Codex, Forecast ETA, Context cost tokens |
+| UNKNOWN | Not exposed by the source, or not readable now | Claude context window, Codex cost |
+
+Rules: an absence is never OBSERVED (no test recorded is "no test observed", not "passed"; no commit is "no commit observed", not "failed"). A value combined from several kinds takes the weakest one. Archived values are OBSERVED *as of their archive day* and are shown with the ARCHIVED chip. Settings (thresholds, context reference window, price table) are labelled as settings, not facts. No LLM judges anything.
 
 ## Observability matrix (Claude Code 2.1.289 CLI / 2.1.286 desktop; Codex CLI 0.160.0)
 
@@ -219,9 +243,22 @@ Anything not in the table shows as *not exposed*. Agent never invents model, eff
 
 Git runs read-only in the session's cwd (and, for Repositories and Changes, in the repositories agents used): `rev-parse`, `status --porcelain -uno` (live sessions only), `rev-list`, `log`, and `diff --numstat`. Every call is hardened with `core.fsmonitor=false`, no external diff or textconv, no pager, no credential helper and `GIT_TERMINAL_PROMPT=0`, so a repository named by an artifact cannot run its own programs. Commits are labelled **observed during session**. **Session ran git commit** appears only when the provider recorded a `git commit` command. In untrusted workspaces Git correlation is off.
 
+## Processes and network
+
+| What runs | Where | When | Network |
+|---|---|---|---|
+| `git` (read-only, hardened, see Git correlation) | session cwd, repositories agents used | every refresh with Git correlation; Repositories / Changes screens while visible; trusted workspaces only | no |
+| `claude --help` / `--version`, `codex --help` | Catalog feed | `agent.catalog.runCli` (default **on**), trusted workspaces only, 5 s timeout, cached one day | no |
+| `claude --version`, `codex --version` | provider version probe (`src/providers/versions.ts`) | once at activation (any workspace), 8 s timeout, minimal environment with no tokens | no |
+| `gh` / `glab` (read-only API calls) | Review, Pipelines, Session HUD CI | only with `agent.review.prState` or `agent.pipelines.enabled` (both default **off**), trusted workspaces only | **yes**, to your GitHub / GitLab |
+| `claude` / `codex` in a VS Code terminal | Launcher | only after you confirm the exact folder and command | as the provider does |
+
+Executables are resolved on absolute PATH entries only, never from a session cwd, and `.cmd` / `.bat` shims are never run through a shell. Nothing else starts a process or opens a socket. No telemetry.
+
 ## Privacy and security
 
-- Local only. No telemetry, no transcript copies. The only network use is the opt-in read-only `gh` / `glab` calls of Review and Pipelines (both off by default). Provider artifacts stay the authority; Agent holds an in-memory projection that it rebuilds on reload.
+- Local only. No telemetry. The only network use is the opt-in read-only `gh` / `glab` calls of Review and Pipelines (both off by default). Provider artifacts stay the authority; Agent holds an in-memory projection that it rebuilds on reload. Agent never writes provider files; it writes only its own archive (`~/.agent/`, when you run the archive / weekly scripts or *Build now*), the files you export, and temporary sqlite copies for the Codex screen (OS temp folder). Raw transcript copies exist only if you turn on `agent.archive.rawTranscripts`.
+- Auth files (`~/.claude/.credentials.json`, `~/.codex/auth.json`, `secrets/`) are never opened.
 - Kept text is limited to titles and command lines, single-line, length-bounded and redacted (API keys, GitHub/GitLab/Slack tokens, JWTs, `Authorization`/`Bearer`, `*_TOKEN=`/`*_SECRET=`, URL credentials, private keys).
 - Environment: Agent reads only `USERPROFILE`, `HOME`, `CODEX_HOME` and `CLAUDE_CONFIG_DIR`. Child processes (`git`, `claude --version`, `codex --version`) get a minimal environment with no tokens.
 - Artifacts are opened read-only. A path that resolves outside the provider root (traversal, symlink, junction) is rejected. Paths read from artifacts must be plausible absolute local paths.
@@ -247,6 +284,14 @@ npm run smoke     # installs the VSIX into an isolated VS Code profile, drives i
 
 `node out-test/scripts/observe.js <days>` prints a headless, redacted observation of this machine's real sessions. `node out-test/scripts/preview.js <dir> [dark|light]` renders every workspace screen from real local data to static HTML for review (local files only).
 
+## Repository
+
+The canonical repository is `github.com/julian-passebecq/agent-vscode` (git remote `agent`). The older `julian-passebecq/datapass-agent` repository still exists (remote `origin` in the original checkout); whether to archive it or keep it as a mirror is an **open owner decision**. No repository migration is done by Agent's code or CI.
+
+## Release gate
+
+`ci.yml` runs on every push and pull request (check, test, build, package). `release.yml` is the release qualification: run it by hand (*Actions → release-qualification → Run workflow*) or push a `v*` tag. It repeats the CI steps, downloads VS Code with `@vscode/test-electron`, runs the installed-VSIX smoke (`scripts/smoke.mjs`, dark and light, every screen) and uploads the VSIX, its SHA-256, the screenshots and `smoke-result.json`. If VS Code cannot be downloaded, the smoke is skipped with a warning (the run fails instead on tags or with *require_smoke*).
+
 ## Future seams (not in this version)
 
-Open, resume, stop and steer would be provider-native control adapters next to `src/providers/*`. Agent stays observation only.
+Open, resume, stop and steer would be provider-native control adapters next to `src/providers/*`. Agent stays observation only. Galaxy export: pure projections to `galaxy.agent-observation/1` and `galaxy.agent-config-snapshot/1` exist in `src/galaxy/` (no command, no Mongo write yet); see [docs/GALAXY.md](docs/GALAXY.md).
