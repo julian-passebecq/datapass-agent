@@ -433,6 +433,30 @@
           "minimum": 1,
           "maximum": 520,
           "description": "History screen: how many of the newest week files are read."
+        },
+        "agent.archive.dir": {
+          "type": "string",
+          "default": "",
+          "description": "Daily archive folder (empty = ~/.agent/archive). Written by npm run archive (scripts/install-archive-task.ps1 schedules it daily); read by the History and Backlog screens so sessions and plan items stay visible after Claude Code or Codex delete their files."
+        },
+        "agent.archive.maxDays": {
+          "type": "number",
+          "default": 400,
+          "minimum": 1,
+          "maximum": 5000,
+          "description": "History / Backlog screens: how many of the newest daily archive files are read."
+        },
+        "agent.archive.rawTranscripts": {
+          "type": "boolean",
+          "default": false,
+          "description": "Daily archive: also keep gzip copies of Claude transcripts and Codex rollouts in <archive>/raw (full conversation text, local only; auth and secret files are never copied). Same as npm run archive -- --raw."
+        },
+        "agent.archive.rawMaxGB": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0.1,
+          "maximum": 500,
+          "description": "Daily archive: size cap of the raw transcript copies, in GB."
         }
       }
     }
@@ -445,7 +469,8 @@
     "package": "npm run build && vsce package --no-dependencies --out agent-vscode-0.4.0.vsix",
     "smoke": "node scripts/smoke.mjs",
     "perf": "npm run compile-tests && node out-test/scripts/perf.js",
-    "weekly": "npm run compile-tests && node out-test/scripts/weekly.js"
+    "weekly": "npm run compile-tests && node out-test/scripts/weekly.js",
+    "archive": "npm run compile-tests && node out-test/scripts/archive.js"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

@@ -13,7 +13,9 @@ import { identityColor } from '../../activity/insights';
 import { ArchiveRead, collectAll, defaultHistoryDir, HISTORY_FEED, historyFeed, writeArchive } from '../../feeds/history';
 import { esc } from '../html';
 import type { WsData, WsState } from '../workspace';
-import { ago } from '../workspace';
+import { ago, repoOf, scopeKey } from '../workspace';
+import { ARCHIVE_FEED, archiveFeed, ArchiveView, archivedOnly } from '../../archive/reader';
+import type { ArchivedSession } from '../../archive/archive';
 import { actBtn, ActCtx, ExtraView, opt, seg, toolbar } from './kit';
 import { Feed, FeedState, feedValue } from './feeds';
 
@@ -31,6 +33,7 @@ interface Cfg {
   range: number;
   leadsOnly: boolean;
   live: boolean;
+  archive: boolean;
   metric: Metric;
   orient: 'cols' | 'rows';
   cmp: 'value' | 'delta' | 'avg';
@@ -53,6 +56,7 @@ function cfg(st: WsState): Cfg {
     range: { '4': 4, '8': 8, '13': 13, '26': 26, '52': 52 }[opt(st, 'history.range', '8')] ?? 8,
     leadsOnly: opt(st, 'history.who', 'all') === 'leads',
     live: opt(st, 'history.live', 'on') !== 'off',
+    archive: opt(st, 'history.archive', 'on') !== 'off',
     metric: isMetric(m) ? m : 'tokens',
     orient: opt(st, 'history.orient', 'cols') === 'rows' ? 'rows' : 'cols',
     cmp: (['value', 'delta', 'avg'] as const).find(x => x === opt(st, 'history.cmp', 'value')) ?? 'value',
@@ -399,7 +403,7 @@ function barsList(list: [string, number][], dim: HDim, m: Metric, n = 10): strin
   return `<div class="hi-bl">${top.map(([k, v]) => `<div class="hi-blr" title="${esc(`${k}: ${fmtMetric(m, v)}${sum ? ` · ${((100 * v) / sum).toFixed(1)} %` : ''}`)}"><span class="hi-bll">${esc(k)}</span><span class="hi-trk"><i style="width:${Math.max(0.5, (100 * v) / max).toFixed(2)}%;background:${colorOf(dim, k.startsWith('other (') ? 'other' : k)}"></i></span><b>${esc(fmtMetric(m, v))}</b></div>`).join('')}</div>`;
 }
 
-function oneWeek(cols: Col[], weeks: Map<string, HistWeek>, overlay: Set<string>, cf: Cfg, d: WsData, st: WsState, reports: Set<string>, leadsOnly: boolean): string {
+function oneWeek(cols: Col[], weeks: Map<string, HistWeek>, overlay: Set<string>, cf: Cfg, d: WsData, st: WsState, reports: Set<string>, leadsOnly: boolean, archived: Map<string, ArchivedOnly> = new Map()): string {
   const picked = fromPick(cf.pick);
   const id = picked && weekStartOf(picked) !== undefined ? picked : [...cols].reverse().find(c => c.rows.length)?.id ?? weekId(d.now);
   const start = weekStartOf(id)!;
@@ -443,8 +447,9 @@ function oneWeek(cols: Col[], weeks: Map<string, HistWeek>, overlay: Set<string>
     ? `<h3>Largest sessions by ${esc(HIST_BASIS[cf.metric].label.toLowerCase())}</h3><table class="hi-t hi-top"><tr><th>Session</th><th>Repo</th><th>Provider · model</th><th class="r">${esc(METRIC_SHORT[cf.metric])}</th>${extra.map(m => `<th class="r">${esc(METRIC_SHORT[m])}</th>`).join('')}<th>Outcome</th></tr>${top
         .map(r => {
           const s = byKey.get(r.k);
-          const name = s ? (s.title ?? s.workerLabel ?? r.k.split(':')[1]?.slice(0, 8)) : r.k.split(':')[1]?.slice(0, 8);
-          return `<tr${s ? ` data-select="${esc(r.k)}" tabindex="0" class="${st.selected === r.k ? 'sel' : ''}"` : ` title="session no longer loaded in the workspace"`}><td>${esc((name ?? r.k).slice(0, 60))}${r.w ? ` <span class="muted">${esc(r.wt ?? 'worker')}</span>` : ''}</td><td><span class="hi-sw" style="background:${identityColor(r.repo)}"></span>${esc(r.repo)}</td><td class="muted"><span class="prov ${esc(r.p)}">${esc(r.p)}</span> ${esc(prettyModelName(r.model) || '—')}${r.effort ? ` · ${esc(r.effort)}` : ''}</td><td class="r"><b>${esc(fmtMetric(cf.metric, rowValue(r, cf.metric)))}</b></td>${extra.map(m => `<td class="r">${esc(fmtMetric(m, rowValue(r, m)))}</td>`).join('')}<td class="muted">${esc(OUT_LABEL[r.o])}</td></tr>`;
+          const a = s ? undefined : archived.get(r.k);
+          const name = s ? (s.title ?? s.workerLabel ?? r.k.split(':')[1]?.slice(0, 8)) : a ? (a.s.title ?? a.s.workerLabel ?? r.k.split(':')[1]?.slice(0, 8)) : r.k.split(':')[1]?.slice(0, 8);
+          return `<tr${s ? ` data-select="${esc(r.k)}" tabindex="0" class="${st.selected === r.k ? 'sel' : ''}"` : ` title="session no longer loaded in the workspace"`}><td>${esc((name ?? r.k).slice(0, 60))}${a ? ` ${archChip(a.rec)}` : ''}${r.w ? ` <span class="muted">${esc(r.wt ?? 'worker')}</span>` : ''}</td><td><span class="hi-sw" style="background:${identityColor(r.repo)}"></span>${esc(r.repo)}</td><td class="muted"><span class="prov ${esc(r.p)}">${esc(r.p)}</span> ${esc(prettyModelName(r.model) || '—')}${r.effort ? ` · ${esc(r.effort)}` : ''}</td><td class="r"><b>${esc(fmtMetric(cf.metric, rowValue(r, cf.metric)))}</b></td>${extra.map(m => `<td class="r">${esc(fmtMetric(m, rowValue(r, m)))}</td>`).join('')}<td class="muted">${esc(OUT_LABEL[r.o])}</td></tr>`;
         })
         .join('')}</table>`
     : '';
@@ -454,6 +459,27 @@ function oneWeek(cols: Col[], weeks: Map<string, HistWeek>, overlay: Set<string>
     ? `<div class="foot">${esc(id)}: ${w.rows.length} session row(s) · written ${w.generatedAt ? esc(ago(d.now, w.generatedAt) || 'just now') : '—'} by the ${w.source.by === 'script' ? 'weekly script' : 'workspace'} · git ${w.source.git ? 'read' : 'not read (commits not counted)'} · ${w.runs} run(s) merged${w.kept ? ` · ${w.kept} row(s) kept from earlier runs` : ''}. Titles in the table come from sessions still loaded; the archive itself stores no title or prompt text.</div>`
     : '';
   return `${nav}<div class="kpis hi-kpis">${kp}</div>${days}<div class="hi-pans">${panels}</div>${table}${src}`;
+}
+
+// ---------------------------------------------------------------- archived sessions (daily archive)
+
+interface ArchivedOnly {
+  rec: ArchivedSession;
+  s: AgentSessionSnapshot;
+}
+
+function archChip(rec: ArchivedSession): string {
+  return `<span class="hi-arch" title="${esc(`ARCHIVED · OBSERVED on ${rec.day} by Agent's daily archive; no longer read from the provider's files (deleted by the provider's cleanup, or outside agent.historyDays)`)}">ARCHIVED ${esc(rec.day)}</span>`;
+}
+
+/** Sessions known only from the archive, newest first. */
+function archivedList(extra: ArchivedOnly[], now: number): string {
+  if (!extra.length) return '';
+  const rows = extra
+    .slice(0, 150)
+    .map(({ rec, s }) => `<tr><td>${archChip(rec)}</td><td class="muted">${esc(s.lastActivityAt ? new Date(s.lastActivityAt).toLocaleDateString() : '—')}</td><td><span class="prov ${esc(s.provider)}">${esc(s.provider)}</span></td><td><span class="hi-sw" style="background:${identityColor(repoOf(s))}"></span>${esc(repoOf(s))}</td><td>${esc((s.title ?? s.workerLabel ?? s.sessionId.slice(0, 8)).slice(0, 70))}${s.isWorker ? ' <span class="muted">worker</span>' : ''}</td><td class="muted">${esc(prettyModelName(s.model) || '—')}</td><td class="r" title="OBSERVED: provider-recorded tokens, as archived">${esc(fmtMetric('tokens', s.usage?.totalTokens ?? 0))}</td><td class="r" title="DERIVED: commits observed in the session window, as archived">${s.commits.length || ''}</td><td class="muted">${esc(s.status)}</td></tr>`)
+    .join('');
+  return `<details class="hi-how hi-archl"><summary>${extra.length} session(s) known only from the archive <span class="muted">(ARCHIVED, oldest kept ${esc(extra[extra.length - 1].rec.day)})</span></summary><table class="hi-t"><tr><th>Archived</th><th>Last activity</th><th>Provider</th><th>Repo</th><th>Session</th><th>Model</th><th class="r">Tokens</th><th class="r">Commits</th><th>Status</th></tr>${rows}</table>${extra.length > 150 ? `<div class="muted">+${extra.length - 150} more</div>` : ''}<div class="muted">Read ${esc(ago(now, extra[0].rec.archivedAt) || 'just now')} from the daily archive; titles only when the provider named the session (never prompt text).</div></details>`;
 }
 
 // ---------------------------------------------------------------- empty archive help
@@ -467,6 +493,7 @@ function howTo(dir: string, open: boolean): string {
 <p><b>Build now</b> reads all local Claude Code and Codex history in this window (git not read: commits are not counted). The weekly script also reads git, read-only.</p>
 <p>${actBtn('copy', 'script', 'Copy script command', SCRIPT_CMD)} <code>${esc(SCRIPT_CMD)}</code> <span class="muted">(in the agent-vscode checkout; <code>--no-git</code>, <code>--days n</code>, <code>--out dir</code>, <code>--dry</code>)</span></p>
 <p>${actBtn('copy', 'schedule', 'Copy Task Scheduler command', SCHEDULE_CMD)} <span class="muted">every Monday 08:00; replace the checkout path</span></p>
+<p>Daily archive: <code>npm run archive</code> keeps one snapshot line per session (no prompt or reply text) in <code>~/.agent/archive</code> (setting <code>agent.archive.dir</code>), so sessions stay visible here after Claude Code (cleanupPeriodDays) or Codex delete their files. <code>scripts/install-archive-task.ps1</code> registers it daily at 03:17.</p>
 </div></details>`;
 }
 
@@ -483,7 +510,11 @@ function render(d: WsData, st: WsState): string {
   const f = feedValue<ArchiveRead>(HISTORY_FEED);
   const arch = f.value;
   const dir = arch?.dir ?? defaultHistoryDir();
-  const { weeks, overlay } = allWeeks(arch, d.sessions, { live: cf.live, git: !!d.git?.enabled, now: d.now });
+  const av = feedValue<ArchiveView>(ARCHIVE_FEED).value;
+  const scope = st.opts?.scope;
+  const extra = cf.archive ? archivedOnly(av, d.sessions, scope ? s => scopeKey(s) === scope : undefined) : [];
+  const extraS = extra.map(x => x.s);
+  const { weeks, overlay } = allWeeks(arch, cf.live ? (extraS.length ? d.sessions.concat(extraS) : d.sessions) : extraS, { live: cf.live || extraS.length > 0, git: !!d.git?.enabled, now: d.now });
   const cols = columns(weeks, overlay, cf.range, cf.leadsOnly, d.now);
   const metricSeg = seg(st, 'history.metric', METRICS.map(m => [m, METRIC_SHORT[m]] as [string, string]), 'tokens', 'Metric');
   const bySeg = seg(st, 'history.by', HDIMS.map(x => [x, DIM_SHORT[x]] as [string, string]), 'provider', 'Group by');
@@ -492,6 +523,7 @@ function render(d: WsData, st: WsState): string {
     seg(st, 'history.range', [['4', '4 wk'], ['8', '8 wk'], ['13', '13 wk'], ['26', '26 wk'], ['52', '52 wk']], '8', 'Weeks shown, ending with the current week'),
     seg(st, 'history.who', [['all', 'All'], ['leads', 'Leads only']], 'all', 'Include worker sessions (subagents) or only top-level sessions'),
     seg(st, 'history.live', [['on', '+ Loaded'], ['off', 'Archive only']], 'on', 'Merge the sessions loaded in the workspace (agent.historyDays) into the archive weeks, so the current week is up to date'),
+    seg(st, 'history.archive', [['on', '+ Archive'], ['off', 'No archive']], 'on', `Include sessions kept in Agent's daily archive (npm run archive, ${av?.dir ?? '~/.agent/archive'}) that are no longer loaded from provider files: shown as ARCHIVED, OBSERVED on the archive day`),
     actBtn('build', 'all', 'Build now', 'Read all local history now and write the week files (asks first)', 'btn'),
     actBtn('open', '', 'Open folder', 'Reveal the archive folder'),
     actBtn('csv', cf.leadsOnly ? 'leads' : 'all', 'Export CSV', 'Weeks × metrics as CSV (numbers only)'),
@@ -528,17 +560,18 @@ function render(d: WsData, st: WsState): string {
     `<div class="kpi" title="${esc(evTitle('sessions'))}"><b>${esc(fmtMetric('sessions', ses))}</b><span>Session-weeks</span></div>`,
     `<div class="kpi" title="${esc(evTitle('tokens'))}"><b>${esc(fmtMetric('tokens', tokens))}</b><span>Tokens</span></div>`,
     `<div class="kpi" title="DERIVED: distinct repository folder names"><b>${repos}</b><span>Repositories</span></div>`,
+    extra.length ? `<div class="kpi" title="ARCHIVED: sessions read from Agent's daily archive that the providers no longer expose (or that are outside agent.historyDays); OBSERVED on the archive day"><b>${extra.length}</b><span>From archive</span></div>` : '',
   ].join('')}</div>`;
 
   let body: string;
   if (cf.view === 'trend') body = trend(cols, cf, d.now);
   else if (cf.view === 'matrix') body = matrix(cols, cf);
-  else if (cf.view === 'week') body = oneWeek(cols, weeks, overlay, cf, d, st, new Set(arch?.reports ?? []), cf.leadsOnly);
+  else if (cf.view === 'week') body = oneWeek(cols, weeks, overlay, cf, d, st, new Set(arch?.reports ?? []), cf.leadsOnly, new Map(extra.map(x => [x.s.key, x])));
   else body = sideBySide(cols, cf) + (cf.pick ? `<div class="hi-open"><button class="link" data-opt="history.view" data-val="week">Open ${esc(fromPick(cf.pick))} in detail ▸</button></div>` : '');
 
   const shownMetric = cf.view === 'weeks' ? undefined : cf.metric;
   const foot = `<div class="foot">${shownMetric ? `<b>${esc(HIST_BASIS[shownMetric].kind)}</b> · ${esc(HIST_BASIS[shownMetric].basis)}. ` : 'Hover a metric for its basis. '}Weeks are ISO weeks in local time (Monday → Sunday). <sup>+</sup> marks weeks that include the sessions loaded in the workspace; the archive itself holds counts, tokens, repositories, models and outcomes only.</div>`;
-  return `<div class="hi">${tb1}${tb2}${banner}${kp}${body}${foot}${howTo(dir, false)}</div>`;
+  return `<div class="hi">${tb1}${tb2}${banner}${kp}${body}${archivedList(extra, d.now)}${foot}${howTo(dir, false)}</div>`;
 }
 
 // ---------------------------------------------------------------- actions
@@ -691,6 +724,7 @@ const CSS = `
 .hi details.hi-how { margin-top: 10px; font-size: 12px; }
 .hi details.hi-how summary { cursor: pointer; color: var(--vscode-descriptionForeground); }
 .hi details.hi-how code { font-size: 11px; }
+.hi .hi-arch { display: inline-block; font-size: 9.5px; font-weight: 600; letter-spacing: .03em; padding: 0 5px; border-radius: 8px; border: 1px dashed var(--quiet); color: var(--vscode-descriptionForeground); white-space: nowrap; }
 `;
 
 export const historyView: ExtraView = {
@@ -699,7 +733,7 @@ export const historyView: ExtraView = {
   group: 'Time',
   hint: 'Long-term weekly rollups from the local archive (built by the weekly script), including archived Claude / Codex sessions.',
   ready: true,
-  feeds: [historyFeed as Feed],
+  feeds: [historyFeed as Feed, archiveFeed as Feed],
   render,
   css: CSS,
   actions: { build, open: openDir, report, copy, csv },
