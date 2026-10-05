@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
 import { SessionStore } from '../sessions/store';
 import { EXTRA_NAV, page, validateMessage, WebviewMessage } from '../render/html';
-import { renderWorkspace, scoped, WsState, WsView } from '../render/workspace';
+import { allViews, renderWorkspace, scoped, WsState, WsView } from '../render/workspace';
 import { extraViews, extraCss } from '../render/extra';
 import { ActCtx } from '../render/extra/kit';
-import { FeedCtx, pump, setFeedScope } from '../render/extra/feeds';
+import { Feed, FeedCtx, pump, setFeedScope } from '../render/extra/feeds';
+import { visibleViews } from '../activity/panes';
 
 let panelSeq = 0;
 
@@ -80,13 +81,21 @@ export class WorkspacePanel implements vscode.Disposable {
 
   private pumpFeeds(force = false): void {
     setFeedScope(this.state.opts?.scope);
-    const v = extraViews().find(x => x.id === this.state.view);
-    if (v?.feeds?.length) pump(v.feeds, this.feedCtx(), () => this.schedule(), force);
+    // The visible screen, or every pane of the Panes screen; a feed shared by two panes loads once.
+    const feeds = new Map<string, Feed>();
+    for (const v of this.visibleExtra()) for (const f of v.feeds ?? []) feeds.set(f.id, f);
+    if (feeds.size) pump([...feeds.values()], this.feedCtx(), () => this.schedule(), force);
+  }
+
+  private visibleExtra() {
+    const vis = visibleViews(this.state.view, this.state.opts, allViews());
+    const ext = extraViews();
+    return vis.flatMap(id => ext.filter(x => x.id === id));
   }
 
   private async act(name: string, arg: string): Promise<void> {
-    const v = extraViews().find(x => x.id === this.state.view);
-    const fn = v?.actions?.[name];
+    // On the Panes screen the first pane whose screen defines the action handles it.
+    const fn = this.visibleExtra().find(x => x.actions?.[name])?.actions?.[name];
     if (!fn) return;
     try {
       await fn(arg, this.ctx());
@@ -133,7 +142,7 @@ export class WorkspacePanel implements vscode.Disposable {
   private body(): string {
     setFeedScope(this.state.opts?.scope);
     // Full event history only for screens that roll it up; otherwise just the selected session's events.
-    const full = this.state.view === 'activity';
+    const full = visibleViews(this.state.view, this.state.opts, allViews()).includes('activity');
     const events = full ? this.store.timeline(undefined, 200_000) : this.state.selected ? this.store.timeline(this.state.selected) : [];
     this.pumpFeeds();
     return renderWorkspace({ sessions: this.store.all(), providers: this.store.providerStates, events, now: Date.now(), ternAvailable: this.ternAvailable(), git: { enabled: this.store.opts.git, lastMs: this.store.lastStats?.gitMs, at: this.store.lastStats?.at }, idleAlertMinutes: vscode.workspace.getConfiguration('agent').get<number>('idleAlertMinutes', 30), timeline: (k, n) => this.store.timeline(k, n), stats: this.stats(), config: (k, f) => vscode.workspace.getConfiguration('agent').get(k.replace(/^agent\./, ''), f) }, this.state);
