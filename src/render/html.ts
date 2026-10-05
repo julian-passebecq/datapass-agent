@@ -152,11 +152,12 @@ function applyFilter() {
   for (const el of root.querySelectorAll('main table tr:not([data-select])')) if (!el.querySelector('th')) el.classList.toggle('hide', !!t && !el.textContent.toLowerCase().includes(t));
 }
 if (q) q.addEventListener('input', applyFilter);
-function items() { return [...root.querySelectorAll('main [data-select]')].filter(e => !e.classList.contains('hide')); }
+// One entry per session: a session shown in two panes (Panes screen) must not trap j/k between its copies.
+function items() { const seen = new Set(); return [...root.querySelectorAll('main [data-select]')].filter(e => !e.classList.contains('hide') && !seen.has(e.dataset.select) && seen.add(e.dataset.select)); }
 document.addEventListener('keydown', e => {
   if (!root.querySelector('.ws')) return;
   if (e.target === q) { if (e.key === 'Escape') { q.value = ''; applyFilter(); q.blur(); } return; }
-  if (e.ctrlKey || e.metaKey || e.altKey || (e.target.tagName === 'INPUT')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   const navs = [...root.querySelectorAll('[data-nav].nav')];
   if (/^[0-9]$/.test(e.key)) { const n = navs[e.key === '0' ? 9 : +e.key - 1]; if (n) { n.click(); e.preventDefault(); } return; }
   if (e.key === '/' && q) { q.focus(); e.preventDefault(); return; }
@@ -176,7 +177,7 @@ document.addEventListener('keydown', e => {
 vscode.postMessage({ type: 'ready', key: '' });
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-open],[data-cmd],[data-nav],[data-select],[data-opt],[data-act]');
-  if (!el) return;
+  if (!el || el.tagName === 'SELECT') return;
   if (el.dataset.act) vscode.postMessage({ type: 'act', name: el.dataset.act, arg: el.dataset.arg || '', key: '' });
   else if (el.dataset.opt) vscode.postMessage({ type: 'opt', name: el.dataset.opt, value: el.dataset.val || '', key: el.dataset.key || '' });
   else if (el.dataset.nav) vscode.postMessage({ type: 'nav', view: el.dataset.nav, key: '' });
@@ -189,6 +190,8 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Enter' || !d) return;
   if (d.select || d.open) vscode.postMessage({ type: 'open', key: d.select || d.open });
 });
+// <select data-opt="name"> posts its value as an option on change (same validation as seg buttons).
+document.addEventListener('change', e => { const el = e.target; if (el && el.tagName === 'SELECT' && el.dataset.opt) vscode.postMessage({ type: 'opt', name: el.dataset.opt, value: el.value, key: '' }); });
 document.addEventListener('dblclick', e => { const el = e.target.closest('[data-select]'); if (el) vscode.postMessage({ type: 'open', key: el.dataset.select }); });
 `;
 

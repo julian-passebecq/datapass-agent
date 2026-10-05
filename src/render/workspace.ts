@@ -483,7 +483,29 @@ export function statusStrip(d: WsData): string {
 const RAIL_GROUPS = ['Now', 'Sessions', 'Time', 'Git', 'Usage', 'Quality', 'System'];
 const CORE_GROUP: Record<string, string> = { overview: 'Now', attention: 'Now', board: 'Sessions', team: 'Sessions', gantt: 'Time', worktrees: 'Git', activity: 'Usage', flow: 'Usage', verify: 'Quality', providers: 'System' };
 /** Reading order inside groups; screens not listed go last in their group. */
-const RAIL_ORDER = ['overview', 'attention', 'live', 'workflows', 'codex', 'projects', 'board', 'team', 'topology', 'roles', 'transcript', 'replay', 'gantt', 'week', 'runs', 'forecast', 'history', 'worktrees', 'repos', 'changes', 'review', 'pipelines', 'tokens', 'limits', 'explore', 'activity', 'flow', 'verify', 'signals', 'health', 'backlog', 'providers', 'settings', 'catalog', 'audit', 'launcher'];
+const RAIL_ORDER = ['overview', 'attention', 'panes', 'live', 'workflows', 'codex', 'projects', 'board', 'team', 'topology', 'roles', 'transcript', 'replay', 'gantt', 'week', 'runs', 'forecast', 'history', 'worktrees', 'repos', 'changes', 'review', 'pipelines', 'tokens', 'limits', 'explore', 'activity', 'flow', 'verify', 'signals', 'health', 'backlog', 'providers', 'settings', 'catalog', 'audit', 'launcher'];
+
+function bodies(d: WsData, st: WsState): Record<string, () => string> {
+  const body: Record<string, () => string> = {
+    overview: () => overview(d, st), attention: () => attentionView(d, st), board: () => board(d, st), team: () => team(d, st), flow: () => flowView(d, st), worktrees: () => worktrees(d, st), gantt: () => gantt(d, st), verify: () => verify(d, st), activity: () => activity(d), providers: () => providersView(d, st),
+  };
+  for (const x of extraViews()) body[x.id] = () => x.render(d, st);
+  return body;
+}
+
+/** Body of one screen (core or add-on) from already-scoped data, as if it were the visible screen. '' if unknown. */
+export function renderView(d: WsData, st: WsState, view: string): string {
+  const f = bodies(d, { ...st, view })[view];
+  return f ? f() : '';
+}
+
+/** Rail label and hint of any screen id. */
+export function viewLabel(v: string): string {
+  return (VIEW_LABEL as Record<string, string>)[v] ?? extraViews().find(x => x.id === v)?.label ?? v;
+}
+export function viewHint(v: string): string {
+  return (VIEW_HINT as Record<string, string>)[v] ?? extraViews().find(x => x.id === v)?.hint ?? '';
+}
 
 export function renderWorkspace(d0: WsData, st0: WsState): string {
   let st = st0;
@@ -512,10 +534,7 @@ export function renderWorkspace(d0: WsData, st0: WsState): string {
     return `<div class="rg${closed ? ' closed' : ''}"><button class="railg" data-opt="${name}" data-val="${closed ? '' : 'closed'}" title="${closed ? 'Expand' : 'Collapse'} ${esc(g)}"><span class="chev">${closed ? '▸' : '▾'}</span>${esc(g)}<span class="rgc">${closed && hot ? esc(String(hot)) : vs.length}</span></button>${closed ? '' : vs.map(navBtn).join('')}</div>`;
   };
   const rail = `<nav class="rail"><div class="brand">Agent <button class="link" data-cmd="openWorkspaceNewTab" title="Open another Agent tab (own screen and scope)">+ tab</button></div>${groups.map(railGroup).join('')}<div class="railfoot">${d.providers.map(p => `<div><span class="dot ${p.detected ? 'RUNNING' : 'UNKNOWN'}"></span> ${esc(PROV[p.provider])} ${esc(p.version ?? '')}</div>`).join('')}${collectorSummary(d)}<div class="muted">local · read-only</div></div></nav>`;
-  const body: Record<string, () => string> = {
-    overview: () => overview(d, st), attention: () => attentionView(d, st), board: () => board(d, st), team: () => team(d, st), flow: () => flowView(d, st), worktrees: () => worktrees(d, st), gantt: () => gantt(d, st), verify: () => verify(d, st), activity: () => activity(d), providers: () => providersView(d, st),
-  };
-  for (const x of extraViews()) body[x.id] = () => x.render(d, st);
+  const body = bodies(d, st);
   if (!body[st.view]) st = { ...st, view: 'overview' };
   const keys = `<div class="keys"><b>1–0</b> screens <b>j/k</b> move <b>Enter</b> inspect <b>/</b> filter <b>Esc</b> clear <b>r</b> refresh <b>?</b> keys</div>`;
   const main = `<main class="mainw"><header class="mh"><h1>${esc(label(st.view))}</h1>${st.opts?.scope ? `<button class="link scope" data-opt="scope" data-val="" title="Clear scope">scope: ${esc(st.opts.scope)} ✕</button>` : ""}<span class="muted">${esc(hint(st.view))}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}${keys}${statusStrip(d)}</main>`;

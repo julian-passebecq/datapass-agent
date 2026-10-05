@@ -13,6 +13,7 @@ import { historyView } from './history';
 import { launcherView } from './launcher';
 import { limitsView } from './limits';
 import { liveView } from './live';
+import { panesView } from './panes';
 import { pipelinesView } from './pipelines';
 import { projectsView } from './projects';
 import { replayView } from './replay';
@@ -45,6 +46,7 @@ export function allExtra(): ExtraView[] {
   launcherView,
   limitsView,
   liveView,
+  panesView,
   pipelinesView,
   projectsView,
   replayView,
