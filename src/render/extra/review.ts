@@ -70,7 +70,8 @@ function card(it: ReviewItem, d: WsData, st: WsState, compactCards: boolean): st
   const repo = repoOf(s);
   const br = it.branch ? `<span class="rv-br" title="${esc(`branch ${it.branch}${s.isLinkedWorktree ? ' · linked worktree' : ''}`)}">⎇ ${esc(it.branch)}</span>` : '';
   const wk = it.workers ? `<span class="chip" title="DERIVED: worker sessions rolled into this item (files, tests, live state)">${it.workers} worker${it.workers > 1 ? 's' : ''}${it.liveWorkers ? ` · ${it.liveWorkers} live` : ''}</span>` : '';
-  const prs = it.pr ? prChip(it.pr, d.now) + it.otherPrs.slice(0, 2).map(p => prChip(p, d.now)).join('') : '';
+  const link = it.pr && it.prLink ? `<span class="chip rv-link${it.prLink.kind === 'INFERRED' ? ' rv-inf' : ''}" title="${esc(`${it.prLink.kind}: ${it.prLink.basis}`)}">${it.prLink.kind === 'INFERRED' ? 'linked by branch' : 'linked by command'}</span>` : '';
+  const prs = it.pr ? prChip(it.pr, d.now) + link + it.otherPrs.slice(0, 2).map(p => prChip(p, d.now)).join('') : '';
   const copy = it.branch ? actBtn('copy', it.branch, 'copy branch', 'Copy the branch name', 'link rv-mini') : '';
   return `<div class="rv-card ${LANE_CLS[it.lane]}${st.selected === s.key ? ' sel' : ''}" data-select="${esc(s.key)}" tabindex="0" style="--id:${identityColor(repo)}">
 <div class="rv-ct"><span class="dot ${esc(s.status)}" title="${esc(`${s.status}: ${s.statusReason}`)}"></span><b class="rv-ti">${esc(titleOf(s).slice(0, 90))}</b>${s.isWorker ? '<span class="chip">worker</span>' : ''}<span class="rv-age" title="${esc(new Date(it.at).toLocaleString())}">${esc(short(d.now, it.at))}</span></div>
@@ -124,7 +125,7 @@ function table(items: ReviewItem[], d: WsData, st: WsState, group: string): stri
       .map(it => {
         const s = it.s;
         const p = it.pr;
-        return `<tr class="${LANE_CLS[it.lane]}${st.selected === s.key ? ' sel' : ''}" data-select="${esc(s.key)}" tabindex="0"><td><span class="rv-lane" title="${esc(LANE_HINT[it.lane])}">${esc(LANE_LABEL[it.lane])}</span></td><td class="rv-tt"><span class="dot ${esc(s.status)}"></span> ${esc(titleOf(s).slice(0, 70))}${it.workers ? ` <span class="muted">+${it.workers}w</span>` : ''}</td><td><span class="rv-sw" style="background:${identityColor(repoOf(s))}"></span>${esc(repoOf(s))}</td><td class="rv-brc" title="${esc(it.branch ?? '')}">${esc(it.branch ?? '')}</td><td>${stepStrip(it.steps)}</td><td>${p ? prChip(p, d.now) : ''}</td><td class="rv-whyc" title="${esc(`${it.kind}: ${it.basis}`)}">${esc(it.reason)}</td><td class="r muted" title="${esc(new Date(it.at).toLocaleString())}">${esc(short(d.now, it.at))}</td></tr>`;
+        return `<tr class="${LANE_CLS[it.lane]}${st.selected === s.key ? ' sel' : ''}" data-select="${esc(s.key)}" tabindex="0"><td><span class="rv-lane" title="${esc(LANE_HINT[it.lane])}">${esc(LANE_LABEL[it.lane])}</span></td><td class="rv-tt"><span class="dot ${esc(s.status)}"></span> ${esc(titleOf(s).slice(0, 70))}${it.workers ? ` <span class="muted">+${it.workers}w</span>` : ''}</td><td><span class="rv-sw" style="background:${identityColor(repoOf(s))}"></span>${esc(repoOf(s))}</td><td class="rv-brc" title="${esc(it.branch ?? '')}">${esc(it.branch ?? '')}</td><td>${stepStrip(it.steps)}</td><td>${p ? prChip(p, d.now) : ''}${p && it.prLink?.kind === 'INFERRED' ? ` <span class="muted" title="${esc(`INFERRED: ${it.prLink.basis}`)}">≈</span>` : ''}</td><td class="rv-whyc" title="${esc(`${it.kind}: ${it.basis}`)}">${esc(it.reason)}</td><td class="r muted" title="${esc(new Date(it.at).toLocaleString())}">${esc(short(d.now, it.at))}</td></tr>`;
       })
       .join('');
   const head = '<tr><th>Lane</th><th>Session</th><th>Repo</th><th>Branch</th><th title="Edit · Test · Commit · Push · PR · CI · Review · Merge (hover a step for its evidence)">Pipeline</th><th>PR / MR</th><th>Why</th><th class="r">Last</th></tr>';
@@ -216,7 +217,7 @@ function render(d: WsData, st: WsState): string {
   }
 
   const legend = `<div class="legend rv-leg">Pipeline: <span class="rv-st rv-st-done">done</span><span class="rv-st rv-st-live">in progress</span><span class="rv-st rv-st-fail">failed</span><span class="rv-st rv-st-none">not seen</span> · CI <span class="rv-ci rv-ci-pass">✓</span> pass <span class="rv-ci rv-ci-fail">✗</span> fail <span class="rv-ci rv-ci-pending">●</span> running · hover any value for its evidence (OBSERVED / DERIVED / INFERRED / UNKNOWN).</div>`;
-  const foot = `<div class="foot">Lanes come from session status, git commits in the session window, and push / <code>gh pr create</code> / <code>glab mr create</code> / merge commands the sessions recorded (OBSERVED). PR / MR, CI and review state come from the forge only when <code>agent.review.prState</code> is on. Workers roll into their lead unless they have their own branch PR or push. No merge, comment or approval is ever sent from here.</div>`;
+  const foot = `<div class="foot">Lanes come from session status, git commits in the session window, and push / <code>gh pr create</code> / <code>glab mr create</code> / merge commands the sessions recorded (OBSERVED). PR / MR, CI and review state come from the forge only when <code>agent.review.prState</code> is on; the session↔PR link is INFERRED ("linked by branch", ≈) unless the session's own push / PR command named that branch. Commits are those in the session window (DERIVED, not proof the session made them) unless the session ran git commit. Absences ("none observed") are DERIVED from the loaded records. Workers roll into their lead unless they have their own branch PR or push. No merge, comment or approval is ever sent from here.</div>`;
   return `<div class="rv">${tb1}${feedLine(f, d)}${kpis}${body}${legend}${prList}${foot}</div>`;
 }
 
@@ -261,6 +262,7 @@ const CSS = `
 .rv .rv-st-fail { background: color-mix(in srgb, var(--bad) 25%, transparent); border-color: var(--bad); color: var(--vscode-foreground); }
 .rv .rv-st-none { opacity: .55; }
 .rv .rv-pr { display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 10.5px; border: 1px solid var(--line); border-radius: 10px; padding: 0 6px 0 2px; background: none; color: var(--vscode-foreground); cursor: pointer; line-height: 16px; }
+.rv .rv-inf { border-style: dashed; opacity: .8; }
 .rv .rv-pr:hover { border-color: var(--vscode-focusBorder); }
 .rv .rv-pst { font-size: 9px; text-transform: uppercase; letter-spacing: .04em; border-radius: 8px; padding: 0 5px; color: #fff; }
 .rv .rv-ps-open { background: var(--ok); } .rv .rv-ps-draft { background: var(--quiet); } .rv .rv-ps-merged { background: var(--rv-merged); } .rv .rv-ps-closed { background: var(--bad); }
