@@ -91,7 +91,8 @@ jobs:
       - name: Artifact name (branch refs such as p5/gate contain a slash, not allowed in artifact names)
         if: always()
         shell: pwsh
-        run: "ARTIFACT_NAME=agent-vscode-release-$($env:GITHUB_REF_NAME -replace '[^A-Za-z0-9._-]', '-')-$($env:GITHUB_RUN_NUMBER)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        run: |
+          "ARTIFACT_NAME=agent-vscode-release-$($env:GITHUB_REF_NAME -replace '[^A-Za-z0-9._-]', '-')-$($env:GITHUB_RUN_NUMBER)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - uses: actions/upload-artifact@v4
         if: always()
