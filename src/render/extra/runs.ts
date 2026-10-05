@@ -424,7 +424,7 @@ const CSS = `
 .rn .rn-avg { height: 2px; background: var(--vscode-foreground); left: 4% !important; right: 4% !important; opacity: .7; }
 .rn .rn-wait { background: repeating-linear-gradient(45deg, var(--warn) 0 3px, color-mix(in srgb, var(--warn) 45%, transparent) 3px 6px); border-radius: 2px 2px 0 0; }
 .rn .rn-cnow { background: color-mix(in srgb, var(--accent) 7%, transparent); } .rn .rn-fut { opacity: .35; }
-.rn .rn-xax { display: flex; gap: 1px; margin-left: 29px; padding: 0 1px; max-width: calc(1400px - 29px); font-size: 9.5px; color: var(--vscode-descriptionForeground); }
+.rn .rn-xax { display: flex; gap: 1px; margin-left: 29px; padding: 0 1px; max-width: calc(1400px - 29px); overflow-x: clip; font-size: 9.5px; color: var(--vscode-descriptionForeground); }
 .rn .rn-xax span { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: visible; }
 .rn svg.rn-ln { width: 100%; max-width: 1400px; height: auto; display: block; }
 .rn .rn-g { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
@@ -434,7 +434,7 @@ const CSS = `
 .rn .rn-la { fill: none; stroke: var(--vscode-foreground); stroke-width: 1; stroke-dasharray: 3 3; opacity: .7; vector-effect: non-scaling-stroke; }
 .rn .rn-lo { fill: none; stroke: color-mix(in srgb, var(--accent) 45%, transparent); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .rn .rn-pt { fill: var(--accent); } .rn .rn-pt.over { fill: var(--bad); }
-.rn .rn-hm { display: grid; grid-template-columns: 70px repeat(24, minmax(16px, 1fr)) 34px; gap: 2px; font-size: 10px; max-width: 1100px; }
+.rn .rn-hm { display: grid; grid-template-columns: 70px repeat(24, minmax(16px, 1fr)) 34px; gap: 2px; font-size: 10px; max-width: 1100px; overflow-x: auto; }
 .rn .rn-hm i { height: 18px; border-radius: 2px; border: 1px solid var(--line); font-style: normal; display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--accent) var(--a), transparent); color: var(--vscode-foreground); }
 .rn .rn-hm i.hi { color: var(--vscode-button-foreground, #fff); } .rn .rn-hm i.over { outline: 1px solid var(--bad); outline-offset: -1px; } .rn .rn-hm i.fut { opacity: .3; }
 .rn .rn-hh { color: var(--vscode-descriptionForeground); text-align: left; } .rn .rn-hl { align-self: center; white-space: nowrap; } .rn .rn-hs { align-self: center; text-align: right; color: var(--vscode-descriptionForeground); font-variant-numeric: tabular-nums; }

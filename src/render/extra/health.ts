@@ -308,9 +308,10 @@ const CSS = `
 .hl .hl-m b.hl-mark, .hl .hl-m b.hl-win { position: absolute; top: -3px; bottom: -3px; width: 0; border-left: 2px dashed var(--vscode-foreground); opacity: .65; }
 .hl .hl-m b.hl-win { border-left: 2px solid var(--codex); opacity: .9; }
 .hl .hl-num { font-variant-numeric: tabular-nums; font-size: 11px; white-space: nowrap; }
-.hl .hl-ch { display: grid; gap: 1px; max-width: 1100px; }
+.hl .hl-ch { display: grid; gap: 1px; max-width: 1100px; overflow-x: auto; }
 .hl .hl-chr { display: grid; grid-template-columns: minmax(120px, 2fr) minmax(70px, 1fr) 150px 150px 96px 28px; gap: 8px; align-items: center; padding: 2px 4px; border-radius: 3px; font-size: 12px; cursor: pointer; }
 .hl .hl-chr .hl-m { width: 100%; }
+@media (max-width: 760px) { .hl .hl-chr { grid-template-columns: minmax(90px, 2fr) minmax(56px, 1fr) 96px 110px 90px 22px; gap: 6px; } }
 .hl .hl-chr:hover { background: var(--vscode-list-hoverBackground); }
 .hl .hl-chr.sel { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
 .hl .hl-lab, .hl .hl-repo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
