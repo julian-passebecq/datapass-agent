@@ -14,6 +14,10 @@ const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
 const AGENT_TOOLS = new Set(['Agent', 'Task']);
 const TODO_TOOLS = new Set(['TodoWrite', 'TaskCreate', 'TaskUpdate']);
 const MAX_PARSE_LINE = 512 * 1024;
+const MAX_PENDING = 500;
+const MAX_ASYNC_AGENTS = 500;
+/** task-notification statuses that end a background task. */
+const END_STATUS = new Set(['completed', 'failed', 'killed']);
 
 interface RegistryEntry {
   pid: number;
@@ -224,7 +228,7 @@ export class ClaudeAdapter implements ProviderAdapter {
       acc.setFact('recordedBranch', o.gitBranch, 120);
     }
     if (typeof o.entrypoint === 'string') acc.setFact('entrypoint', o.entrypoint, 30);
-    if (typeof o.permissionMode === 'string') acc.setFact('permissionMode', o.permissionMode, 30);
+    if (typeof o.permissionMode === 'string') acc.setFact('permissionMode', o.permissionMode, 30, at);
     if (typeof o.agentId === 'string' && acc.isWorker && !acc.workerLabel) acc.workerLabel = bounded(o.agentId, 40);
 
     switch (type) {
@@ -262,19 +266,46 @@ export class ClaudeAdapter implements ProviderAdapter {
         return;
       case 'user':
         acc.touch(at);
+        if (acc.isWorker) this.finalTurn.delete(acc);
         this.userRecord(acc, o, at);
         return;
       case 'assistant':
         acc.touch(at);
         this.assistantRecord(acc, o, at);
+        if (acc.isWorker) {
+          const m = o.message;
+          const final = m?.stop_reason === 'end_turn' && !(Array.isArray(m?.content) && m.content.some((c: any) => c?.type === 'tool_use'));
+          if (final) this.finalTurn.add(acc);
+          else this.finalTurn.delete(acc);
+        }
         return;
       case 'system':
         acc.touch(at);
         if (o.subtype === 'compact_boundary') {
-          acc.event(at, 'SESSION_ACTIVITY', 'context compacted', 'OBSERVED', o.uuid);
+          const m = o.compactMetadata && typeof o.compactMetadata === 'object' ? o.compactMetadata : {};
+          const pre = typeof m.preTokens === 'number' ? m.preTokens : undefined, post = typeof m.postTokens === 'number' ? m.postTokens : undefined;
+          acc.event(at, 'SESSION_ACTIVITY', pre !== undefined && post !== undefined ? `context compacted (${pre} → ${post} tokens)` : 'context compacted', 'OBSERVED', o.uuid);
           acc.bump('compactions');
+          if (at !== undefined) acc.compactInfo({ at, trigger: m.trigger, preTokens: pre, postTokens: post, durationMs: m.durationMs });
+          acc.ev('facts.compacts', 'OBSERVED', 'compact_boundary compactMetadata trigger / preTokens / postTokens');
         }
         if (o.subtype === 'api_error') acc.event(at, 'SESSION_ACTIVITY', 'provider API error (retrying)', 'OBSERVED', o.uuid);
+        return;
+      case 'mode':
+        // {type:"mode", mode, sessionId}: no timestamp; dated by the latest record seen before it.
+        acc.setFact('sessionMode', o.mode, 30);
+        acc.ev('facts.sessionMode', 'OBSERVED', 'transcript {type:"mode"} record (dated by the previous record)');
+        return;
+      case 'pr-link':
+        acc.touch(at);
+        acc.prLink(at, o.prUrl, o.prNumber, o.prRepository);
+        acc.ev('facts.prLinks', 'OBSERVED', 'transcript pr-link record (prUrl, prNumber, prRepository)');
+        return;
+      case 'queue-operation':
+        acc.touch(at);
+        acc.queueOp(o.operation);
+        // A background task's completion notification is queued before it is delivered as a user record.
+        if (typeof o.content === 'string') this.taskNotification(o.content, at);
         return;
       default:
         acc.touch(at); // unknown or future record types still count as activity when timestamped
@@ -303,41 +334,79 @@ export class ClaudeAdapter implements ProviderAdapter {
       else acc.event(at, 'SESSION_ACTIVITY', 'user turn', 'OBSERVED', o.uuid);
     };
     if (typeof content === 'string') {
+      if (content.startsWith('<task-notification>')) this.taskNotification(content, at);
       if (!o.toolUseResult) prompt(content);
       return;
     }
     if (!Array.isArray(content)) return;
     for (const c of content) {
-      if (c?.type === 'text' && typeof c.text === 'string') prompt(c.text);
+      if (c?.type === 'text' && typeof c.text === 'string') {
+        if (c.text.startsWith('<task-notification>')) this.taskNotification(c.text, at);
+        prompt(c.text);
+      }
       if (c?.type !== 'tool_result' || typeof c.tool_use_id !== 'string') continue;
       acc.toolEnd(c.tool_use_id, c.is_error === true);
       acc.toolResult(c.tool_use_id, resultChars(c.content), at);
+      const r = o.toolUseResult && typeof o.toolUseResult === 'object' ? o.toolUseResult : undefined;
       const t = this.pendingTests.get(c.tool_use_id);
       if (t) {
         this.pendingTests.delete(c.tool_use_id);
         const test = t.acc.tests[t.idx];
-        test.outcome = c.is_error === true ? 'FAIL' : c.is_error === false ? 'PASS' : 'UNKNOWN';
-        if (typeof o.toolUseResult?.exitCode === 'number') {
-          test.exitCode = o.toolUseResult.exitCode;
+        // Claude Code records no exit code for Bash (toolUseResult: stdout, stderr, interrupted, backgroundTaskId …):
+        // the outcome is DERIVED from tool_result.is_error. An interrupted or backgrounded run has no outcome yet.
+        const noOutcome = r?.interrupted === true || typeof r?.backgroundTaskId === 'string';
+        test.outcome = noOutcome ? 'UNKNOWN' : c.is_error === true ? 'FAIL' : c.is_error === false ? 'PASS' : 'UNKNOWN';
+        if (typeof r?.exitCode === 'number') {
+          // Not recorded by current Claude Code versions; kept in case a future version does.
+          test.exitCode = r.exitCode;
           test.source = 'provider-exit-code';
           test.outcome = test.exitCode === 0 ? 'PASS' : 'FAIL';
         }
         if (at && at >= test.at) test.durationMs = at - test.at;
-        t.acc.event(at, 'TEST', `${test.outcome} ${test.command}`, 'OBSERVED', `${c.tool_use_id}:r`);
+        // "Is a test" comes from the command regex: INFERRED unless the provider recorded an exit code.
+        t.acc.event(at, 'TEST', `${test.outcome} ${test.command}`, test.source === 'provider-exit-code' ? 'OBSERVED' : 'INFERRED', `${c.tool_use_id}:r`);
       }
       const parent = this.pendingAgents.get(c.tool_use_id);
       if (parent) {
         this.pendingAgents.delete(c.tool_use_id);
-        const r = o.toolUseResult;
         const label = this.agentLabels.get(c.tool_use_id) ?? 'subagent';
         const st = typeof r?.status === 'string' ? r.status : c.is_error ? 'error' : 'returned';
+        const agentKey = typeof r?.agentId === 'string' ? `${parentSid(parent)}/agent-${r.agentId}` : undefined;
+        if (st === 'async_launched') {
+          // Background subagent: the tool returned at launch, the worker keeps running. It ends on its
+          // <task-notification> (completed / failed / killed) or, failing that, on its own transcript (INFERRED).
+          parent.event(at, 'SESSION_ACTIVITY', `${label} — running in background`, 'OBSERVED', `${c.tool_use_id}:launch`);
+          this.asyncAgents.set(c.tool_use_id, { parent, label, agentKey });
+          if (this.asyncAgents.size > MAX_ASYNC_AGENTS) this.asyncAgents.delete(this.asyncAgents.keys().next().value!);
+          continue;
+        }
+        this.agentLabels.delete(c.tool_use_id);
         parent.event(at, 'WORKER_ENDED', `${label} — ${bounded(st, 20)}`, 'OBSERVED', `${c.tool_use_id}:r`);
-        if (typeof r?.agentId === 'string') this.endedAgents.add(`${parentSid(parent)}/agent-${r.agentId}`);
+        if (agentKey) this.endedAgents.add(agentKey);
       }
     }
   }
 
+  /** `<task-notification>` (user record or queued prompt): a background task finished. Only the tool-use id and the
+   *  status tag are read; summary and output are never kept. Ends the background subagent launched by that call. */
+  private taskNotification(text: string, at: number | undefined): void {
+    const head = text.slice(0, 4000);
+    const tu = /<tool-use-id>([^<]{1,100})<\/tool-use-id>/.exec(head)?.[1];
+    const st = /<status>([a-z_]{1,20})<\/status>/.exec(head)?.[1];
+    if (!tu || !st || !END_STATUS.has(st)) return;
+    const a = this.asyncAgents.get(tu);
+    if (!a) return;
+    this.asyncAgents.delete(tu);
+    this.agentLabels.delete(tu);
+    a.parent.event(at, 'WORKER_ENDED', `${a.label} — ${st}`, 'OBSERVED', `${tu}:r`);
+    if (a.agentKey) this.endedAgents.add(a.agentKey);
+  }
+
   private endedAgents = new Set<string>();
+  /** Background (async_launched) Agent calls still running: tool_use id → parent, label, worker session id. */
+  private asyncAgents = new Map<string, { parent: SessionAccumulator; label: string; agentKey?: string }>();
+  /** Workers whose own transcript last recorded a final assistant reply (stop_reason end_turn, no tool call). */
+  private finalTurn = new Set<SessionAccumulator>();
 
   private assistantRecord(acc: SessionAccumulator, o: Record<string, any>, at?: number): void {
     const msg = o.message;
@@ -352,11 +421,19 @@ export class ClaudeAdapter implements ProviderAdapter {
     const u = msg?.usage;
     if (u && typeof u === 'object' && typeof msg.id === 'string') {
       const n = (x: unknown) => (typeof x === 'number' && x >= 0 ? x : 0);
+      const opt = (x: unknown) => (typeof x === 'number' && x >= 0 ? x : undefined);
       const cached = n(u.cache_read_input_tokens);
       const prompt = n(u.input_tokens) + cached + n(u.cache_creation_input_tokens);
-      acc.addCallUsage(msg.id, prompt, n(u.output_tokens), cached);
+      const cc = u.cache_creation && typeof u.cache_creation === 'object' ? u.cache_creation : undefined;
+      acc.addCallUsage(msg.id, prompt, n(u.output_tokens), cached, {
+        inputTokens: opt(u.input_tokens),
+        cacheCreationInputTokens: opt(u.cache_creation_input_tokens),
+        cacheCreation5mTokens: opt(cc?.ephemeral_5m_input_tokens),
+        cacheCreation1hTokens: opt(cc?.ephemeral_1h_input_tokens),
+      });
       acc.modelCall(msg.id, at, prompt, n(u.output_tokens), typeof msg.model === 'string' && msg.model !== '<synthetic>' ? bounded(msg.model, 60) : undefined);
-      acc.ev('usage', 'OBSERVED', 'assistant message .usage, one count per message id');
+      acc.ev('usage', 'DERIVED', 'sum per message id of assistant .usage input + cache read + cache creation + output (cache reads re-counted on every call)');
+      acc.ev('usage.fields', 'OBSERVED', 'assistant .usage input_tokens / output_tokens / cache_read_input_tokens / cache_creation_input_tokens (+ cache_creation 5m/1h) as recorded, summed per message id');
     }
     if (msg?.model !== '<synthetic>') acc.agentDone(at);
     if (!Array.isArray(msg?.content)) return;
@@ -384,7 +461,9 @@ export class ClaudeAdapter implements ProviderAdapter {
         const label = bounded(commandLabel(cmd), 100);
         if (isVerificationCommand(cmd)) {
           acc.tests.push({ command: testLabel(cmd), at: at ?? 0, outcome: 'UNKNOWN', source: 'provider-tool-error-flag' });
+          acc.ev('tests', 'INFERRED', 'test / build command recognised by its text; outcome DERIVED from tool_result.is_error (Claude records no exit code)');
           if (id) this.pendingTests.set(id, { acc, idx: acc.tests.length - 1 });
+          if (this.pendingTests.size > MAX_PENDING) this.pendingTests.delete(this.pendingTests.keys().next().value!);
         } else acc.event(at, 'PROCESS_ACTIVITY', `$ ${label}`, 'OBSERVED', id);
         if (isGitCommit(cmd)) {
           acc.ranGitCommit = true;
@@ -404,6 +483,8 @@ export class ClaudeAdapter implements ProviderAdapter {
         if (id) {
           this.pendingAgents.set(id, acc);
           this.agentLabels.set(id, label);
+          if (this.pendingAgents.size > MAX_PENDING) this.pendingAgents.delete(this.pendingAgents.keys().next().value!);
+          if (this.agentLabels.size > MAX_PENDING) this.agentLabels.delete(this.agentLabels.keys().next().value!);
         }
         acc.event(at, 'WORKER_STARTED', label, 'OBSERVED', id);
       } else {
@@ -452,8 +533,15 @@ export class ClaudeAdapter implements ProviderAdapter {
     for (const acc of accs) {
       if (acc.provider !== 'claude') continue;
       if (acc.isWorker) {
+        // Ended only on the parent's recorded result (sync call) or task-notification (background call).
+        // A final reply in the worker's own transcript closes its turn (INFERRED) but never marks it ENDED.
         const ended = this.endedAgents.has(acc.sessionId);
-        acc.live = { explicitEnded: ended, openTurn: !ended, lastActivityAt: acc.lastActivityAt };
+        const final = !ended && this.finalTurn.has(acc);
+        acc.live = { explicitEnded: ended, openTurn: !ended && !final, lastActivityAt: acc.lastActivityAt };
+        // Set (not ranked): the basis changes as the worker resumes or ends.
+        if (ended) acc.evidence.set('status', { field: 'status', kind: 'OBSERVED', source: 'parent transcript recorded the subagent result or its task-notification' });
+        else if (final) acc.evidence.set('status', { field: 'status', kind: 'INFERRED', source: 'subagent transcript ends on a final reply (stop_reason end_turn); no end recorded by the parent yet' });
+        else acc.evidence.delete('status');
         continue;
       }
       const r = this.registry.get(acc.sessionId);
@@ -468,7 +556,8 @@ export class ClaudeAdapter implements ProviderAdapter {
           acc.providerVersion = r.version;
           acc.ev('providerVersion', 'OBSERVED', 'live registry .version (running process)');
         }
-        acc.ev('status', 'OBSERVED', `live registry ~/.claude/sessions/${path.basename(r.file)} (pid alive check: INFERRED)`);
+        acc.ev('status', 'OBSERVED', `live registry ~/.claude/sessions/${path.basename(r.file)} status ${bounded(r.status ?? 'none', 20)}`);
+        acc.ev('status.alive', 'INFERRED', 'registry pid answers a signal-0 check (pid reuse is possible)');
       } else acc.ev('status', 'DERIVED', 'no live registry entry for this session');
     }
   }
