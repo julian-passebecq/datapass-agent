@@ -12,6 +12,7 @@ import { ArtifactRef, ProviderAdapter } from '../types';
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
 const AGENT_TOOLS = new Set(['Agent', 'Task']);
+const TODO_TOOLS = new Set(['TodoWrite', 'TaskCreate', 'TaskUpdate']);
 const MAX_PARSE_LINE = 512 * 1024;
 
 interface RegistryEntry {
@@ -365,6 +366,12 @@ export class ClaudeAdapter implements ProviderAdapter {
       acc.toolStart(bounded(c.name, 60), toolDetail(c.name, input), at, id);
       if (c.name.startsWith('mcp__')) acc.mcp(bounded(c.name.split('__')[1] || 'mcp', 60));
       else if (c.name === 'WebFetch' || c.name === 'WebSearch') acc.bump('web');
+      if (TODO_TOOLS.has(c.name) && !(id && acc.seenIds.has(`todo:${id}`))) {
+        if (id) acc.seenIds.add(`todo:${id}`);
+        if (c.name === 'TodoWrite' && Array.isArray(input.todos)) acc.setTodos(at, 'TodoWrite', input.todos.slice(0, 200).map((t: any) => ({ text: t?.content, status: t?.status })));
+        else if (c.name === 'TaskCreate') acc.taskCreate(at, input.subject ?? input.description);
+        else if (c.name === 'TaskUpdate') acc.taskUpdate(at, input.taskId, input.status, input.subject);
+      }
       if (SHELL_TOOLS.has(c.name)) {
         acc.counts.commands++;
         const cmd = commandText(input.command);

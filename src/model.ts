@@ -145,6 +145,20 @@ export interface SessionFacts {
   entrypoint?: string;
   /** Codex only: latest `token_count.rate_limits` (used %, window, reset) plus a short used-% history. */
   rateLimits?: RateLimits;
+  /** Latest todo / plan list the agent wrote (Claude TodoWrite or TaskCreate / TaskUpdate, Codex update_plan),
+   *  capped at 30 items × 120 chars, redacted. */
+  todos?: TodoList;
+}
+
+export type TodoStatus = 'pending' | 'in_progress' | 'completed';
+export interface TodoList {
+  /** When the list was last written (epoch ms). */
+  at: number;
+  /** Tool that wrote it (TodoWrite, TaskCreate, update_plan …). */
+  source: string;
+  items: { text: string; status: TodoStatus }[];
+  /** Items dropped by the cap. */
+  dropped?: number;
 }
 
 /** One provider rate-limit window as recorded. resetsAt in epoch ms. */
