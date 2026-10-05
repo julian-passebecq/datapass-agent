@@ -3,7 +3,7 @@
 // for runs and jobs. Opt-in (agent.pipelines.enabled), trusted workspaces only, 5 s per process.
 // Everything kept is bounded and redacted; URLs are kept only when https and on the remote's own host.
 import { execFile } from 'child_process';
-import { HARDEN } from '../git/git';
+import { HARDEN, resolveExe } from '../git/git';
 import type { AgentSessionSnapshot } from '../model';
 import { bounded } from '../util/redact';
 import { isPlausibleLocalPath, normalizeCase } from '../util/paths';
@@ -421,7 +421,9 @@ function env(): NodeJS.ProcessEnv {
 export const defaultExec: Exec = (cmd, args, cwd) =>
   new Promise((resolve, reject) => {
     const full = cmd === 'git' ? [...HARDEN, ...args] : args;
-    execFile(cmd, full, { cwd, timeout: 5_000, windowsHide: true, maxBuffer: 8 << 20, env: env() }, (err, stdout, stderr) => {
+    const exe = resolveExe(cmd);
+    if (!exe) return reject(new Error(`${cmd} not found on PATH`));
+    execFile(exe, full, { cwd, timeout: 5_000, windowsHide: true, maxBuffer: 8 << 20, env: env() }, (err, stdout, stderr) => {
       if (!err) return resolve(stdout.toString());
       const code = (err as NodeJS.ErrnoException).code;
       if (code === 'ENOENT') return reject(new Error(`${cmd} not found on PATH`));

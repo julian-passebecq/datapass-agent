@@ -6,7 +6,7 @@ import { execFile } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { AgentSessionSnapshot } from '../model';
-import { HARDEN } from './git';
+import { HARDEN, resolveExe } from './git';
 import { bounded } from '../util/redact';
 import { isPlausibleLocalPath } from '../util/paths';
 
@@ -103,7 +103,9 @@ export function hardenedGit(timeoutMs = 5_000, counter?: { calls: number }): Git
     if (!READ_ONLY.has(args[0]) || (args[0] === 'worktree' && args[1] !== 'list')) return Promise.resolve(undefined);
     if (counter) counter.calls++;
     return new Promise(resolve => {
-      execFile('git', [...HARDEN, ...args], { cwd, timeout: timeoutMs, windowsHide: true, maxBuffer: 4 << 20, env: minimalEnv() }, (err, stdout) => resolve(err ? undefined : stdout.toString()));
+      const exe = resolveExe('git');
+      if (!exe) return resolve(undefined);
+      execFile(exe, [...HARDEN, ...args], { cwd, timeout: timeoutMs, windowsHide: true, maxBuffer: 4 << 20, env: minimalEnv() }, (err, stdout) => resolve(err ? undefined : stdout.toString()));
     });
   };
 }

@@ -5,7 +5,7 @@ import { execFile } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { AgentSessionSnapshot } from '../model';
-import { HARDEN } from './git';
+import { HARDEN, resolveExe } from './git';
 import { isPlausibleLocalPath } from '../util/paths';
 
 export interface NumstatRow {
@@ -87,7 +87,9 @@ function env(): NodeJS.ProcessEnv {
 
 export const runGit: GitRun = (cwd, args, timeoutMs) =>
   new Promise(resolve => {
-    execFile('git', [...HARDEN, ...args], { cwd, timeout: timeoutMs, windowsHide: true, maxBuffer: 8 << 20, env: env() }, (err, stdout) => resolve(err ? undefined : stdout.toString()));
+    const exe = resolveExe('git');
+    if (!exe) return resolve(undefined);
+    execFile(exe, [...HARDEN, ...args], { cwd, timeout: timeoutMs, windowsHide: true, maxBuffer: 8 << 20, env: env() }, (err, stdout) => resolve(err ? undefined : stdout.toString()));
   });
 
 /** Parses `git diff --numstat -z --no-renames` output: "added\tremoved\tpath\0" records. */
