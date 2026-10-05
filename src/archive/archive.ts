@@ -253,31 +253,58 @@ export function readIndex(dir: string): ArchiveIndex {
   return emptyIndex();
 }
 
-/** Exclusive lock on the archive folder; a lock older than 30 min is considered stale. */
+/** Exclusive lock on the archive folder. The lock file is created atomically ('wx') and holds a per-run token;
+ *  a lock whose mtime is older than 30 min is stale. A stale lock is taken over by renaming it away (atomic: of two
+ *  runs that both saw it stale, only one rename succeeds), checking the renamed file is still that stale lock, then
+ *  retrying the 'wx' create once. Release removes the lock only while it still holds this run's token. */
 export function acquireLock(dir: string, now = Date.now()): () => void {
   fs.mkdirSync(dir, { recursive: true });
   const lock = path.join(dir, '.lock');
+  const token = `${process.pid}:${now}:${Math.random().toString(36).slice(2, 10)}`;
   for (let i = 0; i < 2; i++) {
     try {
-      fs.writeFileSync(lock, String(process.pid), { flag: 'wx' });
+      fs.writeFileSync(lock, token, { flag: 'wx' });
       return () => {
         try {
-          fs.unlinkSync(lock);
+          if (fs.readFileSync(lock, 'utf8') === token) fs.unlinkSync(lock);
         } catch {
           /* already gone */
         }
       };
     } catch (e: any) {
       if (e?.code !== 'EEXIST') throw e;
-      let age = 0;
-      try {
-        age = now - fs.statSync(lock).mtimeMs;
-      } catch {
-        continue;
-      }
-      if (age < LOCK_STALE_MS) throw new Error(`another archive run holds ${lock} (started ${Math.round(age / 1000)} s ago)`);
-      fs.rmSync(lock, { force: true });
     }
+    if (i > 0) break;
+    let age: number;
+    try {
+      age = now - fs.statSync(lock).mtimeMs;
+    } catch {
+      continue; // released between our create and stat: retry the create once
+    }
+    if (age < LOCK_STALE_MS) throw new Error(`another archive run holds ${lock} (started ${Math.round(age / 1000)} s ago)`);
+    const grabbed = `${lock}.stale.${token.replace(/:/g, '-')}`;
+    try {
+      fs.renameSync(lock, grabbed);
+    } catch {
+      continue; // another run took the stale lock over first; the create below decides
+    }
+    let stillStale = false;
+    try {
+      stillStale = now - fs.statSync(grabbed).mtimeMs >= LOCK_STALE_MS;
+    } catch {
+      /* vanished */
+    }
+    if (!stillStale) {
+      // We renamed a lock another run created after our stat: put it back (link fails if a newer lock exists).
+      try {
+        fs.linkSync(grabbed, lock);
+      } catch {
+        /* a newer lock is in place */
+      }
+      fs.rmSync(grabbed, { force: true });
+      throw new Error(`another archive run holds ${lock} (just taken over)`);
+    }
+    fs.rmSync(grabbed, { force: true });
   }
   throw new Error(`could not take ${lock}`);
 }

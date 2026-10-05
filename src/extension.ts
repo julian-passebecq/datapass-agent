@@ -5,6 +5,8 @@ import { ClaudeAdapter } from './providers/claude/claude';
 import { CodexAdapter } from './providers/codex/codex';
 import { ProviderAdapter } from './providers/types';
 import { claudeInstalled, codexInstalled, InstalledVersion } from './providers/versions';
+import { disposeCodexState, sweepCodexCopies } from './providers/codex/state';
+import { maybeWarnRaw } from './archive/rawWarning';
 import { SessionStore } from './sessions/store';
 import { keyOf, SessionsTree } from './ui/sessionsTree';
 import { AgentView, Inspector } from './ui/webviews';
@@ -74,7 +76,13 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
     }
   }
 
+  // Security (audit A2): sqlite copies left by a crashed run are removed; this run's copies go on deactivate.
+  const sweep = setTimeout(() => sweepCodexCopies(), 5_000);
+  const rawWarn = () => maybeWarnRaw({ enabled: () => cfg().get<boolean>('archive.rawTranscripts', false) === true, state: ctx.globalState, show: m => void vscode.window.showWarningMessage(m) });
+  rawWarn();
   ctx.subscriptions.push(
+    { dispose: () => { clearTimeout(sweep); disposeCodexState(); } },
+    vscode.workspace.onDidChangeConfiguration(e => e.affectsConfiguration('agent.archive.rawTranscripts') && rawWarn()),
     out,
     // Views stop listening before the store goes quiet; disposal order is reverse of push.
     { dispose: () => store.dispose() },
