@@ -15,7 +15,7 @@ import { esc } from '../html';
 import { ago, kpi, titleOf, WsData, WsState } from '../workspace';
 import { BACKLOG_FEED, backlogFeed, BacklogFeedOut, backlogLinks } from './backlog';
 import { Feed, feedValue } from './feeds';
-import { actBtn, ActCtx, ExtraView, opt, seg, toolbar } from './kit';
+import { actBtn, ActCtx, ExtraView, loadError, loading, opt, seg, toolbar } from './kit';
 
 const MAX_CHIPS = 120;
 const MAX_PICK = 8;
@@ -157,7 +157,7 @@ function projectView(d: WsData, st: WsState, c: Cfg, p: ProjectMap, base: Baseli
 function render(d: WsData, st: WsState): string {
   const fs = feedValue<BacklogFeedOut>(BACKLOG_FEED);
   const out = fs.value;
-  if (!out) return fs.error ? `<div class="empty sc-bad">Could not read plan files: ${esc(fs.error)}</div>` : '<div class="empty">Reading plan files…</div>';
+  if (!out) return fs.error ? loadError(`Could not read plan files: ${fs.error}`, 'refresh') : loading('scope', 'Reading plan files…', { retry: 'refresh' });
   const base = feedValue<Baseline | undefined>(BASELINE_FEED).value;
   const c = conf(st, !!base);
   const { report } = out;

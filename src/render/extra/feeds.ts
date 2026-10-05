@@ -16,8 +16,13 @@ export interface Feed<T = unknown> {
   id: string;
   /** Minimum time between loads. */
   intervalMs: number;
+  /** A load running longer than this is abandoned by a forced reload (refresh / Retry). Default FEED_TIMEOUT_MS. */
+  timeoutMs?: number;
   load(ctx: FeedCtx): Promise<T>;
 }
+
+/** Default feed timeout; matches the 60 s after which the webview turns a loading marker into Retry (kit.LOAD_TIMEOUT_S). */
+export const FEED_TIMEOUT_MS = 60_000;
 
 export interface FeedState<T> {
   value?: T;
@@ -25,6 +30,8 @@ export interface FeedState<T> {
   ms?: number;
   error?: string;
   running?: boolean;
+  /** When the running load started (ctx.now). */
+  startedAt?: number;
 }
 
 const cache = new Map<string, FeedState<unknown>>();
@@ -39,18 +46,43 @@ export function feedValue<T>(id: string): FeedState<T> {
   return (cache.get(k(id)) as FeedState<T>) ?? {};
 }
 
-/** Loads every stale feed (not running, older than its interval, or `force`). Calls onUpdate after each lands. */
+/** True when the feed is running and started more than its timeout ago. */
+export function feedTimedOut(f: Pick<Feed, 'timeoutMs'>, st: FeedState<unknown>, now: number): boolean {
+  return !!st.running && st.startedAt !== undefined && now - st.startedAt > (f.timeoutMs ?? FEED_TIMEOUT_MS);
+}
+
+/**
+ * Loads every stale feed (not running, older than its interval, or `force`). Calls onUpdate after each lands.
+ * A forced reload also restarts a feed whose load has run past its timeout; the abandoned load's late result is dropped.
+ */
 export function pump(feeds: Feed[], ctx: FeedCtx, onUpdate: () => void, force = false): void {
   for (const f of feeds) {
     const key = k(f.id);
     const st = cache.get(key) ?? {};
-    if (st.running || (!force && st.at !== undefined && ctx.now - st.at < f.intervalMs)) continue;
-    cache.set(key, { ...st, running: true });
+    if (st.running && !(force && feedTimedOut(f, st, ctx.now))) continue;
+    if (!st.running && !force && st.at !== undefined && ctx.now - st.at < f.intervalMs) continue;
+    const prev: FeedState<unknown> = { ...st, running: undefined, startedAt: undefined };
+    const mine: FeedState<unknown> = { ...prev, running: true, startedAt: ctx.now };
+    cache.set(key, mine);
     const t0 = Date.now();
-    f.load(ctx).then(
-      value => cache.set(key, { value, at: Date.now(), ms: Date.now() - t0 }),
-      err => cache.set(key, { ...st, at: Date.now(), ms: Date.now() - t0, error: String(err?.message ?? err).slice(0, 300) }),
-    ).finally(onUpdate);
+    // Only the current load may write: a restarted (timed-out) load that lands late is ignored.
+    const settle = (next: FeedState<unknown>) => {
+      if (cache.get(key) !== mine) return false;
+      cache.set(key, next);
+      return true;
+    };
+    let p: Promise<unknown>;
+    try {
+      p = Promise.resolve(f.load(ctx));
+    } catch (err) {
+      p = Promise.reject(err);
+    }
+    p.then(
+      value => settle({ value, at: Date.now(), ms: Date.now() - t0 }),
+      err => settle({ ...prev, at: Date.now(), ms: Date.now() - t0, error: String((err as Error)?.message ?? err).slice(0, 300) }),
+    ).then(changed => {
+      if (changed) onUpdate();
+    });
   }
 }
 

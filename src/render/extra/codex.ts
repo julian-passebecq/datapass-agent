@@ -7,7 +7,7 @@ import { CodexState, CodexThread, CodexTurn, loadCodexState, threadActivity } fr
 import { base, compact, identityColor } from '../../activity/insights';
 import { esc } from '../html';
 import type { WsData, WsState } from '../workspace';
-import { ExtraView, actBtn, opt, seg, toolbar } from './kit';
+import { ExtraView, actBtn, loadError, loading, opt, seg, toolbar } from './kit';
 import { Feed, feedValue } from './feeds';
 
 const FEED_ID = 'codex.state';
@@ -282,7 +282,7 @@ function sourcesLine(st: CodexState): string {
 function render(d: WsData, st: WsState): string {
   const f = feedValue<CodexState>(FEED_ID);
   const head = `<div class="cx-head"><b>Codex</b> <span class="cx-ev" title="${esc(`${OBS}. Copies of ~/.codex sqlite files read with node:sqlite (readOnly), whitelisted non-text columns only; prompts, objectives and payloads are never read.`)}">${esc(LABEL)}</span> ${actBtn('refresh', '', 'Refresh')}</div>`;
-  if (!f.value) return `${head}<div class="muted">${f.error ? `Load failed: ${esc(f.error)}` : 'Loading Codex app state…'}</div>`;
+  if (!f.value) return `${head}${f.error ? loadError(`Load failed: ${f.error}`, 'refresh') : loading('codex', 'Loading Codex app state…', { retry: 'refresh' })}`;
   const s = f.value;
   if (!s.sqlite) return `${head}<div class="cx-warn">${esc(s.sqliteReason ?? 'node:sqlite unavailable')}: Codex app databases are not read in this runtime.</div>${sourcesLine(s)}`;
   const c = ctxOf(s, d);
