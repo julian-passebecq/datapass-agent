@@ -414,7 +414,7 @@ const CSS = `
 .rp .rp-nt { fill: var(--vscode-foreground); font-size: 12px; font-weight: 600; pointer-events: none; }
 .rp .rp-ns { fill: var(--vscode-descriptionForeground); font-size: 10px; font-variant-numeric: tabular-nums; pointer-events: none; }
 .rp .rp-lanes { border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; }
-.rp .rp-lbody { position: relative; }
+.rp .rp-lbody { position: relative; overflow: clip; overflow-clip-margin: 4px; }
 .rp .rp-ln { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; height: 26px; }
 .rp .rp-lh { font-size: 11px; border-left: 3px solid var(--c); padding-left: 6px; white-space: nowrap; }
 .rp .rp-lt { position: relative; height: 18px; border-bottom: 1px dashed var(--line); }
@@ -426,7 +426,7 @@ const CSS = `
 .rp .rp-scrub { margin-top: 8px; }
 .rp .rp-bar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
 .rp .rp-bar i { display: block; height: 100%; background: var(--accent); transform-origin: left; animation: rp-grow var(--T) linear var(--d0) both; }
-.rp .rp-tks { position: relative; height: 16px; margin-top: 2px; }
+.rp .rp-tks { position: relative; height: 16px; margin-top: 2px; overflow: clip; overflow-clip-margin: 4px; }
 .rp .rp-tk { position: absolute; top: 2px; width: 3px; height: 12px; margin-left: -1px; background: var(--c); opacity: .25; cursor: pointer; animation: rp-rv .2s linear var(--d) both; }
 .rp .rp-tk:hover { outline: 1px solid var(--vscode-focusBorder); }
 .rp .rp-sls { position: relative; height: 14px; font-size: 10px; color: var(--vscode-descriptionForeground); }
