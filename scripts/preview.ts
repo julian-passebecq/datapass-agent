@@ -7,6 +7,7 @@ import { ClaudeAdapter } from '../src/providers/claude/claude';
 import { CodexAdapter } from '../src/providers/codex/codex';
 import { SessionStore } from '../src/sessions/store';
 import { STYLE } from '../src/render/html';
+import { extraCss } from '../src/render/extra';
 import { allViews, renderWorkspace, teamRoot, WsData } from '../src/render/workspace';
 import { isLive } from '../src/activity/insights';
 
@@ -25,7 +26,7 @@ async function main() {
   const selected = (live.find(s => s.status === 'RUNNING') ?? live[0] ?? sessions[0])?.key;
   for (const view of allViews()) {
     const sel = view === 'team' ? teamRoot(d)?.key : selected;
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html{${theme}}${STYLE}</style></head><body><div id="root">${renderWorkspace(d, { view, selected: sel })}</div></body></html>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html{${theme}}${STYLE}${extraCss()}</style></head><body><div id="root">${renderWorkspace(d, { view, selected: sel })}</div></body></html>`;
     fs.writeFileSync(path.join(out, `${view}.html`), html);
   }
   console.log(`${sessions.length} sessions, ${live.length} live → ${out}`);
