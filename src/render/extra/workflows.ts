@@ -9,7 +9,7 @@ import { esc } from '../html';
 import { hhmm } from '../views';
 import { prettyModel, repoOf, titleOf, kpi, WsData, WsState } from '../workspace';
 import { feedValue, Feed } from './feeds';
-import { actBtn, ExtraView, opt, seg, toolbar } from './kit';
+import { actBtn, ExtraView, loadError, loading, opt, seg, toolbar } from './kit';
 
 const FEED = 'workflows.scan';
 
@@ -260,7 +260,7 @@ export function renderWorkflows(d: WsData, st: WsState, snap: WorkflowsSnapshot 
     seg(st, 'workflows.period', [['1h', '1 h'], ['24h', '24 h'], ['7d', '7 d']], '7d', 'Runs active in'),
     seg(st, 'workflows.only', [['all', 'All'], ['live', 'Running only']], 'all', 'Filter'),
   );
-  if (!snap) return `${bar}<div class="empty">${esc(error ? `Workflow scan failed: ${error}` : 'Scanning ~/.claude/projects for workflow runs…')}</div>${codexSection(d)}`;
+  if (!snap) return `${bar}${error ? loadError(`Workflow scan failed: ${error}`, 'refresh') : loading('workflows', 'Scanning ~/.claude/projects for workflow runs…', { retry: 'refresh' })}${codexSection(d)}`;
   const since = d.now - (PERIOD[period] ?? PERIOD['7d']);
   const scope = st.opts?.scope;
   const keys = new Set(d.sessions.map(s => s.key));
@@ -312,6 +312,7 @@ export const workflowsView: ExtraView = {
     return `<div class="wf">${renderWorkflows(d, st, f.value, f.error)}</div>`;
   },
   actions: {
+    refresh: (_arg, ctx) => ctx.refreshFeeds(),
     open: async (arg, ctx) => {
       const p = knownPath(arg, 'file');
       if (!p) return ctx.info('Unknown file.');

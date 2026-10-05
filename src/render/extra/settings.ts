@@ -1,7 +1,7 @@
 // Add-on screen "Settings": effective Claude Code and Codex configuration, read-only and redacted.
 // Data: src/feeds/settings.ts (fs reads only). Actions open / reveal / copy a file the feed listed; the user edits there.
 import type { ExtraView, ActCtx } from './kit';
-import { actBtn, seg, toolbar, opt } from './kit';
+import { actBtn, loadError, loading, seg, toolbar, opt } from './kit';
 import { Feed, FeedCtx, feedValue } from './feeds';
 import { esc } from '../html';
 import { ago, bytes, kpi, prettyModel, repoOf, WsData, WsState } from '../workspace';
@@ -315,7 +315,7 @@ function memoryTab(report: SettingsReport, d: WsData, st: WsState): string {
 function render(d: WsData, st: WsState): string {
   const fs = feedValue<SettingsReport>(FEED_ID);
   const report = fs.value;
-  if (!report) return fs.error ? `<div class="empty cfg-bad">Could not read configuration: ${esc(fs.error)}</div>` : '<div class="empty">Reading configuration files…</div>';
+  if (!report) return fs.error ? loadError(`Could not read configuration: ${fs.error}`, 'refresh') : loading('settings', 'Reading configuration files…', { retry: 'refresh' });
   const tab = opt(st, 'settings.tab', 'effective');
   const user = layersFor(report);
   const r = mergedRules(report.layers.filter(l => l.exists));

@@ -72,9 +72,35 @@ export function toolbar(...parts: string[]): string {
   return `<div class="tb">${parts.filter(Boolean).join('')}</div>`;
 }
 
+/** Seconds before a loading marker turns into a timeout note with a Retry button (the webview counts, see html.ts). */
+export const LOAD_TIMEOUT_S = 60;
+
+/**
+ * Loading marker for a feed that has no value yet. The webview shows the elapsed seconds next to the text and,
+ * after `timeoutS`, a "no answer" note and a Retry button. Evidence: UNKNOWN (nothing read yet).
+ * `retry` names a screen action (data-act) that re-pumps the feeds; without it Retry posts the global refresh.
+ */
+export function loading(id: string, text: string, o: { retry?: string; timeoutS?: number; inline?: boolean } = {}): string {
+  const tag = o.inline ? 'span' : 'div';
+  const t = Math.max(1, Math.round(o.timeoutS ?? LOAD_TIMEOUT_S));
+  return `<${tag} class="${o.inline ? 'muted' : 'empty'} ld" data-loading="${esc(id)}" data-timeout="${t}" role="status" aria-live="polite"><span class="ld-x">${esc(text)}</span><span class="ld-t"></span> <span class="chip ev UNKNOWN" title="UNKNOWN: no value read yet">UNKNOWN</span> ${retryBtn(o.retry, 'ld-retry')}</${tag}>`;
+}
+
+/** Error state for a feed that failed: the message, an UNKNOWN chip and a Retry button. */
+export function loadError(text: string, retry?: string): string {
+  return `<div class="empty ld-err" role="alert"><span class="ld-x">${esc(text)}</span> <span class="chip ev UNKNOWN" title="UNKNOWN: the source could not be read">UNKNOWN</span> ${retryBtn(retry, '')}</div>`;
+}
+
+function retryBtn(act: string | undefined, cls: string): string {
+  const c = cls ? `link ${cls}` : 'link';
+  return act ? actBtn(act, '', 'Retry', 'Read the source again now', c) : `<button class="${c}" data-cmd="refresh" title="Refresh now">Retry</button>`;
+}
+
 export const KIT_CSS = `
+.ld .ld-retry { display: none; } .ld.ld-late .ld-retry { display: inline; } .ld.ld-late .ld-t { color: var(--vscode-foreground); }
+.ld-err .ld-x { color: color-mix(in srgb, var(--bad) 70%, var(--vscode-foreground)); }
 .tb { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 2px 0 8px; font-size: 11px; }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .seg button { background: none; border: none; border-right: 1px solid var(--line); color: var(--vscode-descriptionForeground); padding: 2px 8px; cursor: pointer; font: inherit; }
 .seg button:last-child { border-right: none; }
 .seg button.on { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
