@@ -1,6 +1,6 @@
 // Read-only reader for the Codex desktop app's own state (~/.codex sqlite files, writer locks, model cache).
 // Undocumented format: every value is OBSERVED from the db, may change between Codex versions.
-// Safety: each db (+ -wal / -shm) is COPIED to os.tmpdir()/agent-codex-<pid> and opened readOnly with node:sqlite;
+// Safety: each db (+ -wal / -shm) is COPIED to os.tmpdir()/agent-codex/<pid> and opened readOnly with node:sqlite;
 // only whitelisted, non-text columns are selected (never first_user_message, preview, objective, prompt,
 // payload_json, item_json, error_json, log bodies). auth.json and secrets/ are never opened.
 import * as fs from 'fs';
@@ -151,6 +151,66 @@ export function loadSqlite(): { ctor?: DbCtor; reason?: string } {
 const BIG = 64 * 1024 * 1024;
 const BIG_MIN_MS = 10 * 60_000;
 
+/** Agent's own temp folder for sqlite copies: one sub-folder per extension host process. */
+export function codexCopiesBase(): string {
+  return path.join(os.tmpdir(), 'agent-codex');
+}
+
+const SWEEP_IDLE_MS = 60 * 60_000;
+
+function newestMtime(dir: string): number {
+  let t = 0;
+  try {
+    t = fs.statSync(dir).mtimeMs;
+    for (const f of fs.readdirSync(dir)) {
+      try {
+        t = Math.max(t, fs.statSync(path.join(dir, f)).mtimeMs);
+      } catch {
+        /* vanished */
+      }
+    }
+  } catch {
+    /* gone */
+  }
+  return t;
+}
+
+/** Start-up cleanup of copies left by an earlier run that did not dispose (crash, kill). Only folders Agent
+ *  creates are touched: `<base>/<pid>` and the legacy `<tmp>/agent-codex-<pid>`, never this process's own, and
+ *  only when nothing in them changed for an hour (another VS Code window may still be using its folder; a
+ *  removed folder is simply copied again on its next read). Returns the folders removed. */
+export function sweepCodexCopies(o: { base?: string; tmp?: string; now?: number; pid?: number } = {}): string[] {
+  const base = o.base ?? codexCopiesBase();
+  const tmp = o.tmp ?? os.tmpdir();
+  const now = o.now ?? Date.now();
+  const own = String(o.pid ?? process.pid);
+  const candidates: string[] = [];
+  try {
+    for (const n of fs.readdirSync(base)) if (/^\d+$/.test(n) && n !== own) candidates.push(path.join(base, n));
+  } catch {
+    /* no base yet */
+  }
+  try {
+    for (const n of fs.readdirSync(tmp)) {
+      const m = /^agent-codex-(\d+)$/.exec(n);
+      if (m && m[1] !== own) candidates.push(path.join(tmp, n));
+    }
+  } catch {
+    /* no tmp */
+  }
+  const removed: string[] = [];
+  for (const dir of candidates) {
+    try {
+      if (!fs.statSync(dir).isDirectory() || now - newestMtime(dir) < SWEEP_IDLE_MS) continue;
+      fs.rmSync(dir, { recursive: true, force: true });
+      removed.push(dir);
+    } catch {
+      /* in use or gone: next start */
+    }
+  }
+  return removed;
+}
+
 /** Temp copies of live sqlite files. A copy is refreshed only when the source size / mtime changed
  *  (big files at most every 10 min). dispose() deletes the folder. */
 export class DbCopies {
@@ -158,7 +218,7 @@ export class DbCopies {
   private sig = new Map<string, string>();
   private copiedAt = new Map<string, number>();
 
-  constructor(dir = path.join(os.tmpdir(), `agent-codex-${process.pid}`)) {
+  constructor(dir = path.join(codexCopiesBase(), String(process.pid))) {
     this.dir = dir;
   }
 
@@ -450,10 +510,16 @@ let shared: DbCopies | undefined;
 let last: CodexState | undefined;
 let exitHook = false;
 
-/** Deletes the temp copies (extension deactivate / process exit). */
+/** Deletes the temp copies (extension deactivate / process exit). Without a live loader it still removes this
+ *  process's own copy folder, in case an earlier loader was dropped without dispose. */
 export function disposeCodexState(): void {
   shared?.dispose();
   shared = undefined;
+  try {
+    fs.rmSync(path.join(codexCopiesBase(), String(process.pid)), { recursive: true, force: true });
+  } catch {
+    /* best effort */
+  }
 }
 
 export function lastCodexState(): CodexState | undefined {
