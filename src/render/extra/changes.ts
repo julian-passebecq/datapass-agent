@@ -434,7 +434,7 @@ async function guarded(arg: string, ctx: ActCtx, fn: (p: string) => Promise<void
 export const changesView: ExtraView = {
   id: 'changes',
   label: 'Changes',
-  group: 'Git',
+  group: 'Change',
   hint: 'Files changed by sessions: per-file +/− over commit windows, edit calls, uncommitted work per worktree, edit heat.',
   ready: true,
   render,

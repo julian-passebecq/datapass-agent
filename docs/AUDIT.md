@@ -288,7 +288,6 @@ No P0 remains. Some rows group several audit ids.
 
 | Sev | Issue | Source |
 |---|---|---|
-| P1 | Rail groups not renamed to the NOW / AGENTS / WORK / CHANGE / VERIFY / TIME / USAGE / SYSTEM grammar (only tooltips added) | A1 P1-2 |
 | P1 | Galaxy contracts not registered in `galaxy.json`; no export command | A1 P1-8 |
 | P1 | CSP keeps `style-src 'unsafe-inline'`; XSS safety rests on `esc()` plus the render test | A2 P1-9 |
 | P2 | Cold git phase still about 34 s in the background; idle stats the whole history (PR-measured) | A5 P1-4 |
@@ -301,7 +300,9 @@ No P0 remains. Some rows group several audit ids.
 
 Fixed after 0.7.0 and removed from this table: jump-to-screen picker (#72), worktree overlap badge (#71), per-KPI evidence titles (#73, #75), "≥" durations and inferred alive suffix (#73, #75), smoke 600 / 900 px and Panes (#74) with the overflow they found (#77), raw archive 0600 (#70), parents kept with subagents (#70), release gate runnable on GitHub (#76).
 
-Counts: P0 0, P1 3, P2 7 rows.
+Rail groups renamed to Now / Agents / Work / Change / Verify / Time / Usage / System after the owner approved it (6 Oct); the "Group (code)" column in section 5 shows the groups at audit time.
+
+Counts: P0 0, P1 2, P2 7 rows.
 
 ## 14. Menu recommendations
 
@@ -384,4 +385,4 @@ Count: CORE 15, MERGE-CANDIDATE 6, SECONDARY 11, ADVANCED 9, EXPERIMENTAL 2, tot
 
 **PASS WITH NON-BLOCKING LIMITATIONS**
 
-0 P0. All audit P0s fixed and merged with green CI; installed-VSIX smoke 115/115 locally and SMOKE PASS on the GitHub release gate; 401/401 tests; idle cost down from 1.6 s and 38 git spawns/min to ~0.2 s and 0 spawns. Non-blocking limitations: the 3 P1s left in section 13 (rail grammar rename and Galaxy registration, both owner decisions; CSP `unsafe-inline` styles), cold start still ~20 s with git in the background, and some screens show loading during the first ~50 s. Version 0.7.1 (not 1.0). The release gate now passes on GitHub as well as locally. Nothing was removed; the owner decides tiers from section 14.
+0 P0. All audit P0s fixed and merged with green CI; installed-VSIX smoke 115/115 locally and SMOKE PASS on the GitHub release gate; 401/401 tests; idle cost down from 1.6 s and 38 git spawns/min to ~0.2 s and 0 spawns. Non-blocking limitations: the 2 P1s left in section 13 (Galaxy registration, an owner decision; CSP `unsafe-inline` styles), cold start still ~20 s with git in the background, and some screens show loading during the first ~50 s. Version 0.7.1 (not 1.0). The release gate now passes on GitHub as well as locally. Nothing was removed; the owner decides tiers from section 14.

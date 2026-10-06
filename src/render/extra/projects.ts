@@ -293,7 +293,7 @@ const CSS = `
 export const projectsView: ExtraView = {
   id: 'projects',
   label: 'Projects',
-  group: 'Now',
+  group: 'Work',
   hint: 'Company → project → repository → sessions. Pick a scope for every screen.',
   ready: true,
   feeds: [rulesFeed as Feed],

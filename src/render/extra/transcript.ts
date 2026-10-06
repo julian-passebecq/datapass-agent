@@ -450,7 +450,7 @@ function sessionFor(arg: string, ctx: { sessions(): AgentSessionSnapshot[] }): A
 export const transcriptView: ExtraView = {
   id: 'transcript',
   label: 'Transcript',
-  group: 'Sessions',
+  group: 'Agents',
   hint: 'Read a session as a conversation: prompts, replies and tool calls, live, redacted, local only.',
   ready: true,
   render,

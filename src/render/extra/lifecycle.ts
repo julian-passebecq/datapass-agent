@@ -276,7 +276,7 @@ export function renderLifecycle(d: WsData, st: WsState): string {
 export const lifecycleView: ExtraView = {
   id: 'lifecycle',
   label: 'Lifecycle',
-  group: 'Quality',
+  group: 'Time',
   hint: 'State machines: session status and the prompt → read → edit → test → commit loop, with counts and median times.',
   ready: true,
   render: (d, st) => `<div class="lc">${renderLifecycle(d, st)}</div>`,

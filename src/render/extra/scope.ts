@@ -223,7 +223,7 @@ export function checkTarget(arg: string): { file: string; line: number } {
 export const scopeView: ExtraView = {
   id: 'scope',
   label: 'Scope map',
-  group: 'Quality',
+  group: 'Work',
   hint: "Map of each project's plan: milestones → sections → items coloured by state, progress per milestone, what's left, linked sessions, and what changed since last week's archive snapshot.",
   ready: true,
   feeds: [backlogFeed as Feed, baselineFeed as Feed],

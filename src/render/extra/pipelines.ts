@@ -469,7 +469,7 @@ const CSS = `
 export const pipelinesView: ExtraView = {
   id: 'pipelines',
   label: 'Pipelines',
-  group: 'Git',
+  group: 'Change',
   hint: 'GitHub Actions and GitLab pipelines for the repositories agents touch: what blocks, runs, jobs as a Gantt, runners (opt-in, read-only CLI).',
   ready: true,
   feeds: [pipelinesFeed as Feed],

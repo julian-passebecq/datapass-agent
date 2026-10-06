@@ -32,7 +32,7 @@ export interface ExtraView {
   label: string;
   hint: string;
   /** Rail group. */
-  group: 'Now' | 'Sessions' | 'Time' | 'Git' | 'Usage' | 'Quality' | 'System';
+  group: 'Now' | 'Agents' | 'Work' | 'Change' | 'Verify' | 'Time' | 'Usage' | 'System';
   render(d: WsData, st: WsState): string;
   /** Scoped CSS for this screen (prefix every selector with a class unique to the screen). */
   css?: string;

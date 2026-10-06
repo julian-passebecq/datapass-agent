@@ -296,7 +296,7 @@ async function tern(arg: string, ctx: ActCtx): Promise<void> {
 export const reposView: ExtraView = {
   id: 'repos',
   label: 'Repositories',
-  group: 'Git',
+  group: 'Change',
   hint: 'Every repository agents touched: branches, worktrees, dirty state, ahead / behind.',
   ready: true,
   feeds: [reposFeed as Feed],

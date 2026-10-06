@@ -130,6 +130,6 @@ test('screen renders both machines, lists sessions, escapes', () => {
   assert.ok(renderLifecycle({ ...d, sessions: [] }, { view: 'lifecycle' }).includes('No session'));
   // no timeline: falls back to d.events without throwing
   assert.ok(renderLifecycle({ ...d, timeline: undefined }, { view: 'lifecycle', opts: { 'lifecycle.period': 'all' } }).includes('no event history'));
-  assert.equal(lifecycleView.group, 'Quality');
+  assert.equal(lifecycleView.group, 'Time');
   assert.ok(renderWorkspace(d, { view: 'lifecycle' }).includes('Work loop machine'));
 });

@@ -233,7 +233,7 @@ export function renderRoles(d: WsData, st: WsState, snap: WorkflowsSnapshot | un
 export const rolesView: ExtraView = {
   id: 'roles',
   label: 'Roles',
-  group: 'Sessions',
+  group: 'Agents',
   hint: 'Which role each session played (recorded type or title pattern) and how each role performs.',
   ready: true,
   feeds: [workflowsFeed as Feed],

@@ -384,7 +384,7 @@ function checkPath(arg: string): string {
 export const backlogView: ExtraView = {
   id: 'backlog',
   label: 'Backlog',
-  group: 'Quality',
+  group: 'Work',
   hint: 'Plans and packages found in repositories (handoff/PLAN.md, ROADMAP.md, TODO.md): state, age, the sessions that worked on them, and a weekly archive.',
   ready: true,
   feeds: [backlogFeed as Feed, archiveFeed as Feed],

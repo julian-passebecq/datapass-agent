@@ -353,7 +353,7 @@ const CSS = `
 export const topologyView: ExtraView = {
   id: 'topology',
   label: 'Topology',
-  group: 'Sessions',
+  group: 'Agents',
   hint: 'Lead → workers → nested workers as a collapsible tree, with rolled-up tokens, cost and time.',
   ready: true,
   render,

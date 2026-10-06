@@ -241,7 +241,7 @@ const CSS = `
 export const signalsView: ExtraView = {
   id: 'signals',
   label: 'Signals',
-  group: 'Quality',
+  group: 'Verify',
   hint: 'Failure signals with an observed basis: unsolved, blocked, permissions, swallowed, looping.',
   ready: true,
   render,

@@ -233,7 +233,7 @@ export function renderDispatch(d: WsData, st: WsState, snap: WorkflowsSnapshot |
 export const dispatchView: ExtraView = {
   id: 'dispatch',
   label: 'Dispatches',
-  group: 'Usage',
+  group: 'Agents',
   hint: 'Every worker dispatch with the spawn it came from, the tokens it actually used and its outcome (verified / unverified / failed); outcome rate vs cost per model.',
   ready: true,
   feeds: [workflowsFeed as Feed],

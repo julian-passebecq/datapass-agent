@@ -483,7 +483,7 @@ function parse(arg: string, ctx: ActCtx, nums: number): { key: string; n: number
 export const replayView: ExtraView = {
   id: 'replay',
   label: 'Replay',
-  group: 'Sessions',
+  group: 'Time',
   hint: "Step through one session's recorded events: play / pause / speed, the diagram lights each node as its event plays.",
   ready: true,
   render,

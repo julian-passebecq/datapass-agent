@@ -348,7 +348,7 @@ const FACTS_CSS = TOKEN_FACTS_CSS('hl-pf');
 export const healthView: ExtraView = {
   id: 'health',
   label: 'Health',
-  group: 'Quality',
+  group: 'Verify',
   hint: 'Test pass rate, commits per session and context use against a reference window, with trends and sparklines.',
   ready: true,
   render,

@@ -547,19 +547,20 @@ export function statusStrip(d: WsData): string {
 /** Repository chips shown in the footer strip before "+k". */
 const FOOT_REPOS = 8;
 
-export const RAIL_GROUPS = ['Now', 'Sessions', 'Time', 'Git', 'Usage', 'Quality', 'System'];
-const CORE_GROUP: Record<string, string> = { overview: 'Now', attention: 'Now', board: 'Sessions', team: 'Sessions', gantt: 'Time', worktrees: 'Git', activity: 'Usage', flow: 'Usage', verify: 'Quality', providers: 'System' };
+export const RAIL_GROUPS = ['Now', 'Agents', 'Work', 'Change', 'Verify', 'Time', 'Usage', 'System'];
+const CORE_GROUP: Record<string, string> = { overview: 'Now', attention: 'Now', board: 'Work', team: 'Agents', gantt: 'Time', worktrees: 'Change', activity: 'Time', flow: 'Work', verify: 'Verify', providers: 'System' };
 /** Reading order inside groups; screens not listed go last in their group. Ids that are not registered screens are
  *  ignored (rank only sorts screens that exist), so a planned id such as 'benchmarks' is harmless. */
-export const RAIL_ORDER = ['overview', 'attention', 'panes', 'live', 'hud', 'workflows', 'codex', 'projects', 'board', 'team', 'topology', 'roles', 'transcript', 'replay', 'lifecycle', 'gantt', 'week', 'runs', 'forecast', 'history', 'worktrees', 'repos', 'changes', 'review', 'pipelines', 'tokens', 'ctxcost', 'limits', 'dispatch', 'explore', 'benchmarks', 'activity', 'flow', 'verify', 'signals', 'health', 'backlog', 'scope', 'providers', 'settings', 'catalog', 'audit', 'launcher'];
+export const RAIL_ORDER = ['overview', 'attention', 'live', 'hud', 'panes', 'codex', 'team', 'topology', 'roles', 'dispatch', 'transcript', 'projects', 'workflows', 'board', 'flow', 'backlog', 'scope', 'worktrees', 'repos', 'changes', 'review', 'pipelines', 'verify', 'signals', 'health', 'gantt', 'replay', 'lifecycle', 'week', 'runs', 'activity', 'forecast', 'history', 'tokens', 'ctxcost', 'limits', 'explore', 'benchmarks', 'providers', 'settings', 'catalog', 'audit', 'launcher'];
 /** The question each rail group answers (group header tooltip). */
 export const RAIL_GROUP_HINT: Record<string, string> = {
   Now: 'What is going on right now, and what needs me?',
-  Sessions: 'Who worked under whom, and what did one session do?',
-  Time: 'When, and how often, did agents run?',
-  Git: 'What changed, where, and what is the PR / CI state?',
+  Agents: 'Who worked under whom, what did each worker cost, and what did one session say?',
+  Work: 'Which projects, runs and planned items are agents working on?',
+  Change: 'What changed, where, and what is the PR / CI state?',
+  Verify: 'Do tests pass, and what looks wrong?',
+  Time: 'When, how often and in what order did agents run?',
   Usage: 'How much budget did agents use, and what did it buy?',
-  Quality: 'Do tests pass, what looks wrong, and what is still planned?',
   System: 'Configuration, collectors, and the screens that run a process (Catalog CLI probe, Launcher).',
 };
 

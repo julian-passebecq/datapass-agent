@@ -309,7 +309,7 @@ function knownUrls(): Set<string> {
 export const reviewView: ExtraView = {
   id: 'review',
   label: 'Review',
-  group: 'Git',
+  group: 'Change',
   hint: 'Working / Needs you / In review / Ready to merge / CI failed: sessions with their branch, push and PR / MR state (forge state opt-in).',
   ready: true,
   render,

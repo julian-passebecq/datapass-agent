@@ -298,7 +298,7 @@ function knownPath(arg: string, kind: 'file' | 'dir'): string | undefined {
 export const workflowsView: ExtraView = {
   id: 'workflows',
   label: 'Workflows',
-  group: 'Now',
+  group: 'Work',
   hint: 'Claude Code workflow runs and their agents live: phases, model, time, tokens, current tool; plus background subagents and Codex workers.',
   ready: true,
   feeds: [workflowsFeed as Feed],
