@@ -158,7 +158,7 @@ interface Entry {
   file: boolean;
 }
 
-const AGENT_FILE = /^agent-([A-Za-z0-9_-]{1,80})\.jsonl$/;
+export const AGENT_FILE = /^agent-([A-Za-z0-9_-]{1,80})\.jsonl$/;
 
 /** Cadence for the next scan: 3 s while a run is live, else 30 s. */
 export function scanIntervalMs(snap: WorkflowsSnapshot): number {

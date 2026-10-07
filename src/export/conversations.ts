@@ -29,7 +29,7 @@ const object = (value: unknown): Record<string, unknown> =>
 const string = (value: unknown): string | undefined => typeof value === 'string' ? value : undefined;
 const nativeId = (value: unknown): string | undefined => {
   const text = string(value);
-  return text && /^[a-zA-Z0-9._:-]{1,160}$/.test(text) ? text : undefined;
+  return text && /^[a-zA-Z0-9._:-]{1,160}(?:\/[a-zA-Z0-9._:-]{1,160}){0,3}$/.test(text) ? text : undefined;
 };
 
 /** Complete connection strings and embedded binary data must never enter a shareable bundle. */
@@ -44,10 +44,12 @@ export function sanitize(value: unknown, depth = 0): unknown {
     const node = object(value);
     if (node.type === 'base64') return { type: 'base64', data: '[EXCLUDED: attachment]' };
     return Object.fromEntries(Object.entries(object(value)).map(([key, item]) => {
-      const recordedId = /^(sessionId|session_id)$/.test(key) && nativeId(item);
+      const recordedId = /^(sessionId|session_id|parentSessionId|parent_session_id)$/.test(key) && nativeId(item);
       const count = typeof item === 'number' && /tokens|_count$/i.test(key);
       const binary = /^(image|image_url|audio|audio_url|base64|image_data)$/.test(key);
-      return [key, binary ? '[EXCLUDED: attachment]' : isSecretKeyName(key) && !recordedId && !count
+      const environment = /^(env|environment|environmentVariables|environment_variables|processEnv)$/i.test(key);
+      const encrypted = key === 'encrypted_content';
+      return [redact(key), encrypted ? '[EXCLUDED: encrypted provider payload]' : environment ? '[EXCLUDED: environment snapshot]' : binary ? '[EXCLUDED: attachment]' : isSecretKeyName(key) && !recordedId && !count
         ? '[REDACTED]' : sanitize(item, depth + 1)];
     }));
   }
@@ -64,7 +66,7 @@ export function projectMatches(cwd: string | undefined, project: string): boolea
   return actual === wanted || actual.startsWith(wanted + path.sep);
 }
 
-async function* jsonLines(file: string, size: number): AsyncGenerator<{ line: number; value?: unknown; invalid?: boolean }> {
+export async function* jsonLines(file: string, size: number): AsyncGenerator<{ line: number; value?: unknown; invalid?: boolean; reason?: 'malformed' | 'oversize' }> {
   if (!size) return;
   const input = createReadStream(file, { start: 0, end: size - 1 });
   const reader = createInterface({ input, crlfDelay: Infinity });
@@ -73,9 +75,9 @@ async function* jsonLines(file: string, size: number): AsyncGenerator<{ line: nu
     for await (const text of reader) {
       line++;
       if (!text.trim()) continue;
-      if (text.length > 32 * 1024 * 1024) { yield { line, invalid: true }; continue; }
+      if (text.length > 32 * 1024 * 1024) { yield { line, invalid: true, reason: 'oversize' }; continue; }
       try { yield { line, value: JSON.parse(text) as unknown }; }
-      catch { yield { line, invalid: true }; }
+      catch { yield { line, invalid: true, reason: 'malformed' }; }
     }
   } finally { reader.close(); input.destroy(); }
 }

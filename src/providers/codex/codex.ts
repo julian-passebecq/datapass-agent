@@ -14,7 +14,7 @@ import { cmpVersion } from '../claude/claude';
 import { codexStateSources } from './state';
 
 const MAX_PARSE_LINE = 512 * 1024;
-const ROLLOUT = /^rollout-.*-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
+const ROLLOUT = /^rollout-.*[-_]([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
 
 export function codexRoot(env = process.env): string {
   return env.CODEX_HOME && isPlausibleLocalPath(env.CODEX_HOME) ? env.CODEX_HOME : path.join(os.homedir(), '.codex');

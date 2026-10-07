@@ -24,3 +24,8 @@ await build({
   format: 'cjs', outfile: 'dist/search-knowledge.cjs', logLevel: 'warning',
 });
 console.log('built dist/search-knowledge.cjs');
+await build({
+  entryPoints: ['scripts/export-provider-history.ts'], bundle: true, platform: 'node', target: 'node20',
+  format: 'cjs', outfile: 'dist/export-provider-history.cjs', logLevel: 'warning',
+});
+console.log('built dist/export-provider-history.cjs');

@@ -620,7 +620,8 @@
     "weekly": "npm run compile-tests && node out-test/scripts/weekly.js",
     "archive": "npm run compile-tests && node out-test/scripts/archive.js",
     "benchmarks": "npm run compile-tests && node out-test/scripts/benchmarks.js",
-    "export:conversations": "node dist/export-conversations.cjs"
+    "export:conversations": "node dist/export-conversations.cjs",
+    "export:provider-history": "node dist/export-provider-history.cjs"
   },
   "devDependencies": {
     "@galaxy/dev-context": "file:vendor/galaxy-dev-context-0.1.0.tgz",

@@ -336,3 +336,7 @@ The canonical repository is `github.com/julian-passebecq/agent-vscode` (git remo
 ## Future seams (not in this version)
 
 Open, resume, stop and steer would be provider-native control adapters next to `src/providers/*`. Agent stays observation only. Galaxy export: pure projections to `galaxy.agent-observation/1` and `galaxy.agent-config-snapshot/1` exist in `src/galaxy/` (no command, no Mongo write yet); see [docs/GALAXY.md](docs/GALAXY.md).
+
+## Bulk provider history
+
+Agent provides a non-interactive, read-only Codex/Claude exporter, including complete sanitized native JSONL and source hashes. See [provider-history CLI and archive dry-run binding](docs/PROVIDER-HISTORY.md). Build with `npm run build`; run `node dist/export-provider-history.cjs --help`.

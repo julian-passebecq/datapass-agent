@@ -103,6 +103,14 @@ export function redact(text: string): string {
   if (!text) return text;
   let out = text;
   for (const r of RULES) out = out.replace(r.re, (m: string, ...g: unknown[]) => (r.to ? r.to(m, ...(g as string[])) : MARK));
+  // Archive gates scan token shapes anywhere, including tokens embedded in another word.
+  // Keep this in the shared redaction layer; exports must not implement a weaker parallel policy.
+  for (const re of [
+    /sk-[A-Za-z0-9_-]{20,}/g, /gh[pousr]_[A-Za-z0-9]{20,}/g,
+    /github_pat_[A-Za-z0-9_]{20,}/g, /AKIA[0-9A-Z]{16}/g,
+    /xox[baprs]-[A-Za-z0-9-]{10,}/g,
+    /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}/g,
+  ]) out = out.replace(re, MARK);
   return out;
 }
 
@@ -143,7 +151,7 @@ export function safeEnv(env: NodeJS.ProcessEnv = process.env): Partial<Record<(t
 
 /** Credential / auth files Agent never opens (ActCtx.openFile refuses them whatever screen asks). */
 const CREDENTIAL_FILE =
-  /(^|[\\/])(\.credentials\.json|auth\.json|credentials(\.json)?|\.netrc|_netrc|\.npmrc|\.pypirc|\.git-credentials|\.env(\..*)?|id_(rsa|dsa|ecdsa|ed25519)|[^\\/]*\.(pem|key|pfx|p12))$/i;
+  /(^|[\\/])(\.credentials\.jsonl?|auth\.jsonl?|credentials(\.jsonl?)?|(?:tokens?|cookies?|secrets?)\.jsonl?|\.netrc|_netrc|\.npmrc|\.pypirc|\.git-credentials|\.env(\..*)?|id_(rsa|dsa|ecdsa|ed25519)|[^\\/]*\.(pem|key|pfx|p12))$/i;
 
 export function isCredentialPath(file: string): boolean {
   return typeof file === 'string' && CREDENTIAL_FILE.test(file.replace(/[\\/]+$/, ''));

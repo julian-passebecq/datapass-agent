@@ -9,6 +9,7 @@ import { isInside, isPlausibleLocalPath } from '../../util/paths';
 import { bounded } from '../../util/redact';
 import { DirCache, statFile } from '../discover';
 import { ArtifactRef, ProviderAdapter } from '../types';
+import { AGENT_FILE } from './workflows';
 
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
@@ -48,9 +49,22 @@ function pidAlive(pid: number): boolean {
 
 /** Parent transcript of a subagent transcript (<session>/subagents/agent-*.jsonl → <session>.jsonl), else undefined. */
 export function parentTranscriptOf(p: string): string | undefined {
-  const dir = path.dirname(p);
-  if (path.basename(dir) !== 'subagents') return undefined;
-  return `${path.dirname(dir)}.jsonl`;
+  return claudeArtifactIdentity(p)?.parentTranscript;
+}
+
+/** Same recorded filesystem layout used by the existing workflow reader. */
+export function claudeArtifactIdentity(file: string): { parentTranscript: string; parentId: string; worker: boolean; workflowId?: string } | undefined {
+  const dir = path.dirname(file), name = path.basename(file);
+  if (path.basename(dir) === 'subagents' && AGENT_FILE.test(name)) {
+    const parent = path.dirname(dir);
+    return { parentTranscript: `${parent}.jsonl`, parentId: path.basename(parent), worker: true };
+  }
+  if (path.basename(path.dirname(dir)) === 'workflows' && path.basename(path.dirname(path.dirname(dir))) === 'subagents'
+    && (AGENT_FILE.test(name) || name === 'journal.jsonl')) {
+    const parent = path.dirname(path.dirname(path.dirname(dir)));
+    return { parentTranscript: `${parent}.jsonl`, parentId: path.basename(parent), worker: name !== 'journal.jsonl', workflowId: path.basename(dir) };
+  }
+  return undefined;
 }
 
 /**
@@ -146,7 +160,7 @@ export class ClaudeAdapter implements ProviderAdapter {
     return [path.join(this.root, 'projects'), path.join(this.root, 'sessions')];
   }
 
-  listArtifacts(sinceMs: number, max: number): ArtifactRef[] {
+  listArtifacts(sinceMs: number, max: number, includeWorkflowHistory = false): ArtifactRef[] {
     const projects = path.join(this.root, 'projects');
     const out: ArtifactRef[] = [];
     const dc = this.dirCache;
@@ -164,6 +178,16 @@ export class ClaudeAdapter implements ProviderAdapter {
           if (!dc.list(p)?.some(x => x.dir && x.name === 'subagents')) continue;
           const sub = path.join(p, 'subagents');
           for (const s of dc.list(sub) ?? []) if (s.name.startsWith('agent-') && s.name.endsWith('.jsonl')) push(path.join(sub, s.name));
+          if (includeWorkflowHistory) {
+            const workflows = path.join(sub, 'workflows');
+            if (dc.list(sub)?.some(s => s.dir && s.name === 'workflows')) {
+              for (const run of dc.list(workflows) ?? []) if (run.dir) {
+                const runDir = path.join(workflows, run.name);
+                for (const artifact of dc.list(runDir) ?? []) if (artifact.file &&
+                  (AGENT_FILE.test(artifact.name) || artifact.name === 'journal.jsonl')) push(path.join(runDir, artifact.name));
+              }
+            }
+          }
         }
       }
     }
@@ -182,16 +206,16 @@ export class ClaudeAdapter implements ProviderAdapter {
     }
     let acc = this.accs.get(ref.path);
     if (acc && acc.cursor && acc.cursor.size === ref.size && acc.cursor.mtimeMs === ref.mtimeMs) return acc;
-    const isSub = path.basename(path.dirname(ref.path)) === 'subagents';
+    const identity = claudeArtifactIdentity(ref.path);
     if (!acc) {
       const base = path.basename(ref.path, '.jsonl');
-      if (isSub) {
-        const parentSid = path.basename(path.dirname(path.dirname(ref.path)));
-        acc = new SessionAccumulator('claude', `${parentSid}/${base}`, ref.path);
-        acc.isWorker = true;
+      if (identity) {
+        const parentSid = identity.parentId;
+        acc = new SessionAccumulator('claude', identity.worker ? `${parentSid}/${base}` : `${parentSid}/${identity.workflowId}/journal`, ref.path);
+        acc.isWorker = identity.worker;
         acc.parentSessionId = `claude:${parentSid}`;
         acc.ev('parentSessionId', 'OBSERVED', 'transcript stored under <parent>/subagents/');
-        this.readSubagentMeta(acc, ref.path.replace(/\.jsonl$/, '.meta.json'));
+        if (identity.worker) this.readSubagentMeta(acc, ref.path.replace(/\.jsonl$/, '.meta.json'));
       } else acc = new SessionAccumulator('claude', base, ref.path);
       this.accs.set(ref.path, acc);
     }
