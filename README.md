@@ -1,3 +1,6 @@
+# DataPass Agent 0.8 prototype
+
+Adds selected full conversation exports and a simple **DataPass: Start Here** entry point to the existing Agent cockpit. See [DataPass export and reconciliation guide](docs/DATAPASS.md). The T3 cockpit prototype lives separately in `D:\PROJ\t3code-datapass`.
 # Agent — local observer for Claude Code and Codex
 
 Agent answers one question inside VS Code: **what are my coding agents doing, where, and what did they actually change?**

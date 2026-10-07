@@ -1,8 +1,8 @@
 {
   "name": "agent-vscode",
-  "displayName": "Agent",
+  "displayName": "DataPass Agent",
   "description": "Local observer for Claude Code and Codex sessions: what is running, where, and what changed.",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "publisher": "juliandatapass",
   "private": true,
   "license": "UNLICENSED",
@@ -121,6 +121,14 @@
       {
         "command": "agent.goToScreen",
         "title": "Agent: Go to screen…"
+      },
+      {
+        "title": "DataPass: Start Here",
+        "command": "agent.knowledge"
+      },
+      {
+        "title": "DataPass: Export Selected Conversations",
+        "command": "agent.exportConversations"
       }
     ],
     "keybindings": [
@@ -179,6 +187,11 @@
           "command": "agent.openWorkspace",
           "when": "view == agent.sessions && viewItem =~ /session/",
           "group": "1_open@0"
+        },
+        {
+          "command": "agent.exportConversations",
+          "when": "view == agent.sessions && viewItem == session",
+          "group": "knowledge"
         }
       ],
       "commandPalette": [
@@ -568,7 +581,8 @@
     "perf": "npm run compile-tests && node out-test/scripts/perf.js",
     "weekly": "npm run compile-tests && node out-test/scripts/weekly.js",
     "archive": "npm run compile-tests && node out-test/scripts/archive.js",
-    "benchmarks": "npm run compile-tests && node out-test/scripts/benchmarks.js"
+    "benchmarks": "npm run compile-tests && node out-test/scripts/benchmarks.js",
+    "export:conversations": "node dist/export-conversations.cjs"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

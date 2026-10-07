@@ -13,6 +13,7 @@ import { AgentView, Inspector } from './ui/webviews';
 import { WorkspacePanel } from './ui/workspace';
 import { screenIndex } from './render/workspace';
 import { WebviewMessage } from './render/html';
+import { registerKnowledgeCommands } from './ui/knowledge';
 
 const TERN_COMMANDS = ['tern.revealWorktree', 'tern.revealRevision', 'tern.revealChangeSet'];
 
@@ -53,6 +54,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
   const inspector = new Inspector(store, m => onMessage(m), () => ternAvailable, (view, key) => workspace.open(view, key));
   const tree = new SessionsTree(store);
   const workspace = new WorkspacePanel(store, m => onMessage(m), () => ternAvailable);
+  registerKnowledgeCommands(ctx, store);
   // Extra tabs: each its own screen / scope / options.
   const tabs = new Set<WorkspacePanel>();
   const newTab = (view?: string, key?: string, opts?: Record<string, string>) => {
