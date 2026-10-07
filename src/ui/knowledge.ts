@@ -4,6 +4,7 @@ import { SessionStore } from '../sessions/store';
 import { keyOf } from './sessionsTree';
 import { ConversationSource, discoverConversations, exportConversations, projectMatches } from '../export/conversations';
 import { bounded } from '../util/redact';
+import {observationExport} from '../export/observation';
 
 export function registerKnowledgeCommands(context: vscode.ExtensionContext, store: SessionStore): void {
   context.subscriptions.push(vscode.commands.registerCommand('agent.exportConversations', async (argument?: unknown) => {
@@ -27,7 +28,7 @@ export function registerKnowledgeCommands(context: vscode.ExtensionContext, stor
       const folder = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: 'Export here' });
       if (!folder?.[0]) return;
       const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Exporting redacted conversation events' },
-        () => exportConversations(sources, folder[0].fsPath));
+        () => exportConversations(sources.map(source=>{const s=store.all().find(s=>s.provider===source.provider&&s.sessionId===source.id);return {...source,observation:s?observationExport(s,store.timeline(s.key,300)):undefined};}), folder[0].fsPath));
       const action = await vscode.window.showInformationMessage(`Exported ${result.sessions.length} sources. Review redacted files before sharing. Import cockpit.json in the T3 DataPass cockpit.`, 'Open bundle');
       if (action) await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(result.directory));
     } catch { void vscode.window.showErrorMessage('Conversation export failed. Check source and destination permissions. No source was changed.'); }

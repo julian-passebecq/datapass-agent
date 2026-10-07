@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { AgentSessionSnapshot } from '../model';
 import { SessionStore } from '../sessions/store';
+import {sessionKey} from '../interop';
 import { duration } from '../activity/activity';
 import { base, hhmm, statusText } from '../render/views';
 
@@ -108,7 +109,7 @@ export class SessionsTree implements vscode.TreeDataProvider<Node>, vscode.Dispo
 }
 
 export function keyOf(arg: unknown): string | undefined {
-  if (typeof arg === 'string') return arg;
+  const plain=sessionKey(arg);if(plain)return plain;
   const n = arg as Node | undefined;
   return n && n.kind === 'session' ? n.s.key : undefined;
 }

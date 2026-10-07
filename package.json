@@ -2,7 +2,7 @@
   "name": "agent-vscode",
   "displayName": "DataPass Agent",
   "description": "Local observer for Claude Code and Codex sessions: what is running, where, and what changed.",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "publisher": "juliandatapass",
   "private": true,
   "license": "UNLICENSED",
@@ -44,18 +44,25 @@
     "views": {
       "agent": [
         {
+          "id": "agent.analyzer",
+          "name": "Analyzer"
+        },
+        {
           "id": "agent.cockpit",
           "name": "Cockpit",
-          "type": "webview"
+          "type": "webview",
+          "visibility": "collapsed"
         },
         {
           "id": "agent.sessions",
-          "name": "Sessions"
+          "name": "Sessions",
+          "visibility": "collapsed"
         },
         {
           "id": "agent.timeline",
           "name": "Timeline",
-          "type": "webview"
+          "type": "webview",
+          "visibility": "collapsed"
         },
         {
           "id": "agent.activity",
@@ -129,6 +136,33 @@
       {
         "title": "DataPass: Export Selected Conversations",
         "command": "agent.exportConversations"
+      },
+      {
+        "command": "agent.openAnalyzer",
+        "title": "Agent: Open Analyzer"
+      },
+      {
+        "command": "agent.openCurrentProject",
+        "title": "Agent: Open Current Project"
+      },
+      {
+        "command": "agent.exportSelection",
+        "title": "Agent: Export Selection"
+      },
+      {
+        "command": "agent.inspectChangeInLens",
+        "title": "Agent: Inspect Change in Lens",
+        "enablement": "agent.ternAvailable"
+      },
+      {
+        "command": "agent.openCommitInLens",
+        "title": "Agent: Open Observed Commit in Lens",
+        "enablement": "agent.ternAvailable"
+      },
+      {
+        "command": "agent.openChangedFileInLens",
+        "title": "Agent: Open Changed File in Lens",
+        "enablement": "agent.ternAvailable"
       }
     ],
     "keybindings": [
@@ -585,6 +619,7 @@
     "export:conversations": "node dist/export-conversations.cjs"
   },
   "devDependencies": {
+    "@galaxy/dev-context": "file:vendor/galaxy-dev-context-0.1.0.tgz",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.95.0",
     "@vscode/vsce": "^3.2.0",

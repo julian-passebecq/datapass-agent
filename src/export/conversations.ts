@@ -9,6 +9,7 @@ import { redact, isSecretKeyName, isCredentialPath } from '../util/redact';
 export type ExportProvider = 'codex' | 'claude' | 'chatgpt' | 'mongo' | 'csv';
 export interface ConversationSource {
   provider: ExportProvider; file: string; id: string; project?: string;
+  observation?:unknown;
 }
 export interface ExportSession {
   provider: ExportProvider; id: string; project?: string; title: string;
@@ -252,6 +253,7 @@ export async function exportConversations(sources: ConversationSource[], destina
       if (session.changedDuringExport || session.malformed) bundle.warnings.push(`${source.provider} ${session.id}: ${session.malformed} malformed/oversized rows; changed during export: ${session.changedDuringExport}. Re-export after the session settles.`);
       session.title = String(sanitize(session.title));
       bundle.sessions.push(session);
+      if(source.observation)await fs.writeFile(path.join(target,`${source.provider}-${slug}.observation.json`),JSON.stringify(sanitize(source.observation),null,2)+'\n',{flag:'wx'});
     }
   } catch {
     // Leave evidence of an incomplete run, but never emit source content in an exception.
