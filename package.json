@@ -127,7 +127,7 @@
       },
       {
         "command": "agent.goToScreen",
-        "title": "Agent: Go to screen…"
+        "title": "Agent: Go to screen\u2026"
       },
       {
         "title": "DataPass: Start Here",
@@ -163,6 +163,10 @@
         "command": "agent.openChangedFileInLens",
         "title": "Agent: Open Changed File in Lens",
         "enablement": "agent.ternAvailable"
+      },
+      {
+        "command": "agent.openControlMap",
+        "title": "Agent: Open Agent Map"
       }
     ],
     "keybindings": [

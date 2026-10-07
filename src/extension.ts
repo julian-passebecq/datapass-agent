@@ -144,6 +144,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
       if (pick) target.open(pick.id);
     }),
     vscode.commands.registerCommand('agent.readTranscript', (arg?: unknown) => workspace.open('transcript', keyOf(arg))),
+    vscode.commands.registerCommand('agent.openControlMap',()=>workspace.open('control-map')),
     vscode.commands.registerCommand('agent.openAttention', () => workspace.open('attention')),
     vscode.commands.registerCommand('agent.openTeam', (arg?: unknown) => workspace.open('team', keyOf(arg))),
     vscode.commands.registerCommand('agent.openSession', async (arg?: unknown) => {
