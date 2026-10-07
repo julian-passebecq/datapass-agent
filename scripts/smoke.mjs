@@ -17,7 +17,9 @@ const fixtureHome = args.includes('--fixture-home');
 const shots = path.resolve(args.find(a => !a.startsWith('--')) ?? path.join(root, '.smoke', 'screenshots'));
 const codeDir = process.env.VSCODE_DIR ?? path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Microsoft VS Code');
 const codeExe = path.join(codeDir, process.platform === 'win32' ? 'Code.exe' : 'code');
-const base = path.join(root, '.smoke');
+// A fresh isolated profile avoids stale state and Windows locks from earlier runs.
+fs.mkdirSync(path.join(root, '.smoke'), { recursive: true });
+const base = fs.mkdtempSync(path.join(root, '.smoke', 'run-'));
 const userData = path.join(base, 'user-data');
 const extDir = path.join(base, 'extensions');
 const result = { checks: [], screenshots: [], errors: [] };
@@ -27,7 +29,6 @@ const check = (name, ok, detail = '') => {
 };
 
 if (!fs.existsSync(vsix)) throw new Error('package the VSIX first (npm run package)');
-fs.rmSync(base, { recursive: true, force: true });
 fs.mkdirSync(path.join(userData, 'User'), { recursive: true });
 fs.mkdirSync(shots, { recursive: true });
 
@@ -230,6 +231,25 @@ async function runCommand(win, label) {
   await win.keyboard.press('Enter');
 }
 
+// Analyzer is the default 0.8 pane; legacy views start collapsed.
+async function openLegacyViews(win) {
+  for (const title of ['Cockpit', 'Sessions', 'Timeline']) {
+    const header = win.locator('.pane-header', { hasText: new RegExp(`^${title}`) }).first();
+    if (await header.getAttribute('aria-expanded') === 'false') await header.click();
+  }
+}
+
+async function closeHost(app) {
+  // On Windows the editor can exit after reload while the launcher pipe stays open.
+  let timer;
+  try {
+    await Promise.race([
+      app.close().catch(() => {}),
+      new Promise(resolve => { timer = setTimeout(resolve, 10_000); }),
+    ]);
+  } finally { clearTimeout(timer); }
+}
+
 const t0 = Date.now();
 let { app, win } = await launch();
 try {
@@ -237,6 +257,7 @@ try {
   await icon.waitFor({ timeout: 30_000 });
   check('Activity Bar shows AGENT container', true);
   await icon.click();
+  await openLegacyViews(win);
   const cockpit = await webviewText(win, 'Ended today', 60_000);
   check('Cockpit renders', cockpit, cockpit ? `${Date.now() - t0}ms after launch` : 'no cockpit text');
   // Initial discovery reads every provider artifact and runs git correlation: on a busy machine with
@@ -300,14 +321,16 @@ try {
   console.error(e);
   await shot(win, 'zz-error').catch(() => {});
 } finally {
-  await app.close().catch(() => {});
+  await closeHost(app);
 }
 
 // Light theme pass
 settings('Default Light Modern');
 ({ app, win } = await launch());
 try {
-  await win.locator('.activitybar [aria-label^="Agent"]').first().click();
+  if (!await win.locator('.pane-header', { hasText: /^Cockpit/ }).first().isVisible())
+    await win.locator('.activitybar [aria-label^="Agent"]').first().click();
+  await openLegacyViews(win);
   const ck = await webviewText(win, 'Ended today', 60_000);
   check('Light theme: Cockpit renders', ck);
   await win.waitForTimeout(6000);
@@ -321,7 +344,7 @@ try {
 } catch (e) {
   result.errors.push(String(e?.stack ?? e));
 } finally {
-  await app.close().catch(() => {});
+  await closeHost(app);
 }
 
 // Extension host log: no errors from Agent
