@@ -9,8 +9,8 @@ import { hhmm, statusText } from './views';
 import { endInferred } from '../sessions/classify';
 import { endObserved } from '../activity/audit';
 import type { WfRun } from '../providers/claude/workflows';
-import { liveRunsOf, runCounts, runName, runningWfAgents, WF_COUNT_BASIS, WF_LINK_BASIS } from '../activity/wfLinks';
-import { agentRowHtml, leadRuns, runStripHtml } from './extra/wfkit';
+import { agentLabel, agentWallMs, liveRunsOf, modelEffortText, runCounts, runName, runningWfAgents, WF_COUNT_BASIS, WF_LINK_BASIS } from '../activity/wfLinks';
+import { agentRowHtml, leadRuns, runStripHtml, wfDur } from './extra/wfkit';
 import type { Feed } from './extra/feeds';
 import { workflowsFeed } from './extra/workflows';
 
@@ -169,8 +169,7 @@ function overview(d: WsData, st: WsState): string {
     kpi(compact(u.tokens), 'Tokens 24 h', '', `DERIVED: sum of provider-recorded (OBSERVED) token totals of ${u.sessions} session(s) active in the last 24 hours (whole-session totals)`),
     u.costSessions ? kpi(`$${u.costUSD.toFixed(2)}`, 'Cost recorded', '', `DERIVED: sum of Claude Code cost-state (OBSERVED) over ${u.costSessions} session(s) active in the last 24 hours (whole-session totals); Codex records no cost`) : '',
   ].join('')}</div>`;
-  h += `<div class="cols"><div><h2>Live agents · ${live.length}${wfLive ? ` <span class="muted" title="${esc(`running workflow agents under these leads; ${WF_COUNT_BASIS}`)}">+ ${wfLive} workflow agent(s)</span>` : ''}</h2>${live.length ? `<div class="grid">${live.map(s => card(s, d, st.selected, workersLine(s, d, runs.get(s.key)))).join('')}</div>` : '<div class="empty">No live session. Ended sessions are on the Board.</div>'}</div>`;
-  h += `<div><h2>Needs attention · ${att.length}</h2>${att.length ? attList(att.slice(0, 6), d, st) : '<div class="empty">Nothing needs you.</div>'}${att.length > 6 ? `<button class="link" data-nav="attention">all ${att.length} items →</button>` : ''}</div></div>`;
+  h += overviewCols(d, st, live, att, runs, wfLive);
   h += `<h2>Last 24 hours</h2>${gantt(d, st, 14)}`;
   return h;
 }
@@ -185,13 +184,100 @@ export function wfBadges(runs: WfRun[] | undefined): string {
     .join(' ');
 }
 
+/** Max running workers / workflow agents listed on a lead card before "+n more". */
+export const OV_WORKER_ROWS = 5;
+const OV_PROVS = ['claude', 'codex'] as const;
+
+/** Collapsible section header: a button posting `name` = 'closed' | '' (WsState opts); the count stays visible. */
+function ovHead(st: WsState, name: string, label: string, count: number, tag = 'h2'): { html: string; closed: boolean } {
+  const closed = st.opts?.[name] === 'closed';
+  const html = `<${tag} class="ovh"><button class="ovt" data-opt="${esc(name)}" data-val="${closed ? '' : 'closed'}" aria-expanded="${closed ? 'false' : 'true'}" title="${esc(`${closed ? 'Expand' : 'Collapse'} ${label}`)}"><span class="chev" aria-hidden="true">${closed ? '▸' : '▾'}</span>${esc(label)} <span class="ovn">${count}</span></button></${tag}>`;
+  return { html, closed };
+}
+
+/** Live agents and Needs attention, each grouped by provider and collapsible ('ov.live.*', 'ov.attn', 'ov.attn.*'). */
+function overviewCols(d: WsData, st: WsState, live: AgentSessionSnapshot[], att: AttentionItem[], runs: Map<string, WfRun[]>, wfLive: number): string {
+  const by = new Map(d.sessions.map(s => [s.key, s]));
+  const wfNote = wfLive ? ` <span class="muted" title="${esc(`running workflow agents under these leads; ${WF_COUNT_BASIS}`)}">+ ${wfLive} workflow agent(s)</span>` : '';
+  let lv = `<div class="ov-live"><h2>Live agents · ${live.length}${wfNote}</h2>`;
+  if (!live.length) lv += '<div class="empty">No live session. Ended sessions are on the Board.</div>';
+  for (const p of OV_PROVS) {
+    const list = live.filter(s => s.provider === p);
+    if (!list.length) continue;
+    const hd = ovHead(st, `ov.live.${p}`, PROV[p], list.length, 'h3');
+    lv += `<section class="ovg" data-ovg="live.${p}">${hd.html}${hd.closed ? '' : `<div class="grid">${list.map(s => card(s, d, st.selected, workersLine(s, d, runs.get(s.key)))).join('')}</div>`}</section>`;
+  }
+  lv += '</div>';
+  const top = ovHead(st, 'ov.attn', 'Needs attention', att.length);
+  let at = `<div class="ov-attn${top.closed ? ' closed' : ''}">${top.html}`;
+  if (!top.closed) {
+    if (!att.length) at += '<div class="empty">Nothing needs you.</div>';
+    for (const p of OV_PROVS) {
+      const items = att.filter(a => by.get(a.key)?.provider === p);
+      if (!items.length) continue;
+      const hd = ovHead(st, `ov.attn.${p}`, PROV[p], items.length, 'h3');
+      at += `<section class="ovg" data-ovg="attn.${p}">${hd.html}${hd.closed ? '' : attList(items.slice(0, 6), d, st)}</section>`;
+    }
+    if (att.length > 6) at += `<button class="link" data-nav="attention">all ${att.length} items →</button>`;
+  }
+  at += '</div>';
+  return `<div class="cols ov-cols${top.closed ? ' ov-wide' : ''}">${lv}${at}</div>`;
+}
+
+export interface WorkerRow { key?: string; status: string; dotTitle: string; label: string; me: string; meTitle: string; tool: string; toolTitle: string; elapsed: string; start: number }
+
+/** Running workers (sessions) and running workflow agents of a lead, newest first. Idle and ended ones are only counted. */
+export function runningWorkerRows(s: AgentSessionSnapshot, d: WsData, runs?: WfRun[]): WorkerRow[] {
+  const rows: WorkerRow[] = [];
+  for (const k of d.sessions.filter(c => c.parentSessionId === s.key && c.status === 'RUNNING')) {
+    const ct = k.facts?.currentTool;
+    rows.push({
+      key: k.key,
+      status: k.status,
+      dotTitle: `${statusText(k)} — ${k.statusReason}`,
+      label: k.workerLabel && k.title && k.title !== k.workerLabel ? `${k.workerLabel} · ${k.title}` : titleOf(k),
+      me: [prettyModel(k.model), k.effort].filter(Boolean).join(' · ') || '—',
+      meTitle: 'model and effort as recorded by the provider (OBSERVED); — when not recorded (UNKNOWN)',
+      tool: ct ? `▸ ${ct.name}${ct.detail ? ` ${ct.detail}` : ''}` : '',
+      toolTitle: ct ? 'OBSERVED: tool call with no recorded result yet' : 'UNKNOWN: no open tool call recorded',
+      elapsed: k.startedAt !== undefined ? duration(d.now - k.startedAt) : '—',
+      start: k.startedAt ?? 0,
+    });
+  }
+  for (const r of liveRunsOf(runs))
+    for (const a of r.agents.filter(x => x.status === 'running')) {
+      const me = modelEffortText(a, s, prettyModel);
+      rows.push({
+        status: 'RUNNING',
+        dotTitle: `running — ${a.statusBasis}`,
+        label: `${agentLabel(a)} · workflow ${runName(r)}`,
+        me: me.text,
+        meTitle: me.title,
+        tool: a.currentTool ? `▸ ${a.currentTool}` : '',
+        toolTitle: a.currentTool ? 'OBSERVED: tool call with no recorded result yet' : 'UNKNOWN: no open tool call recorded',
+        elapsed: wfDur(agentWallMs(a, d.now)),
+        start: a.firstAt ?? 0,
+      });
+    }
+  return rows.sort((x, y) => y.start - x.start);
+}
+
+function workerRowHtml(w: WorkerRow): string {
+  const sel = w.key ? ` data-select="${esc(w.key)}" tabindex="0"` : '';
+  return `<div class="ovw"${sel} title="${esc(w.label)}"><span class="dot ${esc(w.status)}" title="${esc(w.dotTitle)}"></span><span class="ovw-l">${esc(w.label.slice(0, 80))}</span><span class="ovw-m" title="${esc(w.meTitle)}">${esc(w.me)}</span><span class="ovw-t" title="${esc(w.toolTitle)}">${esc(w.tool)}</span><span class="ovw-e" title="DERIVED: time since the first record">${esc(w.elapsed)}</span></div>`;
+}
+
 function workersLine(s: AgentSessionSnapshot, d: WsData, runs?: WfRun[]): string {
   const kids = d.sessions.filter(c => c.parentSessionId === s.key);
   const badges = wfBadges(runs);
   if (!kids.length && !badges) return '';
-  const liveK = kids.filter(isLive).length;
-  const w = kids.length ? `${kids.length} worker${kids.length > 1 ? 's' : ''}${liveK ? ` · <span class="pass">${liveK} live</span>` : ''}` : '';
-  return `<div class="cl muted">${[w, badges].filter(Boolean).join(' ')}</div>`;
+  const rows = runningWorkerRows(s, d, runs);
+  const runK = kids.filter(k => k.status === 'RUNNING').length;
+  const rest = kids.length - runK;
+  const w = kids.length ? `<span title="DERIVED: worker sessions whose recorded parent is this lead; running ones are listed, idle and ended ones only counted">${kids.length} worker${kids.length > 1 ? 's' : ''}${runK ? ` · <span class="pass">${runK} running</span>` : ''}${rest ? ` · ${rest} idle/ended` : ''}</span>` : '';
+  const more = rows.length > OV_WORKER_ROWS ? `<button class="link ovmore" data-nav="topology" data-key="${esc(s.key)}" title="Open Topology on this lead">+${rows.length - OV_WORKER_ROWS} more</button>` : '';
+  const list = rows.length ? `<div class="ovws">${rows.slice(0, OV_WORKER_ROWS).map(workerRowHtml).join('')}${more}</div>` : '';
+  return `<div class="cl muted">${[w, badges].filter(Boolean).join(' ')}</div>${list}`;
 }
 
 function order(s: AgentSessionSnapshot): number {

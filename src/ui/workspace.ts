@@ -64,6 +64,7 @@ export class WorkspacePanel implements vscode.Disposable {
       if (msg.type === 'ready') return this.render(true);
       if (msg.type === 'nav') {
         this.state.view = msg.view;
+        if (msg.key) this.state.selected = msg.key;
         return this.render(false, true);
       }
       if (msg.type === 'opt') {
