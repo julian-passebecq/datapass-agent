@@ -69,6 +69,20 @@ th { font-weight: 600; color: var(--vscode-descriptionForeground); font-size: 11
 .k-run b { color: color-mix(in srgb, var(--ok) 70%, var(--vscode-foreground)); } .k-need b { color: color-mix(in srgb, var(--warn) 65%, var(--vscode-foreground)); } .k-fail b { color: color-mix(in srgb, var(--bad) 75%, var(--vscode-foreground)); } .k-idle b { color: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 60%, var(--vscode-foreground)); }
 .cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(220px, 2fr); gap: 16px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+/* Overview: collapsible sections (Needs attention, provider groups); collapsed attention frees its column for live agents. */
+.ovh { margin: 12px 0 4px; font-size: 11px; } h3.ovh { margin: 8px 0 4px; } .ovg { min-width: 0; }
+.ovt { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; background: none; border: none; padding: 2px 4px; margin-left: -4px; border-radius: 3px; cursor: pointer; font: inherit; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--vscode-descriptionForeground); }
+h3.ovh .ovt { text-transform: none; letter-spacing: normal; color: var(--vscode-foreground); }
+.ovt:hover { background: var(--vscode-list-hoverBackground); } .ovt .chev { width: 10px; flex: none; }
+.ovn { font-variant-numeric: tabular-nums; border: 1px solid var(--line); border-radius: 8px; padding: 0 6px; color: var(--vscode-foreground); }
+.ov-cols.ov-wide { grid-template-columns: minmax(0, 1fr); } .ov-cols.ov-wide .ov-attn { order: -1; } .ov-cols > div { min-width: 0; }
+.ovws { display: grid; gap: 1px; margin-top: 2px; min-width: 0; }
+.ovw { display: flex; align-items: center; gap: 6px; font-size: 11px; min-width: 0; padding: 1px 3px; border-radius: 3px; }
+.ovw[data-select]:hover { background: var(--vscode-list-hoverBackground); }
+.ovw > span:not(.dot) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ovw .dot { flex: none; } .ovw-l { flex: 1 1 35%; } .ovw-m, .ovw-t { flex: 1 1 25%; color: var(--vscode-descriptionForeground); } .ovw-t:empty { display: none; }
+.ovw-e { flex: none; font-variant-numeric: tabular-nums; color: var(--vscode-descriptionForeground); }
+.ovws .ovmore { justify-self: start; font-size: 11px; } .ov-cols .card { grid-template-columns: minmax(0, 1fr); }
 .card { border: 1px solid var(--line); border-left: 3px solid var(--id, var(--accent)); border-radius: 6px; padding: 7px 9px; background: var(--raise); cursor: pointer; display: grid; gap: 2px; min-width: 0; }
 .card:hover { border-color: var(--vscode-focusBorder); border-left-color: var(--id); }
 .card.sel, .att.sel, .gr.sel, tr.sel, .agent.sel { outline: 1px solid var(--vscode-focusBorder); }
@@ -351,7 +365,7 @@ document.addEventListener('click', e => {
   if (ld) seen.delete(ld.dataset.loading);
   if (el.dataset.act) vscode.postMessage({ type: 'act', name: el.dataset.act, arg: el.dataset.arg || '', key: '' });
   else if (el.dataset.opt) vscode.postMessage({ type: 'opt', name: el.dataset.opt, value: el.dataset.val || '', key: el.dataset.key || '' });
-  else if (el.dataset.nav) vscode.postMessage({ type: 'nav', view: el.dataset.nav, key: '' });
+  else if (el.dataset.nav) vscode.postMessage({ type: 'nav', view: el.dataset.nav, key: el.dataset.key || '' });
   else if (el.dataset.select) vscode.postMessage({ type: 'select', key: el.dataset.select });
   else if (el.dataset.open) vscode.postMessage({ type: 'open', key: el.dataset.open });
   else vscode.postMessage({ type: 'cmd', cmd: el.dataset.cmd, key: el.dataset.key || '' });
@@ -388,7 +402,7 @@ export type WebviewMessage =
   | { type: 'open'; key: string }
   | { type: 'select'; key: string }
   | { type: 'clear'; key: '' }
-  | { type: 'nav'; view: string; key: '' }
+  | { type: 'nav'; view: string; key: string }
   | { type: 'opt'; name: string; value: string; key: string }
   | { type: 'act'; name: string; arg: string; key: '' }
   | { type: 'cmd'; cmd: 'refresh' | 'timelineAll' | 'revealWorktree' | 'copySessionId' | 'openTimeline' | 'openInTern' | 'openArtifactFolder' | 'openWorkspace' | 'openWorkspaceNewTab' | 'readTranscript'; key: string };
@@ -405,7 +419,7 @@ export function validateMessage(m: unknown, knownKey: (k: string) => boolean): W
   if (o.type === 'open' && knownKey(key)) return { type: 'open', key };
   if (o.type === 'select' && knownKey(key)) return { type: 'select', key };
   if (o.type === 'clear' && key === '') return { type: 'clear', key: '' };
-  if (o.type === 'nav' && key === '' && typeof o.view === 'string' && ((NAV_VIEWS as readonly string[]).includes(o.view) || EXTRA_NAV.has(o.view))) return { type: 'nav', view: o.view, key: '' };
+  if (o.type === 'nav' && (key === '' || knownKey(key)) && typeof o.view === 'string' && ((NAV_VIEWS as readonly string[]).includes(o.view) || EXTRA_NAV.has(o.view))) return { type: 'nav', view: o.view, key };
   if (o.type === 'opt' && typeof o.name === 'string' && /^[a-z0-9.-]{1,40}$/.test(o.name) && typeof o.value === 'string' && /^[a-z0-9._:-]{0,40}$/.test(o.value) && (key === '' || knownKey(key))) return { type: 'opt', name: o.name, value: o.value, key };
   if (o.type === 'act' && key === '' && typeof o.name === 'string' && /^[a-z0-9.-]{1,40}$/.test(o.name) && typeof o.arg === 'string' && o.arg.length <= 1000) return { type: 'act', name: o.name, arg: o.arg, key: '' };
   if (o.type === 'cmd' && typeof o.cmd === 'string' && CMDS.has(o.cmd) && (key === '' || knownKey(key))) return { type: 'cmd', cmd: o.cmd as any, key };
