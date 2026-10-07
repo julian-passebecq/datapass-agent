@@ -16,6 +16,7 @@ export function csp(cspSource: string, n: string): string {
 }
 
 export const STYLE = `
+.agent-map{font-family:var(--vscode-editor-font-family);max-width:1400px}.agent-map-box{border:1px solid var(--vscode-widget-border);padding:14px;overflow-wrap:anywhere}.agent-map-box h2{color:var(--vscode-charts-blue)}.agent-map-models{display:flex;gap:12px;flex-wrap:wrap}.agent-map-columns{display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:18px}.agent-map-arrow{text-align:center;font-size:22px;color:var(--vscode-charts-purple)}@media(max-width:800px){.agent-map-columns{grid-template-columns:1fr}}
 :root { --gap: 6px; --ok: var(--vscode-charts-green, #4caf50); --warn: var(--vscode-charts-orange, #d18616); --bad: var(--vscode-charts-red, #e5534b); --accent: var(--vscode-charts-blue, #4f9fd9); --quiet: var(--vscode-disabledForeground, #888); --claude: #d97757; --codex: #8b7cf6; --line: var(--vscode-widget-border, var(--vscode-panel-border, #8884)); --raise: var(--vscode-editorWidget-background, #8881); }
 body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); background: transparent; padding: 4px 8px 12px; margin: 0; line-height: 1.35; }
 h2 { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--vscode-descriptionForeground); margin: 12px 0 4px; }
@@ -393,7 +394,7 @@ export function page(cspSource: string, body: string, opts: { filter?: boolean; 
 }
 
 /** Kept in sync with WS_VIEWS (render/workspace.ts); duplicated so validation has no UI dependency. */
-export const NAV_VIEWS = ['overview', 'attention', 'board', 'team', 'flow', 'worktrees', 'gantt', 'verify', 'activity', 'providers'] as const;
+export const NAV_VIEWS = ['overview', 'attention', 'board', 'team', 'flow', 'worktrees', 'gantt', 'verify', 'activity', 'providers', 'control-map'] as const;
 /** Add-on screen ids (render/extra) accepted by nav validation; filled by the workspace panel. */
 export const EXTRA_NAV = new Set<string>();
 
@@ -405,9 +406,9 @@ export type WebviewMessage =
   | { type: 'nav'; view: string; key: string }
   | { type: 'opt'; name: string; value: string; key: string }
   | { type: 'act'; name: string; arg: string; key: '' }
-  | { type: 'cmd'; cmd: 'refresh' | 'timelineAll' | 'revealWorktree' | 'copySessionId' | 'openTimeline' | 'openInTern' | 'openArtifactFolder' | 'openWorkspace' | 'openWorkspaceNewTab' | 'readTranscript'; key: string };
+  | { type: 'cmd'; cmd: 'refresh' | 'timelineAll' | 'revealWorktree' | 'copySessionId' | 'openTimeline' | 'openInTern' | 'openArtifactFolder' | 'openWorkspace' | 'openWorkspaceNewTab' | 'readTranscript' | 'knowledge' | 'exportConversations'; key: string };
 
-const CMDS = new Set(['refresh', 'timelineAll', 'revealWorktree', 'copySessionId', 'openTimeline', 'openInTern', 'openArtifactFolder', 'openWorkspace', 'openWorkspaceNewTab', 'readTranscript']);
+const CMDS = new Set(['refresh', 'timelineAll', 'revealWorktree', 'copySessionId', 'openTimeline', 'openInTern', 'openArtifactFolder', 'openWorkspace', 'openWorkspaceNewTab', 'readTranscript', 'knowledge', 'exportConversations']);
 
 /** Strict validation of anything a webview posts back. Unknown shapes are dropped. */
 export function validateMessage(m: unknown, knownKey: (k: string) => boolean): WebviewMessage | undefined {

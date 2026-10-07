@@ -1,3 +1,4 @@
+import {controlMap} from './controlMap';
 // Agent Workspace: one editor panel with a navigation rail, a main surface and a selection pane.
 // Pure string rendering from snapshots; every value is escaped here.
 import { AgentSessionSnapshot, ProviderState, SourceState, TimelineEvent } from '../model';
@@ -19,7 +20,7 @@ export function coreFeeds(view: string): Feed[] {
   return view === 'overview' || view === 'team' ? [workflowsFeed as Feed] : [];
 }
 
-export const WS_VIEWS = ['overview', 'attention', 'board', 'team', 'flow', 'worktrees', 'gantt', 'verify', 'activity', 'providers'] as const;
+export const WS_VIEWS = ['overview', 'attention', 'board', 'team', 'flow', 'worktrees', 'gantt', 'verify', 'activity', 'providers', 'control-map'] as const;
 export type CoreView = (typeof WS_VIEWS)[number];
 /** Core view id or an add-on screen id from render/extra. */
 export type WsView = string;
@@ -69,9 +70,10 @@ export function bytes(n: number): string {
 
 const PROV: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
 const VIEW_LABEL: Record<CoreView, string> = {
-  overview: 'Overview', attention: 'Attention', board: 'Board', team: 'Team', flow: 'Flow', worktrees: 'Worktrees', gantt: 'Last 24 h', verify: 'Verification', activity: 'Activity', providers: 'Sources',
+  'control-map': 'Agent map', overview: 'Overview', attention: 'Attention', board: 'Board', team: 'Team', flow: 'Flow', worktrees: 'Worktrees', gantt: 'Last 24 h', verify: 'Verification', activity: 'Activity', providers: 'Sources',
 };
 const VIEW_HINT: Record<CoreView, string> = {
+  'control-map': 'Optional map of recorded model, session, checkout and evidence, with existing Agent navigation.',
   overview: 'What is running now, what needs you, and today at a glance.',
   attention: 'Sessions that need a human look, with the observation behind each item.',
   board: 'Every session by live status.',
@@ -666,10 +668,10 @@ export function statusStrip(d: WsData): string {
 const FOOT_REPOS = 8;
 
 export const RAIL_GROUPS = ['Now', 'Agents', 'Work', 'Change', 'Verify', 'Time', 'Usage', 'System'];
-const CORE_GROUP: Record<string, string> = { overview: 'Now', attention: 'Now', board: 'Work', team: 'Agents', gantt: 'Time', worktrees: 'Change', activity: 'Time', flow: 'Work', verify: 'Verify', providers: 'System' };
+const CORE_GROUP: Record<string, string> = { 'control-map':'Agents', overview: 'Now', attention: 'Now', board: 'Work', team: 'Agents', gantt: 'Time', worktrees: 'Change', activity: 'Time', flow: 'Work', verify: 'Verify', providers: 'System' };
 /** Reading order inside groups; screens not listed go last in their group. Ids that are not registered screens are
  *  ignored (rank only sorts screens that exist), so a planned id such as 'benchmarks' is harmless. */
-export const RAIL_ORDER = ['overview', 'attention', 'live', 'hud', 'panes', 'codex', 'team', 'topology', 'roles', 'dispatch', 'transcript', 'projects', 'workflows', 'board', 'flow', 'backlog', 'scope', 'worktrees', 'repos', 'changes', 'review', 'pipelines', 'verify', 'signals', 'health', 'gantt', 'replay', 'lifecycle', 'week', 'runs', 'activity', 'forecast', 'history', 'tokens', 'ctxcost', 'limits', 'explore', 'benchmarks', 'providers', 'settings', 'catalog', 'audit', 'launcher'];
+export const RAIL_ORDER = ['overview', 'attention', 'live', 'hud', 'panes', 'codex', 'control-map', 'team', 'topology', 'roles', 'dispatch', 'transcript', 'projects', 'workflows', 'board', 'flow', 'backlog', 'scope', 'worktrees', 'repos', 'changes', 'review', 'pipelines', 'verify', 'signals', 'health', 'gantt', 'replay', 'lifecycle', 'week', 'runs', 'activity', 'forecast', 'history', 'tokens', 'ctxcost', 'limits', 'explore', 'benchmarks', 'providers', 'settings', 'catalog', 'audit', 'launcher'];
 /** The question each rail group answers (group header tooltip). */
 export const RAIL_GROUP_HINT: Record<string, string> = {
   Now: 'What is going on right now, and what needs me?',
@@ -703,7 +705,7 @@ export function screenPickerSource(): string {
 
 function bodies(d: WsData, st: WsState): Record<string, () => string> {
   const body: Record<string, () => string> = {
-    overview: () => overview(d, st), attention: () => attentionView(d, st), board: () => board(d, st), team: () => team(d, st), flow: () => flowView(d, st), worktrees: () => worktrees(d, st), gantt: () => gantt(d, st), verify: () => verify(d, st), activity: () => activity(d), providers: () => providersView(d, st),
+    'control-map': () => controlMap(d, st), overview: () => overview(d, st), attention: () => attentionView(d, st), board: () => board(d, st), team: () => team(d, st), flow: () => flowView(d, st), worktrees: () => worktrees(d, st), gantt: () => gantt(d, st), verify: () => verify(d, st), activity: () => activity(d), providers: () => providersView(d, st),
   };
   for (const x of extraViews()) body[x.id] = () => x.render(d, st);
   return body;

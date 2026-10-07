@@ -13,6 +13,10 @@ import { AgentView, Inspector } from './ui/webviews';
 import { WorkspacePanel } from './ui/workspace';
 import { screenIndex } from './render/workspace';
 import { WebviewMessage } from './render/html';
+import { registerKnowledgeCommands } from './ui/knowledge';
+import {Analyzer} from './ui/analyzer';
+import {agentLensContext} from './interop';
+import {developmentObservations} from './export/development';
 
 const TERN_COMMANDS = ['tern.revealWorktree', 'tern.revealRevision', 'tern.revealChangeSet'];
 
@@ -21,6 +25,7 @@ export interface AgentApi {
   openWorkspace(view?: string, key?: string): void;
   installed: { claude?: InstalledVersion; codex?: InstalledVersion };
   activationMs: number;
+  getDevelopmentObservations():ReturnType<typeof developmentObservations>;
 }
 
 export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> {
@@ -38,7 +43,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
     // Paused until an Agent view shows (see syncGitEnded below).
     gitEnded: false,
   });
-  const api: AgentApi = { store, installed: {}, activationMs: 0, openWorkspace: (v, k) => workspace.open(v as any, k) };
+  const api: AgentApi = { store, installed: {}, activationMs: 0, getDevelopmentObservations:()=>developmentObservations(store.all()), openWorkspace: (v, k) => workspace.open(v as any, k) };
 
   let ternAvailable = false;
   const checkTern = async () => {
@@ -53,6 +58,12 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
   const inspector = new Inspector(store, m => onMessage(m), () => ternAvailable, (view, key) => workspace.open(view, key));
   const tree = new SessionsTree(store);
   const workspace = new WorkspacePanel(store, m => onMessage(m), () => ternAvailable);
+  registerKnowledgeCommands(ctx, store);
+  const analyzer=new Analyzer(store,()=>ternAvailable);
+  ctx.subscriptions.push(analyzer,vscode.window.registerTreeDataProvider('agent.analyzer',analyzer),
+    vscode.commands.registerCommand('agent.openAnalyzer',()=>vscode.commands.executeCommand('agent.analyzer.focus')),
+    vscode.commands.registerCommand('agent.openCurrentProject',()=>workspace.open('projects')),
+    vscode.commands.registerCommand('agent.exportSelection',(arg?:unknown)=>vscode.commands.executeCommand('agent.exportConversations',arg)));
   // Extra tabs: each its own screen / scope / options.
   const tabs = new Set<WorkspacePanel>();
   const newTab = (view?: string, key?: string, opts?: Record<string, string>) => {
@@ -133,6 +144,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
       if (pick) target.open(pick.id);
     }),
     vscode.commands.registerCommand('agent.readTranscript', (arg?: unknown) => workspace.open('transcript', keyOf(arg))),
+    vscode.commands.registerCommand('agent.openControlMap',()=>workspace.open('control-map')),
     vscode.commands.registerCommand('agent.openAttention', () => workspace.open('attention')),
     vscode.commands.registerCommand('agent.openTeam', (arg?: unknown) => workspace.open('team', keyOf(arg))),
     vscode.commands.registerCommand('agent.openSession', async (arg?: unknown) => {
@@ -170,8 +182,11 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
     }),
     vscode.commands.registerCommand('agent.openInTern', async (arg?: unknown) => {
       const s = store.get(keyOf(arg) ?? '');
-      if (!s || !ternAvailable) return;
-      await vscode.commands.executeCommand('tern.revealWorktree', { repository: s.repository, worktree: s.worktree, branch: s.branch, head: s.headAfter });
+      if (!s || !ternAvailable) return vscode.window.showInformationMessage('Agent: Lens is unavailable.');
+      const pointer=agentLensContext(s,'worktree');if(!pointer)return vscode.window.showInformationMessage('Agent: no Git worktree evidence recorded.');
+      await vscode.commands.executeCommand('tern.openDevContext',pointer);
+      const lens=vscode.extensions.getExtension('julian-passebecq.tern-vscode');const api=lens?.isActive?lens.exports:undefined;
+      api?.setAgentAnnotations?.([{provider:s.provider,sessionId:s.sessionId,repoPath:pointer.repository!.path,worktreePath:s.worktree,touchedFiles:s.changedFiles,evidenceKind:'OBSERVED',observedAt:new Date().toISOString()}]);
     }),
     vscode.commands.registerCommand('agent.showDiagnostics', () => {
       out.info(JSON.stringify({ providers: store.providerStates, installed: api.installed, refresh: store.history.slice(-10), memoryMB: Math.round(process.memoryUsage().rss / 1e6) }, null, 2));
@@ -182,6 +197,9 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
       void store.refresh();
     }),
   );
+  for(const [id,action]of [['agent.inspectChangeInLens','change'],['agent.openCommitInLens','commit'],['agent.openChangedFileInLens','file']]as const)ctx.subscriptions.push(vscode.commands.registerCommand(id,async(arg?:unknown)=>{
+    const s=store.get(keyOf(arg)??'');const pointer=s&&agentLensContext(s,action);if(!pointer||!ternAvailable)return vscode.window.showInformationMessage('Agent: Lens or the requested Git evidence is unavailable.');return vscode.commands.executeCommand('tern.openDevContext',pointer);
+  }));
 
   // Refresh model: fs watchers (debounced) on provider artifact folders + a slow tick for time-based status.
   let debounce: NodeJS.Timeout | undefined;

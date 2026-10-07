@@ -1,0 +1,5 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {developmentObservations} from '../src/export/development';
+import type {AgentSessionSnapshot} from '../src/model';
+test('development observations omit transcript text, prompts, command bodies and archive paths',()=>{const s={sessionId:'s',provider:'codex',status:'UNKNOWN',artifactPath:'secret-rollout',changedFiles:[],commits:[],tests:[{command:'sensitive command',at:1,outcome:'UNKNOWN',source:'provider-exit-code'}],evidence:[],title:'private prompt',lastAction:'private action',facts:{currentTool:{name:'exec_command',detail:'private tool body',startedAt:1}}} as unknown as AgentSessionSnapshot;const data=developmentObservations([s],1),text=JSON.stringify(data);for(const secret of ['secret-rollout','sensitive command','private prompt','private action','private tool body'])assert.ok(!text.includes(secret));assert.equal(data.version,'agent.development-observations/1');assert.equal(data.sessions[0].currentAction?.tool,'exec_command');assert.equal(data.sessions[0].status,'UNKNOWN');});

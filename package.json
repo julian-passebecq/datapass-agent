@@ -1,8 +1,8 @@
 {
   "name": "agent-vscode",
-  "displayName": "Agent",
+  "displayName": "DataPass Agent",
   "description": "Local observer for Claude Code and Codex sessions: what is running, where, and what changed.",
-  "version": "0.7.1",
+  "version": "0.8.2",
   "publisher": "juliandatapass",
   "private": true,
   "license": "UNLICENSED",
@@ -44,18 +44,25 @@
     "views": {
       "agent": [
         {
+          "id": "agent.analyzer",
+          "name": "Analyzer"
+        },
+        {
           "id": "agent.cockpit",
           "name": "Cockpit",
-          "type": "webview"
+          "type": "webview",
+          "visibility": "collapsed"
         },
         {
           "id": "agent.sessions",
-          "name": "Sessions"
+          "name": "Sessions",
+          "visibility": "collapsed"
         },
         {
           "id": "agent.timeline",
           "name": "Timeline",
-          "type": "webview"
+          "type": "webview",
+          "visibility": "collapsed"
         },
         {
           "id": "agent.activity",
@@ -120,7 +127,46 @@
       },
       {
         "command": "agent.goToScreen",
-        "title": "Agent: Go to screen…"
+        "title": "Agent: Go to screen\u2026"
+      },
+      {
+        "title": "DataPass: Start Here",
+        "command": "agent.knowledge"
+      },
+      {
+        "title": "DataPass: Export Selected Conversations",
+        "command": "agent.exportConversations"
+      },
+      {
+        "command": "agent.openAnalyzer",
+        "title": "Agent: Open Analyzer"
+      },
+      {
+        "command": "agent.openCurrentProject",
+        "title": "Agent: Open Current Project"
+      },
+      {
+        "command": "agent.exportSelection",
+        "title": "Agent: Export Selection"
+      },
+      {
+        "command": "agent.inspectChangeInLens",
+        "title": "Agent: Inspect Change in Lens",
+        "enablement": "agent.ternAvailable"
+      },
+      {
+        "command": "agent.openCommitInLens",
+        "title": "Agent: Open Observed Commit in Lens",
+        "enablement": "agent.ternAvailable"
+      },
+      {
+        "command": "agent.openChangedFileInLens",
+        "title": "Agent: Open Changed File in Lens",
+        "enablement": "agent.ternAvailable"
+      },
+      {
+        "command": "agent.openControlMap",
+        "title": "Agent: Open Agent Map"
       }
     ],
     "keybindings": [
@@ -179,6 +225,11 @@
           "command": "agent.openWorkspace",
           "when": "view == agent.sessions && viewItem =~ /session/",
           "group": "1_open@0"
+        },
+        {
+          "command": "agent.exportConversations",
+          "when": "view == agent.sessions && viewItem == session",
+          "group": "knowledge"
         }
       ],
       "commandPalette": [
@@ -568,9 +619,11 @@
     "perf": "npm run compile-tests && node out-test/scripts/perf.js",
     "weekly": "npm run compile-tests && node out-test/scripts/weekly.js",
     "archive": "npm run compile-tests && node out-test/scripts/archive.js",
-    "benchmarks": "npm run compile-tests && node out-test/scripts/benchmarks.js"
+    "benchmarks": "npm run compile-tests && node out-test/scripts/benchmarks.js",
+    "export:conversations": "node dist/export-conversations.cjs"
   },
   "devDependencies": {
+    "@galaxy/dev-context": "file:vendor/galaxy-dev-context-0.1.0.tgz",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.95.0",
     "@vscode/vsce": "^3.2.0",

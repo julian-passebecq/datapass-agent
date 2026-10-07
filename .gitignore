@@ -5,3 +5,7 @@ out-test/
 *.vsix
 .vscode-test/
 .smoke/
+.env*
+!.env.example
+.datapass/
+exports/
