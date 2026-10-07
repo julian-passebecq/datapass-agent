@@ -24,6 +24,7 @@ One editor panel: a navigation rail, the main surface, and a result card for the
 | Overview | Live counts, attention count, sessions / commits / tests / tokens over 24 h, live agent cards (model · effort, context %, tokens, recorded cost, last action, lifecycle stages), the attention list and the 24 h swimlanes |
 | Attention | Where to look: input requested, last test failed in a live session, context ≥ 80 %, open turn without activity, idle beyond `agent.idleAlertMinutes` (30), ended with edits but no commit. Each item names its basis |
 | Board | Sessions in columns: needs input, running, idle, unknown, ended in the last 24 h |
+| Agent map | Optional schematic of recorded providers, models, selected session, checkout and evidence; links to existing screens; unavailable knowledge/runtime capabilities stay UNKNOWN |
 | Team | A lead session and its workers in lanes, one per worker role the provider recorded (Claude subagent type, Codex agent nickname) |
 | Flow | Provider → repository → observed outcome (live, commit observed, files edited without a commit, no file change). No commit is never shown as a failure |
 | Worktrees | Repository → branch / worktree → the agents working there, with `Open in Tern` when Tern is installed |
