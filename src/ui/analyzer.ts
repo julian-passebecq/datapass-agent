@@ -18,7 +18,7 @@ export class Analyzer implements vscode.TreeDataProvider<Entry>,vscode.Disposabl
     const item=new vscode.TreeItem(bounded(entry.label,500));if(entry.command)item.command={command:entry.command,title:entry.label,arguments:entry.key?[entry.key]:[]};return item;
   }
   getChildren(entry?:Entry):Entry[] {
-    if(!entry)return ['ACTIVE','RECENT','ATTENTION','EXPORT'].map(section=>({section}));
+    if(!entry)return ['ACTIVE','ATTENTION','RECENT','EXPORT'].map(section=>({section}));
     if('session'in entry){const s=entry.session;return [
       {label:`Project: ${s.cwd??'UNKNOWN'}`},{label:`Action: ${s.lastAction??'UNKNOWN'}`},
       {label:`Context: ${s.usage?.contextTokens??'UNKNOWN'}`},

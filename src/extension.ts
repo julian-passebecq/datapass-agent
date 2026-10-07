@@ -16,6 +16,7 @@ import { WebviewMessage } from './render/html';
 import { registerKnowledgeCommands } from './ui/knowledge';
 import {Analyzer} from './ui/analyzer';
 import {agentLensContext} from './interop';
+import {developmentObservations} from './export/development';
 
 const TERN_COMMANDS = ['tern.revealWorktree', 'tern.revealRevision', 'tern.revealChangeSet'];
 
@@ -24,6 +25,7 @@ export interface AgentApi {
   openWorkspace(view?: string, key?: string): void;
   installed: { claude?: InstalledVersion; codex?: InstalledVersion };
   activationMs: number;
+  getDevelopmentObservations():ReturnType<typeof developmentObservations>;
 }
 
 export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> {
@@ -41,7 +43,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
     // Paused until an Agent view shows (see syncGitEnded below).
     gitEnded: false,
   });
-  const api: AgentApi = { store, installed: {}, activationMs: 0, openWorkspace: (v, k) => workspace.open(v as any, k) };
+  const api: AgentApi = { store, installed: {}, activationMs: 0, getDevelopmentObservations:()=>developmentObservations(store.all()), openWorkspace: (v, k) => workspace.open(v as any, k) };
 
   let ternAvailable = false;
   const checkTern = async () => {
