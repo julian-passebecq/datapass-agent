@@ -9,6 +9,11 @@ import { esc } from '../html';
 import { statusText } from '../views';
 import { kpi, prettyModel, repoOf, titleOf, WsData, WsState } from '../workspace';
 import { ExtraView, opt, seg, toolbar } from './kit';
+import type { WfRun } from '../../providers/claude/workflows';
+import { liveRunsOf, runningWfAgents, WF_COUNT_BASIS } from '../../activity/wfLinks';
+import { Feed } from './feeds';
+import { workflowsFeed } from './workflows';
+import { agentRowHtml, leadRuns, runStripHtml } from './wfkit';
 
 const MIN = 60_000;
 const MAX_ROWS = 200;
@@ -26,6 +31,8 @@ interface Cfg {
   sort: LiveSort;
   laneBy: 'repo' | 'provider' | 'model' | 'status';
   orient: 'horizontal' | 'vertical';
+  /** Workflow runs per lead key (filled in render from the workflows feed). */
+  runs?: Map<string, WfRun[]>;
 }
 
 const RECENT: Record<string, number> = { live: 0, '30m': 30 * MIN, '2h': 120 * MIN };
@@ -195,13 +202,23 @@ function nameCell(r: LiveRow): string {
   return `${dot(s)}<b class="lv-nm">${esc(titleOf(s))}</b>${roleChip(s)}${r.spawn ? `<span class="lv-spawn" title="INFERRED: parent's spawn call of the same type just before this worker started">“${esc(r.spawn)}”</span>` : ''}`;
 }
 
+/** Running workflow runs of a lead: a strip per run plus one row per running agent. */
+function wfBlock(r: LiveRow, c: Cfg, now: number): string {
+  if (r.depth !== 0 || !c.runs) return '';
+  const runs = liveRunsOf(c.runs.get(r.s.key));
+  if (!runs.length) return '';
+  return `<div class="lv-wf">${runs.map(run => runStripHtml(run) + run.agents.filter(a => a.status === 'running').map(a => agentRowHtml(a, now, prettyModel, r.s)).join('')).join('')}</div>`;
+}
+
 // ---------------------------------------------------------------- layouts
 
 function table(rows: LiveRow[], d: WsData, st: WsState, c: Cfg, max: number): string {
   const body = rows.map(r => {
     const s = r.s;
     const pad = 6 + r.depth * 16;
-    return `<tr ${rowAttrs(r, st, 'lv-tr')}><td class="lv-n1" style="padding-left:${pad}px">${r.depth ? '<span class="lv-br">└</span>' : ''}${nameCell(r)}</td><td class="lv-st">${esc(statusText(s))}</td><td class="lv-who"><span class="lv-pv">${esc(PROV[s.provider] ?? s.provider)}</span> ${esc(who(s))}</td><td class="lv-mode" title="${esc(T_MODE)}">${modeHtml(s)}</td><td class="lv-do">${doing(r, d.now)}</td><td class="r lv-rate" title="${esc(T_RATE(c))}">${esc(rateText(rateOf(r, c)))}</td><td>${sparkline(r, c, max)}</td><td class="r">${ctxCell(r)}</td><td class="r" title="user prompts recorded (OBSERVED)">${r.prompts ?? ''}</td><td class="r" title="files the provider recorded editing (OBSERVED)">${r.files || ''}</td><td class="r">${workersCell(r)}</td><td class="r" title="total tokens recorded for the session (OBSERVED)">${s.usage ? esc(compact(s.usage.totalTokens)) : ''}</td><td class="lv-where">${esc(where(s))}</td><td class="r" title="since session start (DERIVED)">${esc(el(s.startedAt !== undefined ? d.now - s.startedAt : undefined))}</td></tr>`;
+    const main = `<tr ${rowAttrs(r, st, 'lv-tr')}><td class="lv-n1" style="padding-left:${pad}px">${r.depth ? '<span class="lv-br">└</span>' : ''}${nameCell(r)}</td><td class="lv-st">${esc(statusText(s))}</td><td class="lv-who"><span class="lv-pv">${esc(PROV[s.provider] ?? s.provider)}</span> ${esc(who(s))}</td><td class="lv-mode" title="${esc(T_MODE)}">${modeHtml(s)}</td><td class="lv-do">${doing(r, d.now)}</td><td class="r lv-rate" title="${esc(T_RATE(c))}">${esc(rateText(rateOf(r, c)))}</td><td>${sparkline(r, c, max)}</td><td class="r">${ctxCell(r)}</td><td class="r" title="user prompts recorded (OBSERVED)">${r.prompts ?? ''}</td><td class="r" title="files the provider recorded editing (OBSERVED)">${r.files || ''}</td><td class="r">${workersCell(r)}</td><td class="r" title="total tokens recorded for the session (OBSERVED)">${s.usage ? esc(compact(s.usage.totalTokens)) : ''}</td><td class="lv-where">${esc(where(s))}</td><td class="r" title="since session start (DERIVED)">${esc(el(s.startedAt !== undefined ? d.now - s.startedAt : undefined))}</td></tr>`;
+    const wf = wfBlock(r, c, d.now);
+    return wf ? `${main}<tr class="lv-wftr"><td colspan="14" style="padding-left:${pad + 14}px">${wf}</td></tr>` : main;
   }).join('');
   return `<div class="lv-tw"><table class="lv-tab"><thead><tr><th>Session</th><th>Status</th><th>Provider · model</th><th>Mode</th><th>Now doing</th><th class="r">Tok/min</th><th>Last ${SPARK_MIN} min</th><th class="r">Context</th><th class="r">Prompts</th><th class="r">Files</th><th class="r">Workers</th><th class="r">Tokens</th><th>Repo · branch</th><th class="r">Up</th></tr></thead><tbody>${body}</tbody></table></div>`;
 }
@@ -222,7 +239,7 @@ function cardOf(r: LiveRow, d: WsData, st: WsState, c: Cfg, max: number, mini = 
 ${mini ? '' : `<div class="lv-c2 muted">${esc(where(s))}</div>`}
 <div class="lv-c3">${doing(r, d.now)}</div>
 <div class="lv-c4">${stats}</div>
-${sparkline(r, c, max)}</div>`;
+${sparkline(r, c, max)}${wfBlock(r, c, d.now)}</div>`;
 }
 
 function cards(rows: LiveRow[], d: WsData, st: WsState, c: Cfg, max: number): string {
@@ -258,6 +275,8 @@ function swimlanes(rows: LiveRow[], d: WsData, st: WsState, c: Cfg, max: number)
 
 function render(d: WsData, st: WsState): string {
   const c = cfg(st);
+  c.runs = leadRuns(d);
+  const wfLive = runningWfAgents(c.runs);
   const grp = (t: string, control: string) => `<span class="lv-tg"><span class="lv-lbl">${t}</span>${control}</span>`;
   const tb1 = toolbar(
     grp('layout', seg(st, 'live.layout', [['table', 'Table'], ['cards', 'Cards'], ['lanes', 'Swimlanes']], 'table', 'Dense table, one card per session, or swimlanes')),
@@ -276,7 +295,7 @@ function render(d: WsData, st: WsState): string {
   const t = liveTotals(rows, repoOf);
   const rate = c.basis === 'output' ? t.outRate : t.rate;
   const prov = Object.entries(t.byProvider).map(([p, n]) => `${PROV[p] ?? p} ${n}`).join(' · ');
-  const kpis = `<div class="kpis big lv-k">${kpi(t.agents, 'agents live', t.agents ? 'k-run' : '', `every live session, leads and workers${prov ? ` (${prov})` : ''}; live = Running / Idle / Needs input (INFERRED from recency)`)}${kpi(t.conversations, 'conversations', '', 'live sessions that are not workers')}${kpi(t.workers, 'workers live', '', 'live sessions with a recorded parent (Claude subagents, Codex spawned agents)')}${kpi(t.running, 'running', 'k-run')}${kpi(t.needsInput, 'needs input', t.needsInput ? 'k-need' : '')}${kpi(t.toolsInFlight, 'tools in flight', '', T_TOOL)}${kpi(t.rateRows ? rateText(rate) : '—', `tok/min · ${c.win} min`, '', `${T_RATE(c)}; summed over ${t.rateRows} live session(s) with call records`)}${kpi(t.repos, 'repos', '', 'distinct repositories with a live session')}</div>`;
+  const kpis = `<div class="kpis big lv-k">${kpi(t.agents, 'agents live', t.agents ? 'k-run' : '', `every live session, leads and workers${prov ? ` (${prov})` : ''}; live = Running / Idle / Needs input (INFERRED from recency)`)}${kpi(t.conversations, 'conversations', '', 'live sessions that are not workers')}${kpi(t.workers, 'workers live', '', 'live sessions with a recorded parent (Claude subagents, Codex spawned agents)')}${wfLive ? kpi(wfLive, 'workflow agents', 'k-run', `running Claude workflow agents under the listed leads (${WF_COUNT_BASIS}); shown under each lead`) : ''}${kpi(t.running, 'running', 'k-run')}${kpi(t.needsInput, 'needs input', t.needsInput ? 'k-need' : '')}${kpi(t.toolsInFlight, 'tools in flight', '', T_TOOL)}${kpi(t.rateRows ? rateText(rate) : '—', `tok/min · ${c.win} min`, '', `${T_RATE(c)}; summed over ${t.rateRows} live session(s) with call records`)}${kpi(t.repos, 'repos', '', 'distinct repositories with a live session')}</div>`;
   let h = `<div class="lv">${tb1}${tb2}${kpis}`;
   if (!rows.length) {
     return `${h}<div class="empty">No live Claude Code or Codex session right now${c.show === 'live' ? '. Switch “show” to include sessions that ended recently' : ' and none ended in that window'}.</div>${legend()}</div>`;
@@ -290,7 +309,7 @@ function render(d: WsData, st: WsState): string {
 }
 
 function legend(): string {
-  return `<div class="foot lv-leg">Live status is INFERRED from recency and provider state. Tool calls, actions, modes, prompts, files and tokens are OBSERVED in the transcript / rollout; elapsed times and tokens / min are DERIVED from them. Context % only where the provider records the window (else UNKNOWN). Spawn descriptions in quotes are INFERRED. Left border: provider (<span class="lv-sw" style="--pv:var(--claude)"></span>Claude <span class="lv-sw" style="--pv:var(--codex)"></span>Codex); tool time turns amber after 5 min, red after 20 min. Updates on every refresh.</div>`;
+  return `<div class="foot lv-leg">Live status is INFERRED from recency and provider state. Tool calls, actions, modes, prompts, files and tokens are OBSERVED in the transcript / rollout; elapsed times and tokens / min are DERIVED from them. Context % only where the provider records the window (else UNKNOWN). Spawn descriptions in quotes are INFERRED. Under a lead: its running Claude workflow runs (run stored under the session directory, OBSERVED) with each running agent's model · effort, current tool, tokens (incl. cache reads, DERIVED) and time. Left border: provider (<span class="lv-sw" style="--pv:var(--claude)"></span>Claude <span class="lv-sw" style="--pv:var(--codex)"></span>Codex); tool time turns amber after 5 min, red after 20 min. Updates on every refresh.</div>`;
 }
 
 function badge(d: WsData): string {
@@ -299,6 +318,8 @@ function badge(d: WsData): string {
 }
 
 const CSS = `
+.lv .lv-wf { margin-top: 4px; border-top: 1px dashed var(--line); padding-top: 3px; min-width: 0; }
+.lv .lv-wftr td { border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent); }
 .lv .tb { margin: 0 0 6px; }
 .lv-tg { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .lv-lbl { color: var(--vscode-descriptionForeground); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; margin-left: 4px; }
@@ -382,6 +403,7 @@ export const liveView: ExtraView = {
   group: 'Now',
   hint: 'Who does what right now: every live Claude / Codex session and worker, current tool, tokens and pace.',
   ready: true,
+  feeds: [workflowsFeed as Feed],
   render,
   css: CSS,
   badge,

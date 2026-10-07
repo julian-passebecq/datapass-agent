@@ -17,6 +17,10 @@ import { Feed, feedValue } from './feeds';
 import { sessTok } from './lifecycle';
 import { statusEvidenceOf } from '../../sessions/classify';
 import { pipelinesFeed } from './pipelines';
+import type { WfRun } from '../../providers/claude/workflows';
+import { runCounts, WF_COUNT_BASIS } from '../../activity/wfLinks';
+import { workflowsFeed } from './workflows';
+import { agentRowHtml, leadRuns, runStripHtml } from './wfkit';
 
 const LESSONS_FEED = 'hud.lessons';
 const MAX_CARDS = 12;
@@ -82,8 +86,22 @@ function modeRow(s: AgentSessionSnapshot): string {
 const W_ICON: Record<HudWorker['state'], string> = { run: '●', needs: '!', idle: '◌', ended: '✓', unknown: '?' };
 const W_TEXT: Record<HudWorker['state'], string> = { run: 'run', needs: 'needs input', idle: 'idle', ended: 'ended', unknown: 'unknown' };
 
-function workersRow(s: AgentSessionSnapshot, ws: HudWorker[], d: WsData): string {
+/** Workflow runs of the lead, grouped by run: strip + its running agents (ended ones are counted in the strip). */
+function wfGroups(s: AgentSessionSnapshot, runs: WfRun[], d: WsData): string {
+  return runs
+    .slice(-3)
+    .map(r => `<div class="hud-wf">${runStripHtml(r)}${r.agents.filter(a => a.status === 'running').slice(0, MAX_WORKERS).map(a => agentRowHtml(a, d.now, prettyModel, s)).join('')}</div>`)
+    .join('');
+}
+
+function workersRow(s: AgentSessionSnapshot, ws: HudWorker[], d: WsData, runs: WfRun[] = []): string {
   const spawns = s.facts?.spawns?.length ?? 0;
+  const wfN = runs.reduce((n, r) => n + r.agents.length, 0);
+  const wfRun = runs.reduce((n, r) => n + runCounts(r).running, 0);
+  if (!ws.length && wfN) {
+    const head = `<b>${wfRun}</b>/${wfN} running${ev('DERIVED', `workflow agents of ${runs.length} run(s) under this session; ${WF_COUNT_BASIS}`)}`;
+    return row('subagents', head, `<div class="hud-sub">${wfGroups(s, runs, d)}</div>`);
+  }
   if (!ws.length) {
     const txt = spawns ? `${spawns} spawned, none loaded as a session` : 'none';
     return row('subagents', `<span class="muted">${esc(txt)}</span>${ev(spawns ? 'OBSERVED' : 'DERIVED', spawns ? 'spawn calls in the transcript / rollout' : 'no child session with this parent')}`);
@@ -91,12 +109,12 @@ function workersRow(s: AgentSessionSnapshot, ws: HudWorker[], d: WsData): string
   const run = ws.filter(w => w.state === 'run').length;
   const idle = ws.filter(w => w.state === 'idle').length;
   const needs = ws.filter(w => w.state === 'needs').length;
-  const head = `<b>${run}</b>/${ws.length} running${needs ? ` · <span class="hud-need">${needs} needs input</span>` : ''}${idle ? ` · ${idle} idle` : ''}${ev('DERIVED', 'child sessions (parentSessionId); run / needs input / idle / ended from each child status')}`;
+  const head = `<b>${run + wfRun}</b>/${ws.length + wfN} running${needs ? ` · <span class="hud-need">${needs} needs input</span>` : ''}${idle ? ` · ${idle} idle` : ''}${ev('DERIVED', `child sessions (parentSessionId); run / needs input / idle / ended from each child status${wfN ? `; plus ${wfN} workflow agent(s) of ${runs.length} run(s), ${WF_COUNT_BASIS}` : ''}`)}`;
   const list = ws
     .slice(0, MAX_WORKERS)
     .map(w => `<div class="hud-w hud-w-${w.state}" data-select="${esc(w.s.key)}" tabindex="0" title="${esc(`${titleOf(w.s)} · ${w.s.status} · ${w.s.statusReason}`)}"><span class="hud-wi">${W_ICON[w.state]}</span><span class="hud-wn">${esc((w.s.workerLabel ?? titleOf(w.s)).slice(0, 48))}</span><span class="hud-ws">${esc(W_TEXT[w.state])}</span><span class="muted">${esc(ago(d.now, w.s.lastActivityAt))}</span></div>`)
     .join('');
-  return row('subagents', head, `<div class="hud-sub">${list}${ws.length > MAX_WORKERS ? `<div class="muted">… ${ws.length - MAX_WORKERS} more</div>` : ''}</div>`);
+  return row('subagents', head, `<div class="hud-sub">${list}${ws.length > MAX_WORKERS ? `<div class="muted">… ${ws.length - MAX_WORKERS} more</div>` : ''}${wfGroups(s, runs, d)}</div>`);
 }
 
 function todoRow(s: AgentSessionSnapshot, d: WsData, full: boolean): string {
@@ -181,7 +199,7 @@ interface HudFeeds {
   ciOn: boolean;
 }
 
-function hudCard(s: AgentSessionSnapshot, d: WsData, st: WsState, pinned: boolean, f: HudFeeds, marker: number, full: boolean): string {
+function hudCard(s: AgentSessionSnapshot, d: WsData, st: WsState, pinned: boolean, f: HudFeeds, marker: number, full: boolean, runs: Map<string, WfRun[]>): string {
   const ws = workersOf(s, d.sessions);
   const who = [s.provider, prettyModel(s.model), s.effort].filter(Boolean).join(' · ');
   const where = [repoOf(s), s.branch ?? s.facts?.recordedBranch].filter(Boolean).join(' · ');
@@ -191,7 +209,7 @@ function hudCard(s: AgentSessionSnapshot, d: WsData, st: WsState, pinned: boolea
   return `<section class="hud-c${st.selected === s.key ? ' sel' : ''}" style="--id:${identityColor(repoOf(s))};--pv:var(--${esc(s.provider)})">
 <div class="hud-h" data-select="${esc(s.key)}" tabindex="0" title="${esc(`${s.key} · ${s.statusReason}`)}"><span class="dot ${esc(s.status)}"></span><b class="hud-t">${esc(titleOf(s))}</b>${pinned ? '<span class="hud-pin" title="Pinned">📌</span>' : ''}<span class="hud-st hud-st-${esc(stE.kind)}" title="${esc(`${stE.kind}: ${stE.basis}`)}">${esc(stE.text)}${stE.kind === 'OBSERVED' ? '' : ` <span class="hud-ev">${EV_SHORT[stE.kind]}</span>`}</span></div>
 <div class="hud-meta muted">${esc(who)} · ${esc(where)} · ${esc(ago(d.now, s.lastActivityAt))}</div>${now}
-<div class="hud-body">${modeRow(s)}${workersRow(s, ws, d)}${todoRow(s, d, full)}${testsRow(s, d)}${ciRow(s, f.ci, f.ciOn, f.ciError)}${ctxRow(s, marker)}${lessonsRow(s, f.lessons, f.lessonsError)}</div>
+<div class="hud-body">${modeRow(s)}${workersRow(s, ws, d, runs.get(s.key))}${todoRow(s, d, full)}${testsRow(s, d)}${ciRow(s, f.ci, f.ciOn, f.ciError)}${ctxRow(s, marker)}${lessonsRow(s, f.lessons, f.lessonsError)}</div>
 ${logBlock(s, d)}</section>`;
 }
 
@@ -224,10 +242,11 @@ export function renderHud(d: WsData, st: WsState): string {
   const feeds: HudFeeds = { lessons: lsFs.value, lessonsError: lsFs.error, ci: ciFs.value, ciError: ciFs.error, ciOn };
   const mk = Number(d.config?.<number>('agent.health.contextWindow', DEFAULT_WINDOW));
   const marker = Number.isFinite(mk) && mk >= 1000 ? mk : DEFAULT_WINDOW;
+  const runs = leadRuns(d);
   const body = cards.length
-    ? `<div class="hud-grid hud-cols-${esc(cols)}">${cards.map(s => hudCard(s, d, st, s === pinned, feeds, marker, full)).join('')}</div>`
+    ? `<div class="hud-grid hud-cols-${esc(cols)}">${cards.map(s => hudCard(s, d, st, s === pinned, feeds, marker, full, runs)).join('')}</div>`
     : '<div class="muted hud-empty">No live session. Pin a session above to watch it here.</div>';
-  const foot = `<div class="legend hud-foot">One card per live lead session (workers fold into their lead) plus the pinned one. Evidence per value: <b>obs</b> read from the provider record · <b>der</b> computed (child sessions, counts, percentages) · <b>inf</b> heuristic · <b>unk</b> not exposed. Todo = the latest TodoWrite / TaskCreate list (Claude) or update_plan (Codex), ≤ 30 items × 120 chars, redacted. Lessons = bullet lines of handoff/MEMORY.md, tasks/lessons.md or the CLAUDE.md "Lessons" section. CI needs <code>agent.pipelines.enabled</code>.</div>`;
+  const foot = `<div class="legend hud-foot">One card per live lead session (workers fold into their lead) plus the pinned one. Evidence per value: <b>obs</b> read from the provider record · <b>der</b> computed (child sessions, counts, percentages) · <b>inf</b> heuristic · <b>unk</b> not exposed. Subagents include Claude workflow agents, grouped by run (run directory under the session, OBSERVED; status from the run journal, DERIVED). Todo = the latest TodoWrite / TaskCreate list (Claude) or update_plan (Codex), ≤ 30 items × 120 chars, redacted. Lessons = bullet lines of handoff/MEMORY.md, tasks/lessons.md or the CLAUDE.md "Lessons" section. CI needs <code>agent.pipelines.enabled</code>.</div>`;
   return `${bar0}${picker}${body}${foot}`;
 }
 
@@ -237,7 +256,7 @@ export const hudView: ExtraView = {
   group: 'Now',
   hint: 'Terminal-style panel per live session: plan mode, subagents, todo checklist, tests, CI, context, lessons and a log tail.',
   ready: true,
-  feeds: [lessonsFeed as Feed, pipelinesFeed as Feed],
+  feeds: [lessonsFeed as Feed, pipelinesFeed as Feed, workflowsFeed as Feed],
   actions: {
     refresh: (_arg, ctx) => ctx.refreshFeeds(),
   },

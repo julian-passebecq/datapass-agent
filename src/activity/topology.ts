@@ -1,6 +1,7 @@
 // Lead → workers → nested workers as a tree, with DERIVED rollups. Edges exist only where the provider
 // recorded the parent (Claude subagents/ transcripts, Codex parent_thread_id); nothing is guessed.
 import { AgentSessionSnapshot } from '../model';
+import type { WfAgent, WfRun } from '../providers/claude/workflows';
 import { isLive, workerRole } from './insights';
 
 export interface Rollup {
@@ -33,6 +34,12 @@ export interface TopoNode {
   role?: string;
   /** Short description of the spawn that probably produced this worker (INFERRED: type + time match). */
   spawn?: string;
+  /** Workflow run group under its lead (key `wf:<runId>`); parent link OBSERVED from the run directory. */
+  wf?: WfRun;
+  /** Workflow agent under its run (key `wfa:<runId>:<agentId>`); not a loaded session, so not selectable. */
+  wa?: WfAgent;
+  /** Lead session key of a workflow agent's run. */
+  wfLead?: string;
   children: TopoNode[];
   roll: Rollup;
 }
@@ -123,6 +130,34 @@ export interface BuildOptions {
   sort?: SortBy;
   /** Group siblings by worker role when a node has more than this many children (0 = never). */
   groupAbove?: number;
+  /** Workflow runs per lead session key (src/activity/wfLinks.ts runsByLead); shown as group nodes under the lead. */
+  runs?: Map<string, WfRun[]>;
+}
+
+/** A node that stands for one agent: a loaded session or a workflow agent (group and run nodes do not). */
+export const isAgentNode = (n: TopoNode) => !!(n.s || n.wa);
+
+function wfAgentNode(r: WfRun, a: WfAgent, now: number): TopoNode {
+  const roll = emptyRollup();
+  roll.sessions = 1;
+  roll.live = a.status === 'running' ? 1 : 0;
+  roll.tokens = a.tokens;
+  roll.outputTokens = a.outputTokens;
+  roll.start = a.firstAt;
+  roll.end = a.status === 'running' ? now : a.lastAt;
+  return { key: `wfa:${r.runId}:${a.agentId}`, wa: a, wfLead: r.parentKey, role: a.phase, children: [], roll };
+}
+
+/** Group node for one workflow run with its agents as children (journal order). */
+export function wfRunNode(r: WfRun, now: number): TopoNode {
+  const n: TopoNode = { key: `wf:${r.runId}`, wf: r, label: r.name ?? r.runId, children: r.agents.map(a => wfAgentNode(r, a, now)), roll: emptyRollup() };
+  for (const c of n.children) {
+    add(n.roll, c.roll);
+    n.roll.depth = 1;
+  }
+  if (n.roll.start === undefined) n.roll.start = r.startedAt;
+  if (n.roll.end === undefined) n.roll.end = r.status === 'running' ? now : r.lastAt;
+  return n;
 }
 
 /** Builds the subtree under `root`. Cycle-safe: a session appears at most once. */
@@ -135,10 +170,11 @@ export function buildTree(sessions: AgentSessionSnapshot[], root: AgentSessionSn
     const kids = (kidsOf.get(s.key) ?? []).filter(k => !seen.has(k.key));
     const spawns = matchSpawns(s, kids);
     const nodes = kids.filter(k => !seen.has(k.key)).map(k => make(k, spawns.get(k.key)));
-    const n: TopoNode = { key: s.key, s, role: s.isWorker ? workerRole(s) : undefined, spawn, children: group(s.key, nodes, o), roll: own(s, o.now) };
+    const wfs = (o.runs?.get(s.key) ?? []).map(r => wfRunNode(r, o.now));
+    const n: TopoNode = { key: s.key, s, role: s.isWorker ? workerRole(s) : undefined, spawn, children: [...group(s.key, nodes, o), ...wfs], roll: own(s, o.now) };
     for (const c of n.children) {
       add(n.roll, c.roll);
-      n.roll.depth = Math.max(n.roll.depth, c.roll.depth + (c.s ? 1 : 0));
+      n.roll.depth = Math.max(n.roll.depth, c.roll.depth + (isAgentNode(c) ? 1 : 0));
     }
     return n;
   };
@@ -167,12 +203,13 @@ function group(parentKey: string, nodes: TopoNode[], o: BuildOptions): TopoNode[
   return sortKids(out, by);
 }
 
-/** Top-level sessions that have at least one recorded worker, live first then most recent. */
-export function leads(sessions: AgentSessionSnapshot[]): AgentSessionSnapshot[] {
+/** Top-level sessions that have at least one recorded worker or workflow run, live first then most recent. */
+export function leads(sessions: AgentSessionSnapshot[], runs?: Map<string, WfRun[]>): AgentSessionSnapshot[] {
   const keys = new Set(sessions.map(s => s.key));
   const parents = new Set(sessions.map(s => s.parentSessionId).filter((k): k is string => !!k && keys.has(k)));
+  for (const [k, rs] of runs ?? []) if (rs.length && keys.has(k)) parents.add(k);
   const roots = sessions.filter(s => parents.has(s.key) && !(s.parentSessionId && keys.has(s.parentSessionId)));
-  const liveKids = (s: AgentSessionSnapshot) => sessions.filter(c => c.parentSessionId === s.key && isLive(c)).length;
+  const liveKids = (s: AgentSessionSnapshot) => sessions.filter(c => c.parentSessionId === s.key && isLive(c)).length + (runs?.get(s.key) ?? []).reduce((n, r) => n + r.agents.filter(a => a.status === 'running').length, 0);
   return roots.sort((a, b) => liveKids(b) - liveKids(a) || Number(isLive(b)) - Number(isLive(a)) || (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0));
 }
 
@@ -190,7 +227,7 @@ export function orphanTree(sessions: AgentSessionSnapshot[], parentKey: string, 
   const n: TopoNode = { key: `orphan:${parentKey}`, label: `parent not loaded · ${parentKey.split(':')[1]?.slice(0, 8) ?? parentKey}`, children: group(`orphan:${parentKey}`, nodes, o), roll: emptyRollup() };
   for (const c of n.children) {
     add(n.roll, c.roll);
-    n.roll.depth = Math.max(n.roll.depth, c.roll.depth + (c.s ? 1 : 0));
+    n.roll.depth = Math.max(n.roll.depth, c.roll.depth + (isAgentNode(c) ? 1 : 0));
   }
   return n;
 }
