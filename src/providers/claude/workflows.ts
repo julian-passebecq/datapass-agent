@@ -26,6 +26,9 @@ export interface WfAgent {
   worktree?: string;
   spawnDepth?: number;
   model?: string;
+  /** Reasoning effort recorded for this agent (OBSERVED): assistant record .effort, else meta.json effort. */
+  effort?: string;
+  effortSource?: 'transcript' | 'meta';
   firstAt?: number;
   lastAt?: number;
   /**
@@ -119,6 +122,7 @@ const MAX_STATE_BYTES = 4 << 20;
 export interface TranscriptState {
   cursor?: Cursor;
   model?: string;
+  effort?: string;
   firstAt?: number;
   lastAt?: number;
   /** File creation time: the start time when only the tail was read. */
@@ -382,6 +386,8 @@ export class WorkflowScanner {
         worktree: meta.worktreePath,
         spawnDepth: meta.spawnDepth,
         model: tr?.model,
+        effort: tr?.effort ?? meta.effort,
+        effortSource: tr?.effort ? 'transcript' : meta.effort ? 'meta' : undefined,
         firstAt: partial ? (tr?.birthMs ?? tr?.firstAt) : tr?.firstAt,
         lastAt: tr?.lastAt,
         tokens,
@@ -649,6 +655,7 @@ export interface AgentMeta {
   workflowPhase?: string;
   worktreePath?: string;
   spawnDepth?: number;
+  effort?: string;
 }
 
 export function parseAgentMeta(text: string): AgentMeta {
@@ -660,6 +667,7 @@ export function parseAgentMeta(text: string): AgentMeta {
     workflowPhase: str(m.workflowPhase, 60),
     worktreePath: typeof m.worktreePath === 'string' && m.worktreePath.length < 400 ? m.worktreePath : undefined,
     spawnDepth: typeof m.spawnDepth === 'number' ? m.spawnDepth : undefined,
+    effort: str(m.effort, 20),
   };
 }
 
@@ -765,6 +773,7 @@ export function transcriptLine(t: TranscriptState, line: string): void {
   const msg = o.message;
   if (o.type === 'assistant' && msg && typeof msg === 'object') {
     if (typeof msg.model === 'string' && msg.model !== '<synthetic>') t.model = msg.model.slice(0, 60);
+    if (typeof o.effort === 'string' && o.effort) t.effort = bounded(o.effort, 20);
     const u = msg.usage;
     if (u && typeof u === 'object' && typeof msg.id === 'string') {
       const n = (x: unknown) => (typeof x === 'number' && x >= 0 ? x : 0);

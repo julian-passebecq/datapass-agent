@@ -3,11 +3,15 @@
 import type { AgentSessionSnapshot } from '../../model';
 import { duration } from '../../activity/activity';
 import { compact, identityColor, isLive, outcome } from '../../activity/insights';
-import { buildTree, leads, orphans, orphanTree, pathTo, Rollup, shortId, SortBy, TopoNode, wallMs } from '../../activity/topology';
+import { buildTree, isAgentNode, leads, orphans, orphanTree, pathTo, Rollup, shortId, SortBy, TopoNode, wallMs } from '../../activity/topology';
+import { agentLabel, agentWallMs, modelEffortText, runCounts, runName, runPhase, WF_COUNT_BASIS, WF_LINK_BASIS } from '../../activity/wfLinks';
 import { esc } from '../html';
 import { statusText } from '../views';
 import { kpi, prettyModel, repoOf, teamRoot, titleOf, WsData, WsState } from '../workspace';
 import { ExtraView, opt, seg, toolbar } from './kit';
+import { Feed } from './feeds';
+import { workflowsFeed } from './workflows';
+import { leadRuns, wfDot, WF_TOK_BASIS } from './wfkit';
 
 const MAX_KIDS = 60;
 const MAX_LEADS = 12;
@@ -29,6 +33,7 @@ interface Ctx {
 const usd = (n: number) => `$${n < 10 ? n.toFixed(2) : n.toFixed(0)}`;
 
 function metricOf(n: TopoNode, m: Metric, now: number): number {
+  if (n.wa) return m === 'tokens' ? n.wa.tokens : m === 'time' ? agentWallMs(n.wa, now) ?? 0 : 0;
   if (!n.s) return 0;
   if (m === 'tokens') return n.s.usage?.totalTokens ?? 0;
   if (m === 'time') return wallMs(n.s, now) ?? 0;
@@ -57,16 +62,31 @@ function fold(c: Ctx, n: TopoNode, isOpen: boolean): string {
 }
 
 function name(n: TopoNode): string {
+  if (n.wa) return agentLabel(n.wa);
+  if (n.wf) return `workflow ${runName(n.wf)}`;
   return n.s ? titleOf(n.s) : n.label ?? n.key;
 }
 
 function dot(n: TopoNode): string {
+  if (n.wa) return wfDot(n.wa.status, n.wa.statusBasis);
+  if (n.wf) return wfDot(n.wf.status, `workflow run ${n.wf.status}${n.wf.finalStatus ? ` (recorded: ${n.wf.finalStatus})` : ''}`);
   return n.s ? `<span class="dot ${esc(n.s.status)}" title="${esc(`${statusText(n.s)} — ${n.s.statusReason}`)}"></span>` : `<span class="tp-gd" title="${n.key.startsWith('orphan:') ? 'Workers whose recorded parent is outside the loaded history' : 'Siblings grouped by recorded worker role'}"></span>`;
 }
 
 function roleChip(n: TopoNode): string {
+  if (n.wa && n.role) return `<span class="tp-role" style="--rc:${identityColor(n.role)}" title="workflow phase recorded in the run journal (OBSERVED)">${esc(n.role)}</span>`;
+  if (n.wf) return `<span class="tp-role tp-wfr" title="${esc(WF_LINK_BASIS)}">workflow</span>`;
   if (!n.role || !n.s) return '';
   return `<span class="tp-role" style="--rc:${identityColor(n.role)}" title="worker type as recorded by the provider (OBSERVED)">${esc(n.role)}</span>`;
+}
+
+function whoN(n: TopoNode, d: WsData): string {
+  if (n.wa) return modelEffortText(n.wa, d.sessions.find(s => s.key === n.wfLead), prettyModel).text;
+  return who(n.s);
+}
+
+function whoTitle(n: TopoNode, d: WsData): string {
+  return n.wa ? modelEffortText(n.wa, d.sessions.find(s => s.key === n.wfLead), prettyModel).title : 'model and effort as recorded by the provider (OBSERVED)';
 }
 
 function who(s: AgentSessionSnapshot | undefined): string {
@@ -77,6 +97,15 @@ function who(s: AgentSessionSnapshot | undefined): string {
 /** One-line result from observed facts only. */
 function result(n: TopoNode, now: number): string {
   const s = n.s;
+  if (n.wa) {
+    const a = n.wa;
+    if (a.status === 'running') return a.currentTool ? `▸ ${a.currentTool}` : a.lastTool ? `▸ last: ${a.lastTool}` : 'running';
+    return [a.status === 'stale' ? 'no result' : a.status, a.result ?? (a.lastTool ? `last: ${a.lastTool}` : '')].filter(Boolean).join(': ');
+  }
+  if (n.wf) {
+    const c = runCounts(n.wf);
+    return [n.wf.status, runPhase(n.wf), `${c.done + c.failed}/${c.total} agents done`, c.running ? `${c.running} running` : '', c.failed ? `${c.failed} failed` : ''].filter(Boolean).join(' · ');
+  }
   if (!s) {
     const r = n.roll;
     return [`${r.sessions} session(s)`, r.live ? `${r.live} live` : '', r.files ? `${r.files} file(s)` : '', r.commits ? `${r.commits} commit(s)` : ''].filter(Boolean).join(' · ');
@@ -97,6 +126,8 @@ function result(n: TopoNode, now: number): string {
 }
 
 function resultTitle(n: TopoNode): string {
+  if (n.wa) return n.wa.statusBasis;
+  if (n.wf) return `${WF_COUNT_BASIS}; phase = phase of the newest running agent (OBSERVED in the journal)`;
   if (!n.s) return 'DERIVED: rollup of the grouped sessions';
   const o = outcome(n.s);
   return o === 'live' ? (n.s.facts?.currentTool ? 'OBSERVED: tool call with no recorded result yet' : 'OBSERVED: latest recorded action') : o === 'committed' ? 'DERIVED: commit observed in git during the session window' : 'OBSERVED: provider-recorded file edits / actions';
@@ -104,6 +135,7 @@ function resultTitle(n: TopoNode): string {
 
 function tokens(n: TopoNode): { own: string; sum: string } {
   const ownT = n.s?.usage?.totalTokens;
+  if (n.wa) return { own: `${compact(n.wa.tokens)}${n.wa.tokensPartial ? '+' : ''}`, sum: '' };
   return {
     own: n.s ? (ownT !== undefined ? compact(ownT) : '—') : '',
     sum: n.children.length ? compact(n.roll.tokens) : '',
@@ -117,12 +149,13 @@ function cost(n: TopoNode, rolled: boolean): string {
 }
 
 function wall(n: TopoNode, now: number): string {
+  if (n.wa) return duration(agentWallMs(n.wa, now));
   if (n.s) return duration(wallMs(n.s, now));
   return n.roll.start !== undefined && n.roll.end !== undefined ? duration(n.roll.end - n.roll.start) : '—';
 }
 
 function bar(c: Ctx, n: TopoNode): string {
-  if (c.metric === 'none' || !c.max || !n.s) return '';
+  if (c.metric === 'none' || !c.max || !isAgentNode(n)) return '';
   const v = metricOf(n, c.metric, c.d.now);
   const pct = Math.max(v ? 2 : 0, Math.round((100 * v) / c.max));
   return `<span class="tp-bar" title="${esc(`${c.metric}: share of the largest session in this tree`)}"><i style="width:${pct}%"></i></span>`;
@@ -132,15 +165,16 @@ const T_TOK = 'tokens recorded by the provider for this session (OBSERVED)';
 const T_SUM = 'Σ subtree: sum of each session’s recorded total (DERIVED)';
 const T_COST = 'cost recorded by Claude Code cost-state (OBSERVED); — = not recorded (UNKNOWN, Codex records none)';
 const T_WALL = 'wall time start → end, or now while live (DERIVED)';
+const tokTitle = (n: TopoNode) => (n.wa ? WF_TOK_BASIS : T_TOK);
 
 function provVar(n: TopoNode): string {
-  return n.s ? `var(--${n.s.provider})` : 'var(--line)';
+  return n.s ? `var(--${n.s.provider})` : n.wa || n.wf ? 'var(--claude)' : 'var(--line)';
 }
 
 function selAttrs(c: Ctx, n: TopoNode, cls: string): string {
   const sel = n.s && c.st.selected === n.key ? ' tp-sel' : '';
-  const live = n.s && isLive(n.s) ? ' tp-live' : '';
-  return `class="${cls}${sel}${live}${n.s ? '' : ' tp-grp'}" style="--pv:${provVar(n)};--id:${identityColor(n.s ? repoOf(n.s) : n.role ?? 'group')}"${n.s ? ` data-select="${esc(n.key)}" tabindex="0"` : ''}`;
+  const live = (n.s && isLive(n.s)) || n.wa?.status === 'running' ? ' tp-live' : '';
+  return `class="${cls}${sel}${live}${n.s ? '' : ' tp-grp'}${n.wa || n.wf ? ' tp-wf' : ''}" style="--pv:${provVar(n)};--id:${identityColor(n.s ? repoOf(n.s) : n.role ?? 'group')}"${n.s ? ` data-select="${esc(n.key)}" tabindex="0"` : ''}`;
 }
 
 function kidsSlice(n: TopoNode): { shown: TopoNode[]; more: number } {
@@ -155,7 +189,7 @@ function treeNode(c: Ctx, n: TopoNode, level: number): string {
   const isOpen = open(c, n, level);
   const t = tokens(n);
   const sub = [n.spawn ? `<span class="tp-spawn" title="INFERRED: parent's spawn call of the same type just before this worker started">“${esc(n.spawn)}”</span>` : '', `<span title="${esc(resultTitle(n))}">${esc(result(n, c.d.now))}</span>`].filter(Boolean).join(' ');
-  const row = `<div ${selAttrs(c, n, 'tp-row')}>${fold(c, n, isOpen)}<div class="tp-m"><div class="tp-l1">${dot(n)}<b>${esc(name(n))}</b>${roleChip(n)}<span class="tp-who">${esc(who(n.s))}</span></div><div class="tp-l2">${sub}</div></div><div class="tp-n"><span title="${T_TOK}">${esc(t.own)}</span><span class="tp-sum" title="${T_SUM}">${t.sum ? `Σ ${esc(t.sum)}` : ''}</span><span title="${T_COST}">${esc(cost(n, !n.s))}</span><span title="${T_WALL}">${esc(wall(n, c.d.now))}</span>${bar(c, n)}</div></div>`;
+  const row = `<div ${selAttrs(c, n, 'tp-row')}>${fold(c, n, isOpen)}<div class="tp-m"><div class="tp-l1">${dot(n)}<b>${esc(name(n))}</b>${roleChip(n)}<span class="tp-who" title="${esc(whoTitle(n, c.d))}">${esc(whoN(n, c.d))}</span></div><div class="tp-l2">${sub}</div></div><div class="tp-n"><span title="${esc(tokTitle(n))}">${esc(t.own)}</span><span class="tp-sum" title="${T_SUM}">${t.sum ? `Σ ${esc(t.sum)}` : ''}</span><span title="${T_COST}">${esc(cost(n, !n.s))}</span><span title="${T_WALL}">${esc(wall(n, c.d.now))}</span>${bar(c, n)}</div></div>`;
   if (!isOpen) return `<li>${row}</li>`;
   const next = n.s ? level + 1 : level;
   const { shown, more } = kidsSlice(n);
@@ -170,7 +204,7 @@ function listRows(c: Ctx, n: TopoNode, level: number, indent: number, out: strin
   const t = tokens(n);
   const tests = s ? `${s.tests.filter(x => x.outcome === 'PASS').length}/${s.tests.length}` : `${n.roll.testsPass}/${n.roll.testsPass + n.roll.testsFail}`;
   const active = s?.facts?.activeMs !== undefined ? duration(s.facts.activeMs) : '—';
-  out.push(`<tr ${selAttrs(c, n, 'tp-tr')}><td class="tp-nm" style="padding-left:${4 + indent * 14}px">${fold(c, n, isOpen)}${dot(n)} <b>${esc(name(n))}</b>${n.spawn ? ` <span class="tp-spawn" title="INFERRED spawn description">“${esc(n.spawn)}”</span>` : ''}</td><td>${s ? esc(s.status.toLowerCase().replace('_', ' ')) : ''}</td><td>${roleChip(n)}${s && !s.isWorker ? '<span class="tp-lead">lead</span>' : ''}</td><td class="tp-who">${esc(who(s))}</td><td class="r" title="${T_TOK}">${esc(t.own)}</td><td class="r tp-sum" title="${T_SUM}">${esc(t.sum)}</td><td class="r" title="${T_COST}">${esc(cost(n, !s))}</td><td class="r" title="${T_WALL}">${esc(wall(n, c.d.now))}</td><td class="r" title="active time: sum of gaps under 5 min (DERIVED)">${esc(active)}</td><td class="r">${s ? s.changedFiles.length || '' : n.roll.files || ''}</td><td class="r">${s ? s.commits.length || '' : n.roll.commits || ''}</td><td class="r${(s ? s.tests.some(x => x.outcome === 'FAIL') : n.roll.testsFail) ? ' tp-bad' : ''}">${tests === '0/0' ? '' : esc(tests)}</td><td class="tp-res" title="${esc(resultTitle(n))}">${esc(result(n, c.d.now))}</td><td>${bar(c, n)}</td></tr>`);
+  out.push(`<tr ${selAttrs(c, n, 'tp-tr')}><td class="tp-nm" style="padding-left:${4 + indent * 14}px">${fold(c, n, isOpen)}${dot(n)} <b>${esc(name(n))}</b>${n.spawn ? ` <span class="tp-spawn" title="INFERRED spawn description">“${esc(n.spawn)}”</span>` : ''}</td><td>${s ? esc(s.status.toLowerCase().replace('_', ' ')) : n.wa ? esc(n.wa.status) : n.wf ? esc(n.wf.status) : ''}</td><td>${roleChip(n)}${s && !s.isWorker ? '<span class="tp-lead">lead</span>' : ''}</td><td class="tp-who" title="${esc(whoTitle(n, c.d))}">${esc(whoN(n, c.d))}</td><td class="r" title="${esc(tokTitle(n))}">${esc(t.own)}</td><td class="r tp-sum" title="${T_SUM}">${esc(t.sum)}</td><td class="r" title="${T_COST}">${esc(cost(n, !s))}</td><td class="r" title="${T_WALL}">${esc(wall(n, c.d.now))}</td><td class="r" title="active time: sum of gaps under 5 min (DERIVED)">${esc(active)}</td><td class="r">${s ? s.changedFiles.length || '' : n.wa ? '' : n.roll.files || ''}</td><td class="r">${s ? s.commits.length || '' : n.wa ? '' : n.roll.commits || ''}</td><td class="r${(s ? s.tests.some(x => x.outcome === 'FAIL') : n.roll.testsFail) ? ' tp-bad' : ''}">${tests === '0/0' ? '' : esc(tests)}</td><td class="tp-res" title="${esc(resultTitle(n))}">${esc(result(n, c.d.now))}</td><td>${bar(c, n)}</td></tr>`);
   if (!isOpen) return;
   const { shown, more } = kidsSlice(n);
   for (const k of shown) listRows(c, k, n.s ? level + 1 : level, indent + 1, out);
@@ -188,8 +222,8 @@ function list(c: Ctx, root: TopoNode): string {
 function orgNode(c: Ctx, n: TopoNode, level: number): string {
   const isOpen = open(c, n, level);
   const t = tokens(n);
-  const nums = [t.own && t.own !== '—' ? `<span title="${T_TOK}">${esc(t.own)}</span>` : '', t.sum ? `<span class="tp-sum" title="${T_SUM}">Σ ${esc(t.sum)}</span>` : '', `<span title="${T_WALL}">${esc(wall(n, c.d.now))}</span>`, cost(n, !n.s) !== '—' ? `<span title="${T_COST}">${esc(cost(n, !n.s))}</span>` : ''].filter(Boolean).join(' · ');
-  const box = `<div ${selAttrs(c, n, 'tp-box')}><div class="tp-l1">${dot(n)}<b>${esc(name(n))}</b>${fold(c, n, isOpen)}</div><div class="tp-l1">${roleChip(n)}<span class="tp-who">${esc(who(n.s))}</span></div><div class="tp-nums">${nums}</div>${n.spawn ? `<div class="tp-spawn" title="INFERRED spawn description">“${esc(n.spawn)}”</div>` : ''}<div class="tp-res2" title="${esc(resultTitle(n))}">${esc(result(n, c.d.now))}</div>${bar(c, n)}</div>`;
+  const nums = [t.own && t.own !== '—' ? `<span title="${esc(tokTitle(n))}">${esc(t.own)}</span>` : '', t.sum ? `<span class="tp-sum" title="${T_SUM}">Σ ${esc(t.sum)}</span>` : '', `<span title="${T_WALL}">${esc(wall(n, c.d.now))}</span>`, cost(n, !n.s) !== '—' ? `<span title="${T_COST}">${esc(cost(n, !n.s))}</span>` : ''].filter(Boolean).join(' · ');
+  const box = `<div ${selAttrs(c, n, 'tp-box')}><div class="tp-l1">${dot(n)}<b>${esc(name(n))}</b>${fold(c, n, isOpen)}</div><div class="tp-l1">${roleChip(n)}<span class="tp-who" title="${esc(whoTitle(n, c.d))}">${esc(whoN(n, c.d))}</span></div><div class="tp-nums">${nums}</div>${n.spawn ? `<div class="tp-spawn" title="INFERRED spawn description">“${esc(n.spawn)}”</div>` : ''}<div class="tp-res2" title="${esc(resultTitle(n))}">${esc(result(n, c.d.now))}</div>${bar(c, n)}</div>`;
   if (!isOpen) return `<li>${box}</li>`;
   const next = n.s ? level + 1 : level;
   const { shown, more } = kidsSlice(n);
@@ -198,10 +232,15 @@ function orgNode(c: Ctx, n: TopoNode, level: number): string {
 
 // ---------------------------------------------------------------- page
 
+function countWf(n: TopoNode): number {
+  return (n.wa ? 1 : 0) + n.children.reduce((k, c) => k + countWf(c), 0);
+}
+
 function rollKpis(r: Rollup, root: TopoNode, now: number): string {
   const workers = r.sessions - (root.s ? 1 : 0);
+  const wfA = countWf(root);
   const span = r.start !== undefined && r.end !== undefined ? duration(r.end - r.start) : '—';
-  return `<div class="kpis tp-k">${kpi(workers, 'workers', '', 'sessions below the lead with a recorded parent (OBSERVED edges)')}${kpi(r.live, 'live', r.live ? 'k-run' : '')}${kpi(r.depth, 'depth', '', 'deepest nesting level (DERIVED)')}${kpi(compact(r.tokens), 'Σ tokens', '', T_SUM)}${kpi(r.costSessions ? usd(r.costUSD) : '—', 'Σ cost', '', `${T_COST}; ${r.costSessions} session(s) recorded a cost`)}${kpi(span, 'span', '', 'earliest start → latest activity in the tree (DERIVED)')}${kpi(r.files, 'files', '', 'files edited, summed per session (OBSERVED, may double-count shared files)')}${kpi(r.commits, 'commits')}${kpi(`${r.testsPass}/${r.testsPass + r.testsFail}`, 'tests pass', r.testsFail ? 'k-fail' : '')}</div>`;
+  return `<div class="kpis tp-k">${kpi(workers, 'workers', '', `sessions below the lead with a recorded parent (OBSERVED edges)${wfA ? `, including ${wfA} workflow agent(s) (run directory under the lead, OBSERVED)` : ''}`)}${wfA ? kpi(wfA, 'workflow agents', '', WF_COUNT_BASIS) : ''}${kpi(r.live, 'live', r.live ? 'k-run' : '')}${kpi(r.depth, 'depth', '', 'deepest nesting level (DERIVED)')}${kpi(compact(r.tokens), 'Σ tokens', '', T_SUM)}${kpi(r.costSessions ? usd(r.costUSD) : '—', 'Σ cost', '', `${T_COST}; ${r.costSessions} session(s) recorded a cost`)}${kpi(span, 'span', '', 'earliest start → latest activity in the tree (DERIVED)')}${kpi(r.files, 'files', '', 'files edited, summed per session (OBSERVED, may double-count shared files)')}${kpi(r.commits, 'commits')}${kpi(`${r.testsPass}/${r.testsPass + r.testsFail}`, 'tests pass', r.testsFail ? 'k-fail' : '')}</div>`;
 }
 
 function section(c: Ctx, root: TopoNode, layout: Layout, orient: string): string {
@@ -234,23 +273,26 @@ function render(d: WsData, st: WsState): string {
     grpd('sort', seg(st, 'topology.sort', [['start', 'Start'], ['tokens', 'Tokens'], ['live', 'Live first']], 'start')),
     grpd('bar', seg(st, 'topology.bar', [['tokens', 'Tokens'], ['time', 'Time'], ['files', 'Files'], ['none', 'Off']], 'tokens', 'Size bar per session, relative to the largest one in the tree')),
   );
-  const o = { now: d.now, sort, groupAbove: grp === 'none' ? 0 : grp === 'role' ? 1 : 8 };
+  const runs = leadRuns(d);
+  const o = { now: d.now, sort, groupAbove: grp === 'none' ? 0 : grp === 'role' ? 1 : 8, runs };
+  const runN = [...runs.values()].reduce((k, rs) => k + rs.length, 0);
+  const wfAgents = [...runs.values()].reduce((k, rs) => k + rs.reduce((m, r) => m + r.agents.length, 0), 0);
   const c: Ctx = { d, st, limit: depth === 'all' ? Infinity : Number(depth) || 1, tag: `d${depth}`, forced: new Set(), metric, max: 0 };
-  const ls = leads(d.sessions);
+  const ls = leads(d.sessions, runs);
   const orph = [...orphans(d.sessions)].sort((a, b) => Math.max(...b[1].map(s => s.lastActivityAt ?? 0)) - Math.max(...a[1].map(s => s.lastActivityAt ?? 0)));
   const workers = d.sessions.filter(s => s.isWorker).length;
   let h = tb;
-  const totals = `<div class="tp-tot muted">${ls.length} lead(s) with workers · ${workers} worker session(s) loaded · ${d.sessions.filter(s => s.isWorker && isLive(s)).length} live${orph.length ? ` · ${orph.reduce((n, [, k]) => n + k.length, 0)} worker(s) whose parent is not loaded` : ''}</div>`;
+  const totals = `<div class="tp-tot muted">${ls.length} lead(s) with workers · ${workers} worker session(s) loaded · ${d.sessions.filter(s => s.isWorker && isLive(s)).length} live${runN ? ` · ${runN} workflow run(s) with ${wfAgents} agent(s)` : ''}${orph.length ? ` · ${orph.reduce((n, [, k]) => n + k.length, 0)} worker(s) whose parent is not loaded` : ''}</div>`;
   h += totals;
-  if (!ls.length && !orph.length) return h + `<div class="empty">No session with recorded workers in the loaded history. Claude exposes subagents as subagents/ transcripts; Codex exposes them via parent_thread_id.</div>` + legend();
+  if (!ls.length && !orph.length) return h + `<div class="empty">No session with recorded workers in the loaded history. Claude exposes subagents as subagents/ transcripts and Workflow-tool agents under subagents/workflows/; Codex exposes them via parent_thread_id.</div>` + legend();
   const trees: TopoNode[] = [];
   if (roots === 'all') {
     for (const l of ls.slice(0, MAX_LEADS)) trees.push(buildTree(d.sessions, l, o));
     for (const [p, kids] of orph.slice(0, MAX_ORPHANS)) trees.push(orphanTree(d.sessions, p, kids, o));
     if (ls.length > MAX_LEADS) h += `<div class="muted">Showing the ${MAX_LEADS} most relevant of ${ls.length} leads (live first, then most recent).</div>`;
   } else {
-    h += `<div class="pick">${ls.slice(0, 16).map(l => `<button class="pill${teamRoot(d, st.selected)?.key === l.key ? ' on' : ''}" data-select="${esc(l.key)}" style="--id:${identityColor(repoOf(l))}"><span class="dot ${esc(l.status)}"></span>${esc(titleOf(l).slice(0, 32))} <span class="muted">${d.sessions.filter(k => k.parentSessionId === l.key).length}</span></button>`).join('')}</div>`;
-    const root = teamRoot(d, st.selected);
+    h += `<div class="pick">${ls.slice(0, 16).map(l => `<button class="pill${teamRoot(d, st.selected, runs)?.key === l.key ? ' on' : ''}" data-select="${esc(l.key)}" style="--id:${identityColor(repoOf(l))}"><span class="dot ${esc(l.status)}"></span>${esc(titleOf(l).slice(0, 32))} <span class="muted">${d.sessions.filter(k => k.parentSessionId === l.key).length + (runs.get(l.key) ?? []).reduce((m, r) => m + r.agents.length, 0)}</span></button>`).join('')}</div>`;
+    const root = teamRoot(d, st.selected, runs);
     if (root) trees.push(buildTree(d.sessions, root, o));
     else if (orph.length) trees.push(orphanTree(d.sessions, orph[0][0], orph[0][1], o));
   }
@@ -259,7 +301,7 @@ function render(d: WsData, st: WsState): string {
 }
 
 function legend(): string {
-  return `<div class="foot tp-leg">Edges are OBSERVED (parent recorded by the provider: Claude subagents/ transcripts, Codex parent_thread_id). Tokens and cost are provider-recorded (OBSERVED; cost only from Claude Code cost-state, else UNKNOWN “—”). Σ, wall time, depth and spans are DERIVED. Spawn descriptions in quotes are INFERRED (type + time match with the parent’s spawn call). Left border: provider (<span class="tp-sw" style="--pv:var(--claude)"></span>Claude <span class="tp-sw" style="--pv:var(--codex)"></span>Codex).</div>`;
+  return `<div class="foot tp-leg">Edges are OBSERVED (parent recorded by the provider: Claude subagents/ transcripts, Codex parent_thread_id; a Claude workflow run and its agents hang under the session whose directory holds subagents/workflows/&lt;run&gt;/). Workflow agent status comes from the run journal and transcript recency; their tokens include cache reads (DERIVED, “+” = only the transcript tail was read). Tokens and cost are provider-recorded (OBSERVED; cost only from Claude Code cost-state, else UNKNOWN “—”). Σ, wall time, depth and spans are DERIVED. Spawn descriptions in quotes are INFERRED (type + time match with the parent’s spawn call). Left border: provider (<span class="tp-sw" style="--pv:var(--claude)"></span>Claude <span class="tp-sw" style="--pv:var(--codex)"></span>Codex).</div>`;
 }
 
 const CSS = `
@@ -348,6 +390,8 @@ const CSS = `
 .tp-hz ul > li:only-child::before { display: none; }
 .tp-hz ul > li.tp-more::before, .tp-hz ul > li.tp-more::after { display: none; }
 .tp-leg { line-height: 1.5; }
+.tp-row.tp-wf, .tp-box.tp-wf { border-left-style: solid; }
+.tp-wfr { --rc: var(--accent); }
 `;
 
 export const topologyView: ExtraView = {
@@ -356,6 +400,7 @@ export const topologyView: ExtraView = {
   group: 'Agents',
   hint: 'Lead → workers → nested workers as a collapsible tree, with rolled-up tokens, cost and time.',
   ready: true,
+  feeds: [workflowsFeed as Feed],
   render,
   css: CSS,
 };

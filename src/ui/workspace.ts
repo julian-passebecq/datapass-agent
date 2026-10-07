@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { SessionStore, viewNeedsRender } from '../sessions/store';
 import { EXTRA_NAV, page, validateMessage, WebviewMessage } from '../render/html';
-import { allViews, renderWorkspace, scoped, WsState, WsView } from '../render/workspace';
+import { allViews, coreFeeds, renderWorkspace, scoped, WsState, WsView } from '../render/workspace';
 import { extraViews, extraCss } from '../render/extra';
 import { ActCtx } from '../render/extra/kit';
 import { Feed, FeedCtx, pump, setFeedScope } from '../render/extra/feeds';
@@ -113,6 +113,7 @@ export class WorkspacePanel implements vscode.Disposable {
     // The visible screen, or every pane of the Panes screen; a feed shared by two panes loads once.
     const feeds = new Map<string, Feed>();
     for (const v of this.visibleExtra()) for (const f of v.feeds ?? []) feeds.set(f.id, f);
+    for (const id of visibleViews(this.state.view, this.state.opts, allViews())) for (const f of coreFeeds(id)) feeds.set(f.id, f);
     if (feeds.size)
       pump([...feeds.values()], this.feedCtx(), () => {
         this.feedPending = true;

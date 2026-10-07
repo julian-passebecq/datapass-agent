@@ -9,9 +9,11 @@ import { esc } from '../html';
 import { hhmm } from '../views';
 import { prettyModel, repoOf, titleOf, kpi, WsData, WsState } from '../workspace';
 import { feedValue, Feed } from './feeds';
+import { agentEffort, modelEffortText } from '../../activity/wfLinks';
+import { WF_FEED_ID } from './wfkit';
 import { actBtn, ExtraView, loadError, loading, opt, seg, toolbar } from './kit';
 
-const FEED = 'workflows.scan';
+const FEED = WF_FEED_ID;
 
 export const workflowsFeed: Feed<WorkflowsSnapshot> = {
   id: FEED,
@@ -77,6 +79,11 @@ function phaseStrip(run: WfRun): string {
   return `<div class="wf-phases">${parts.join('<span class="wf-arrow">→</span>')}</div>`;
 }
 
+function modelCell(a: WfAgent, run: WfRun | undefined, d: WsData): string {
+  const me = modelEffortText(a, d.sessions.find(s => s.key === run?.parentKey), prettyModel);
+  return `<td title="${esc(me.title)}">${esc(me.text)}</td>`;
+}
+
 function agentRow(a: WfAgent, run: WfRun | undefined, d: WsData, st: WsState, cols: { run: boolean }): string {
   const known = d.sessions.some(s => s.key === a.sessionKey);
   const sel = opt(st, 'workflows.agent', '') === a.agentId.toLowerCase();
@@ -88,7 +95,7 @@ function agentRow(a: WfAgent, run: WfRun | undefined, d: WsData, st: WsState, co
 <td><b>${esc(a.label)}</b>${a.toolErrors ? ` <span class="wf-err" title="tool results flagged is_error (OBSERVED)">${a.toolErrors} err</span>` : ''}</td>
 ${cols.run ? `<td class="muted">${esc(run?.name ?? run?.runId ?? '')}</td>` : ''}
 <td class="muted">${esc(a.agentType ?? '')}</td>
-<td title="assistant message .model (OBSERVED)">${esc(prettyModel(a.model))}</td>
+${modelCell(a, run, d)}
 <td>${esc(a.phase ?? '')}</td>
 <td class="num" title="first transcript timestamp (OBSERVED)">${esc(when(d.now, a.firstAt))}</td>
 <td class="num" title="last − first timestamp, or now for running (DERIVED)">${esc(dur(a.firstAt && end ? end - a.firstAt : undefined))}</td>
@@ -111,6 +118,10 @@ function detail(a: WfAgent, run: WfRun | undefined, d: WsData): string {
     ['Run', run ? `${run.name ?? ''} ${run.runId}` : '', 'folder name + script meta (OBSERVED)'],
     ['Phase', a.phase ?? '', 'journal started.phase (OBSERVED)'],
     ['Model', a.model ?? '', 'assistant message .model (OBSERVED)'],
+    ...((): [string, string, string][] => {
+      const e = agentEffort(a, d.sessions.find(s => s.key === run?.parentKey));
+      return [['Effort', e.text || 'unknown', `${e.kind}: ${e.basis}`]];
+    })(),
     ['Status', `${STATUS_LABEL[a.status]} — ${a.statusBasis}`, a.statusBasis.split(':')[0]],
     ['Started / last', `${when(d.now, a.firstAt)} → ${when(d.now, a.lastAt)}`, 'transcript timestamps (OBSERVED)'],
     ['Tokens', `${a.tokens.toLocaleString()} total incl. cache reads · ${a.outputTokens.toLocaleString()} output · ${a.calls} model calls${partialNote(a)}`, `${TOK_BASIS}; output: OBSERVED`],

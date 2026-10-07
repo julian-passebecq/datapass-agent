@@ -1,6 +1,7 @@
 // Registry of add-on workspace screens. Every planned screen has its own file already registered here,
 // so packages only edit their own file. A screen with ready: false stays out of the rail.
 import { ExtraView, KIT_CSS } from './kit';
+import { WFK_CSS } from './wfkit';
 import { auditView } from './audit';
 import { backlogView } from './backlog';
 import { benchmarksView } from './benchmarks';
@@ -82,5 +83,5 @@ export function extraViews(): ExtraView[] {
 }
 
 export function extraCss(): string {
-  return KIT_CSS + extraViews().map(v => v.css ?? '').join('\n');
+  return KIT_CSS + WFK_CSS + extraViews().map(v => v.css ?? '').join('\n');
 }

@@ -8,6 +8,16 @@ import { extraViews } from './extra';
 import { hhmm, statusText } from './views';
 import { endInferred } from '../sessions/classify';
 import { endObserved } from '../activity/audit';
+import type { WfRun } from '../providers/claude/workflows';
+import { liveRunsOf, runCounts, runName, runningWfAgents, WF_COUNT_BASIS, WF_LINK_BASIS } from '../activity/wfLinks';
+import { agentRowHtml, leadRuns, runStripHtml } from './extra/wfkit';
+import type { Feed } from './extra/feeds';
+import { workflowsFeed } from './extra/workflows';
+
+/** Async feeds core screens read (pumped by the panel like an add-on screen's feeds). */
+export function coreFeeds(view: string): Feed[] {
+  return view === 'overview' || view === 'team' ? [workflowsFeed as Feed] : [];
+}
 
 export const WS_VIEWS = ['overview', 'attention', 'board', 'team', 'flow', 'worktrees', 'gantt', 'verify', 'activity', 'providers'] as const;
 export type CoreView = (typeof WS_VIEWS)[number];
@@ -142,14 +152,16 @@ function overview(d: WsData, st: WsState): string {
   const tests = d.sessions.flatMap(s => s.tests).filter(t => t.at >= today);
   const commits = new Set(d.sessions.flatMap(s => s.commits).filter(c => c.at >= today).map(c => c.sha));
   const u = usageSince(d.sessions, today);
-  const workers = d.sessions.filter(s => s.isWorker && isLive(s)).length;
+  const runs = leadRuns(d);
+  const wfLive = runningWfAgents(runs);
+  const workers = d.sessions.filter(s => s.isWorker && isLive(s)).length + wfLive;
   const passN = tests.filter(t => t.outcome === 'PASS').length;
   const status = (k: string) => `DERIVED: lead sessions whose current status is ${k} (each status carries its own evidence: live registry, open turn, recent activity)`;
   let h = `<div class="kpis big">${[
     kpi(live.filter(s => s.status === 'RUNNING').length, 'Running', 'k-run', status('running')),
     kpi(live.filter(s => s.status === 'NEEDS_INPUT').length, 'Needs input', 'k-need', status('needs input')),
     kpi(live.filter(s => s.status === 'IDLE').length, 'Idle', 'k-idle', status('idle')),
-    kpi(workers, 'Live workers', '', 'DERIVED: worker sessions (subagents) whose current status is running, idle or needs input'),
+    kpi(workers, 'Live workers', '', `DERIVED: worker sessions (subagents) whose current status is running, idle or needs input, plus ${wfLive} running Claude workflow agent(s) (${WF_COUNT_BASIS})`),
     kpi(att.filter(a => a.severity !== 'low').length, 'Attention', att.some(a => a.severity === 'high') ? 'k-need' : '', 'DERIVED: medium and high attention items; each item shows the observation behind it'),
     kpi(todays.length, 'Sessions 24 h', '', 'DERIVED: lead sessions with recorded activity in the last 24 hours'),
     kpi(commits.size, 'Commits 24 h', '', 'DERIVED: distinct commits from git log in the last 24 hours, in the window of a loaded session. Not proof a session made them (only a recorded `git commit` by the session is).'),
@@ -157,17 +169,29 @@ function overview(d: WsData, st: WsState): string {
     kpi(compact(u.tokens), 'Tokens 24 h', '', `DERIVED: sum of provider-recorded (OBSERVED) token totals of ${u.sessions} session(s) active in the last 24 hours (whole-session totals)`),
     u.costSessions ? kpi(`$${u.costUSD.toFixed(2)}`, 'Cost recorded', '', `DERIVED: sum of Claude Code cost-state (OBSERVED) over ${u.costSessions} session(s) active in the last 24 hours (whole-session totals); Codex records no cost`) : '',
   ].join('')}</div>`;
-  h += `<div class="cols"><div><h2>Live agents · ${live.length}</h2>${live.length ? `<div class="grid">${live.map(s => card(s, d, st.selected, workersLine(s, d))).join('')}</div>` : '<div class="empty">No live session. Ended sessions are on the Board.</div>'}</div>`;
+  h += `<div class="cols"><div><h2>Live agents · ${live.length}${wfLive ? ` <span class="muted" title="${esc(`running workflow agents under these leads; ${WF_COUNT_BASIS}`)}">+ ${wfLive} workflow agent(s)</span>` : ''}</h2>${live.length ? `<div class="grid">${live.map(s => card(s, d, st.selected, workersLine(s, d, runs.get(s.key)))).join('')}</div>` : '<div class="empty">No live session. Ended sessions are on the Board.</div>'}</div>`;
   h += `<div><h2>Needs attention · ${att.length}</h2>${att.length ? attList(att.slice(0, 6), d, st) : '<div class="empty">Nothing needs you.</div>'}${att.length > 6 ? `<button class="link" data-nav="attention">all ${att.length} items →</button>` : ''}</div></div>`;
   h += `<h2>Last 24 hours</h2>${gantt(d, st, 14)}`;
   return h;
 }
 
-function workersLine(s: AgentSessionSnapshot, d: WsData): string {
+/** "workflow <name> n/m" badges for a lead's running runs (n = agents with a result). */
+export function wfBadges(runs: WfRun[] | undefined): string {
+  return liveRunsOf(runs)
+    .map(r => {
+      const c = runCounts(r);
+      return `<span class="wk-badge" title="${esc(`${WF_LINK_BASIS}. ${c.done + c.failed} of ${c.total} agents have a result, ${c.running} running. ${WF_COUNT_BASIS}`)}">workflow ${esc(runName(r))} ${c.done + c.failed}/${c.total}</span>`;
+    })
+    .join(' ');
+}
+
+function workersLine(s: AgentSessionSnapshot, d: WsData, runs?: WfRun[]): string {
   const kids = d.sessions.filter(c => c.parentSessionId === s.key);
-  if (!kids.length) return '';
+  const badges = wfBadges(runs);
+  if (!kids.length && !badges) return '';
   const liveK = kids.filter(isLive).length;
-  return `<div class="cl muted">${kids.length} worker${kids.length > 1 ? 's' : ''}${liveK ? ` · <span class="pass">${liveK} live</span>` : ''}</div>`;
+  const w = kids.length ? `${kids.length} worker${kids.length > 1 ? 's' : ''}${liveK ? ` · <span class="pass">${liveK} live</span>` : ''}` : '';
+  return `<div class="cl muted">${[w, badges].filter(Boolean).join(' ')}</div>`;
 }
 
 function order(s: AgentSessionSnapshot): number {
@@ -209,30 +233,38 @@ function board(d: WsData, st: WsState): string {
 }
 
 /** Root for the Team view: the selection (or its parent), else the lead with the most live workers. */
-export function teamRoot(d: WsData, selected?: string): AgentSessionSnapshot | undefined {
+export function teamRoot(d: WsData, selected?: string, runs?: Map<string, WfRun[]>): AgentSessionSnapshot | undefined {
   const by = new Map(d.sessions.map(s => [s.key, s]));
   let s = selected ? by.get(selected) : undefined;
   while (s?.parentSessionId && by.has(s.parentSessionId)) s = by.get(s.parentSessionId);
-  if (s && d.sessions.some(c => c.parentSessionId === s!.key)) return s;
-  const leads = d.sessions.filter(x => !x.isWorker && d.sessions.some(c => c.parentSessionId === x.key));
-  const score = (x: AgentSessionSnapshot) => d.sessions.filter(c => c.parentSessionId === x.key && isLive(c)).length * 1000 + (isLive(x) ? 500 : 0) + (x.lastActivityAt ?? 0) / 1e10;
+  const hasWf = (k: string) => !!runs?.get(k)?.length;
+  if (s && (d.sessions.some(c => c.parentSessionId === s!.key) || hasWf(s.key))) return s;
+  const leads = d.sessions.filter(x => !x.isWorker && (d.sessions.some(c => c.parentSessionId === x.key) || hasWf(x.key)));
+  const liveWf = (k: string) => (runs?.get(k) ?? []).reduce((n, r) => n + runCounts(r).running, 0);
+  const score = (x: AgentSessionSnapshot) => (d.sessions.filter(c => c.parentSessionId === x.key && isLive(c)).length + liveWf(x.key)) * 1000 + (isLive(x) ? 500 : 0) + (x.lastActivityAt ?? 0) / 1e10;
   return leads.sort((a, b) => score(b) - score(a))[0] ?? s;
 }
 
 function team(d: WsData, st: WsState): string {
-  const root = teamRoot(d, st.selected);
-  const leads = d.sessions.filter(x => !x.isWorker && d.sessions.some(c => c.parentSessionId === x.key)).sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0));
-  let h = `<div class="pick">${leads.slice(0, 12).map(l => `<button class="pill${root?.key === l.key ? ' on' : ''}" data-select="${esc(l.key)}" style="--id:${identityColor(repoOf(l))}"><span class="dot ${l.status}"></span>${esc(titleOf(l).slice(0, 32))} <span class="muted">${d.sessions.filter(c => c.parentSessionId === l.key).length}</span></button>`).join('')}</div>`;
+  const runs = leadRuns(d);
+  const root = teamRoot(d, st.selected, runs);
+  const leads = d.sessions.filter(x => !x.isWorker && (d.sessions.some(c => c.parentSessionId === x.key) || !!runs.get(x.key)?.length)).sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0));
+  let h = `<div class="pick">${leads.slice(0, 12).map(l => `<button class="pill${root?.key === l.key ? ' on' : ''}" data-select="${esc(l.key)}" style="--id:${identityColor(repoOf(l))}"><span class="dot ${l.status}"></span>${esc(titleOf(l).slice(0, 32))} <span class="muted">${d.sessions.filter(c => c.parentSessionId === l.key).length + (runs.get(l.key) ?? []).reduce((n, r) => n + r.agents.length, 0)}</span></button>`).join('')}</div>`;
   if (!root) return h + `<div class="empty">No session with observed workers in the loaded history. Claude exposes subagents as subagents/ transcripts; Codex exposes them via parent_thread_id.</div>`;
   const kids = d.sessions.filter(c => c.parentSessionId === root.key).sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0));
   const lanes = new Map<string, AgentSessionSnapshot[]>();
   for (const k of kids) lanes.set(workerRole(k), [...(lanes.get(workerRole(k)) ?? []), k]);
-  h += `<div class="org"><div class="lead">${card(root, d, st.selected, `<div class="cl muted">${kids.length} worker(s) · ${kids.filter(isLive).length} live · ${kids.reduce((n, k) => n + k.changedFiles.length, 0)} files by workers</div>`)}</div><div class="lanes">`;
+  const rootRuns = runs.get(root.key) ?? [];
+  h += `<div class="org"><div class="lead">${card(root, d, st.selected, `<div class="cl muted">${kids.length} worker(s) · ${kids.filter(isLive).length} live · ${kids.reduce((n, k) => n + k.changedFiles.length, 0)} files by workers${rootRuns.length ? ` · ${rootRuns.length} workflow run(s)` : ''}</div>${wfBadges(rootRuns) ? `<div class="cl">${wfBadges(rootRuns)}</div>` : ''}`)}</div><div class="lanes">`;
   for (const [role, list] of lanes) {
     const shown = list.slice(-12);
     h += `<div class="lane" style="--id:${identityColor(role)}"><div class="laneh"><b>${esc(role)}</b> <span class="muted">${list.length} · ${list.filter(isLive).length} live</span></div><div class="grid">${shown.map(k => card(k, d, st.selected, nested(k, d))).join('')}</div>${list.length > shown.length ? `<div class="muted">… ${list.length - shown.length} earlier ${esc(role)} worker(s)</div>` : ''}</div>`;
   }
-  return h + `</div></div><div class="foot">Roles are the worker type the provider recorded (Claude subagent type, Codex agent nickname). Edges exist only where the provider recorded the parent.</div>`;
+  for (const r of [...rootRuns].reverse()) {
+    const shown = r.agents.slice(-12);
+    h += `<div class="lane wk-lane" style="--id:var(--accent)"><div class="laneh">${runStripHtml(r, 'wk-strip wk-lh')}</div>${shown.map(a => agentRowHtml(a, d.now, prettyModel, root)).join('')}${r.agents.length > shown.length ? `<div class="muted">… ${r.agents.length - shown.length} earlier agent(s) on the Workflows screen</div>` : ''}</div>`;
+  }
+  return h + `</div></div><div class="foot">Roles are the worker type the provider recorded (Claude subagent type, Codex agent nickname). Edges exist only where the provider recorded the parent. Workflow lanes: Claude Workflow-tool runs stored under this session's directory (OBSERVED link); agent status from the run journal and transcript recency, tokens include cache reads (DERIVED).</div>`;
 }
 
 function nested(k: AgentSessionSnapshot, d: WsData): string {
