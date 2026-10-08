@@ -10,6 +10,10 @@ test('incremental stable-prefix export: new, unchanged, append, same-mtime rewri
   const f = await cockpitFixture();
   try {
     const exporter = new IncrementalExporter([f.adapter]), out = path.join(f.temp, 'out'), redaction = digest('shared/1');
+    if (process.platform === 'win32') {
+      const alias = f.snapshots.map(s => ({ ...s, artifactPath: s.artifactPath.toUpperCase() }));
+      assert.equal((await exporter.plan(f.grant, alias, f.grant.sessionKeys, redaction, out)).newCount, 1);
+    }
     const sourceBefore = await fs.readFile(f.files[0]);
     await fs.appendFile(f.files[0], '{"type":"response_item","payload":');
     const plan = await exporter.plan(f.grant, f.snapshots, f.grant.sessionKeys, redaction, out); assert.equal(plan.newCount, 1);

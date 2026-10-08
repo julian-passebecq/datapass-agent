@@ -83,7 +83,10 @@ export class IncrementalExporter {
     const captures: Capture[] = [];
     for (const s of selected as AgentSessionSnapshot[]) {
       const a = this.adapters.find(a => a.provider === s.provider); if (!a) throw new Error('Provider reader unavailable.');
-      const root = await fs.realpath(a.root), file = path.resolve(s.artifactPath);
+      await plainDirectory(path.resolve(s.artifactPath));
+      // Windows runners may record an 8.3 TEMP alias while realpath(root) is long-form.
+      // Reject links first, then compare canonical paths on both sides of the boundary.
+      const root = await fs.realpath(a.root), file = await fs.realpath(s.artifactPath);
       await guardSource(root, file);
       const st = await fs.stat(file); if (st.size > 256 * 1024 * 1024) throw new Error('Selected source exceeds capture bound.');
       const observed = a.ingest({ path: file, size: st.size, mtimeMs: st.mtimeMs });
