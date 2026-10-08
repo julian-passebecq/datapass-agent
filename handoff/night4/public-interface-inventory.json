@@ -1,7 +1,7 @@
 {
   "schema": "datapass.agent-public-interface-inventory/1",
   "baselineSha": "f8c7fa1565d89f6a799cf9395b3173eecef64ece",
-  "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+  "sourceSha": "cf84be2f0dd011dc580cd14ad5c216508ab9ee05",
   "legacyFields": [
     "store",
     "openWorkspace",

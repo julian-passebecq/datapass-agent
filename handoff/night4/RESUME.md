@@ -1,6 +1,6 @@
 # Resume Agent NIGHT4
 
-Lane AGENT; canonical repository julian-passebecq/agent-vscode; branch codex/night4-agent; PR https://github.com/julian-passebecq/agent-vscode/pull/84. Product source candidate 7b47beb877114c841aa8d2716df900b927d1eca5, version 0.9.0. Do not reset/cherry-pick another writer's checkout or merge main.
+Lane AGENT; canonical repository julian-passebecq/agent-vscode; branch codex/night4-agent; PR https://github.com/julian-passebecq/agent-vscode/pull/84. Product source candidate cf84be2f0dd011dc580cd14ad5c216508ab9ee05, version 0.9.0. Do not reset/cherry-pick another writer's checkout or merge main.
 
 Implementation, 439 tests, targeted privacy/export checks and actual installed standalone/same-host-consumer qualification are complete. SHIP-REPORT and outcome.json retain separate installation/integration/merge/deploy/owner-verification states. The immutable package hash is in READY; use the package, not this worktree.
 

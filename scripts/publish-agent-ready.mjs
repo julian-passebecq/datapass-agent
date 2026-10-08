@@ -15,7 +15,9 @@ if (!/^[a-f0-9]{40}$/.test(sourceSha)) throw new Error('Installed source revisio
 const changedRuntime = execFileSync('git', ['diff', '--name-only', sourceSha, '--', 'src', 'test', 'package.json', 'package-lock.json', 'README.md', 'scripts/build.mjs'], { cwd: root, encoding: 'utf8' }).trim();
 if (changedRuntime) throw new Error('Product source changed since installed qualification: ' + changedRuntime);
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-const host = { hostId: 'host:' + sha(JSON.stringify(os.hostname())).slice(0, 16), os: process.platform, architecture: process.arch, runtimeVersion: process.version };
+const publisherHost = { hostId: 'host:' + sha(JSON.stringify(os.hostname())).slice(0, 16), os: process.platform, architecture: process.arch, runtimeVersion: process.version };
+const host = JSON.parse(fs.readFileSync(path.join(installed.base, 'contract-probe.json'))).summary.host;
+if (host.hostId !== publisherHost.hostId || host.os !== publisherHost.os || host.architecture !== publisherHost.architecture) throw new Error('Installed runtime host differs from publisher host.');
 fs.mkdirSync(out, { recursive: true });
 const artifacts = [];
 function add(file, kind, label = path.basename(file)) {
@@ -45,7 +47,7 @@ if (!passCount || !/fail 0\s*(?:\r?\n|$)/.test(log)) throw new Error('Required l
 for (const file of ['SHIP-REPORT.md', 'outcome.json', 'RESUME.md', 'public-interface-inventory.json']) {
   const p = path.join(root, 'handoff', 'night4', file); if (fs.existsSync(p)) add(p, 'report');
 }
-const ready = { schema: 'galaxy.component-ready/1', workstreamId: 'COCKPIT-20261008-NIGHT4', lane: 'AGENT', componentId: 'juliandatapass.agent-vscode', componentVersion: version, sourceSha, reportRevision, capturedAt: new Date().toISOString(), host, contractMajor: 1, contractMinor: 1,
+const ready = { schema: 'galaxy.component-ready/1', workstreamId: 'COCKPIT-20261008-NIGHT4', lane: 'AGENT', componentId: 'juliandatapass.agent-vscode', componentVersion: version, sourceSha, reportRevision, capturedAt: new Date().toISOString(), host, publisherHost, contractMajor: 1, contractMinor: 1,
   capabilities: ['summary', 'providerConfiguration', 'reveal', 'subscribe', 'incrementalExport', 'registeredContextReceipts', 'acceptedWork', 'assets', 'getScopes'].map(name => ({ name, version: 1, state: 'OK' })), artifacts,
   checks: [{ id: 'required-local-suite-' + passCount, status: 'PASS', evidenceRefs: [testsRef] }, { id: 'installed-synthetic-standalone-and-consumer-flow', status: 'PASS', evidenceRefs: [installedRef] }],
   unavailable: [{ capability: 'PM/Brain production integration', reason: 'Agent installed facade qualified with a synthetic same-host consumer; PM owns assembled multi-product installation.' }, { capability: 'real-history-export', reason: 'No real source scope selected; only owned synthetic fixtures exported.' }] };
