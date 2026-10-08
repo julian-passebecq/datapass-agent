@@ -10,7 +10,7 @@ const out = path.resolve(process.argv[2] ?? path.join(root, 'integration', 'COCK
 const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'))).version;
 const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-const host = { hostId: 'host:' + sha(os.hostname()).slice(0, 16), os: process.platform, architecture: process.arch, runtimeVersion: process.version };
+const host = { hostId: 'host:' + sha(JSON.stringify(os.hostname())).slice(0, 16), os: process.platform, architecture: process.arch, runtimeVersion: process.version };
 fs.mkdirSync(out, { recursive: true });
 const artifacts = [];
 function add(file, kind, label = path.basename(file)) {
@@ -27,6 +27,7 @@ add(path.join(root, 'src', 'cockpit', 'interfaces.ts'), 'source', 'cockpit-inter
 add(path.join(root, 'docs', 'COCKPIT-V1.md'), 'report');
 const installed = JSON.parse(fs.readFileSync(path.join(root, '.datapass', 'night4', 'installed-latest.json')));
 if (installed.error || installed.checks.some(c => !c.ok)) throw new Error('Installed path is not qualified.');
+if (installed.vsixSha256 !== artifacts.find(a => a.kind === 'vsix').sha256) throw new Error('Installed proof belongs to another VSIX.');
 const installedRef = add(path.join(installed.base, 'qualification.json'), 'report');
 add(path.join(installed.base, 'contract-probe.json'), 'fixture', 'redacted-installed-facade-example.json');
 const testsRef = add(path.join(root, '.datapass', 'night4', 'tests.log'), 'report', 'local-ci-tests.log');

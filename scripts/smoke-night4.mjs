@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { buildFixtureHome } from './smoke-fixture.mjs';
 
@@ -14,7 +15,8 @@ const exe = path.join(codeDir, 'Code.exe');
 const cli = fs.readdirSync(codeDir).map(d => path.join(codeDir, d, 'resources', 'app', 'out', 'cli.js')).find(p => fs.existsSync(p)) ?? path.join(codeDir, 'resources', 'app', 'out', 'cli.js');
 fs.mkdirSync(path.join(root, '.smoke'), { recursive: true });
 const base = fs.mkdtempSync(path.join(root, '.smoke', 'night4-')), profile = path.join(base, 'profile'), extensions = path.join(base, 'extensions'), home = path.join(base, 'home');
-const result = { schema: 'datapass.agent-installed-qualification/1', version, checks: [], artifacts: [], privateHistory: 'not read; synthetic home only' };
+const vsixSha256 = crypto.createHash('sha256').update(fs.readFileSync(path.join(root, `agent-vscode-${version}.vsix`))).digest('hex');
+const result = { schema: 'datapass.agent-installed-qualification/1', version, sourceSha: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), vsixSha256, checks: [], artifacts: [], privateHistory: 'not read; synthetic home only' };
 const check = (id, ok, detail = '') => { result.checks.push({ id, ok: !!ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'} ${id} ${detail}`); if (!ok) throw new Error(id + ': ' + detail); };
 fs.mkdirSync(path.join(profile, 'User'), { recursive: true }); fs.mkdirSync(home, { recursive: true });
 fs.writeFileSync(path.join(profile, 'User', 'settings.json'), JSON.stringify({ 'workbench.startupEditor': 'none', 'telemetry.telemetryLevel': 'off', 'update.mode': 'none', 'extensions.autoUpdate': false, 'workbench.tips.enabled': false, 'chat.disableAIFeatures': true, 'agent.catalog.cliProbes': false }));
@@ -65,7 +67,7 @@ try {
   for (const value of ['fixture', 'local', 'fixture']) {
     const input = win.locator('.quick-input-box input'); await input.waitFor({ state: 'visible' }); await input.fill(value); await win.keyboard.press('Enter'); await win.waitForTimeout(250);
   }
-  await win.locator('.quick-input-box input').fill('Observation and sanitized provider configuration'); await win.waitForTimeout(250); await win.keyboard.press('Enter'); await win.waitForTimeout(400);
+  await win.locator('.quick-input-list .monaco-list-row').filter({ hasText: 'Observation and sanitized provider configuration' }).first().click(); await win.waitForTimeout(400);
   await command(win, 'NIGHT4: Probe installed Agent contract');
   for (const end = Date.now() + 30000; Date.now() < end && !fs.existsSync(probePath);) await win.waitForTimeout(250);
   check('installed-consumer-reply', fs.existsSync(probePath)); const probe = JSON.parse(fs.readFileSync(probePath)); check('installed-contract-no-error', !probe.error, probe.error ?? '');
