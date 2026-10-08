@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { bounded, safeEnv } from '../util/redact';
-import { isPlausibleLocalPath, normalizeCase } from '../util/paths';
+import { hasLinkedAncestor, isPlausibleLocalPath, normalizeCase } from '../util/paths';
 
 export type LayerKind = 'managed' | 'local' | 'project' | 'user';
 /** Claude Code precedence, highest first (CC /settings: managed > local project > shared project > user). */
@@ -157,6 +157,7 @@ export function defaultHomes(): { claudeHome: string; codexHome: string; managed
 }
 
 function stat(file: string): fs.Stats | undefined {
+  if (hasLinkedAncestor(file)) return undefined;
   try {
     return fs.statSync(file);
   } catch {

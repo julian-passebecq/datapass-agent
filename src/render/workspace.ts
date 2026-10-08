@@ -1,4 +1,5 @@
 import {controlMap} from './controlMap';
+import { compactSessions } from './extra/compact';
 // Agent Workspace: one editor panel with a navigation rail, a main surface and a selection pane.
 // Pure string rendering from snapshots; every value is escaped here.
 import { AgentSessionSnapshot, ProviderState, SourceState, TimelineEvent } from '../model';
@@ -38,6 +39,7 @@ export interface WsState {
 }
 
 export interface WsData {
+  cockpitInputs?: import('../cockpit/facade').ScopedInputs;
   sessions: AgentSessionSnapshot[];
   providers: ProviderState[];
   events: TimelineEvent[];
@@ -671,7 +673,7 @@ export const RAIL_GROUPS = ['Now', 'Agents', 'Work', 'Change', 'Verify', 'Time',
 const CORE_GROUP: Record<string, string> = { 'control-map':'Agents', overview: 'Now', attention: 'Now', board: 'Work', team: 'Agents', gantt: 'Time', worktrees: 'Change', activity: 'Time', flow: 'Work', verify: 'Verify', providers: 'System' };
 /** Reading order inside groups; screens not listed go last in their group. Ids that are not registered screens are
  *  ignored (rank only sorts screens that exist), so a planned id such as 'benchmarks' is harmless. */
-export const RAIL_ORDER = ['overview', 'attention', 'live', 'hud', 'panes', 'codex', 'control-map', 'team', 'topology', 'roles', 'dispatch', 'transcript', 'projects', 'workflows', 'board', 'flow', 'backlog', 'scope', 'worktrees', 'repos', 'changes', 'review', 'pipelines', 'verify', 'signals', 'health', 'gantt', 'replay', 'lifecycle', 'week', 'runs', 'activity', 'forecast', 'history', 'tokens', 'ctxcost', 'limits', 'explore', 'benchmarks', 'providers', 'settings', 'catalog', 'audit', 'launcher'];
+export const RAIL_ORDER = ['compact', 'context-activity', 'asset-gallery', 'overview', 'attention', 'live', 'hud', 'panes', 'codex', 'control-map', 'team', 'topology', 'roles', 'dispatch', 'transcript', 'projects', 'workflows', 'board', 'flow', 'backlog', 'scope', 'worktrees', 'repos', 'changes', 'review', 'pipelines', 'verify', 'signals', 'health', 'gantt', 'replay', 'lifecycle', 'week', 'runs', 'activity', 'forecast', 'history', 'tokens', 'ctxcost', 'limits', 'explore', 'benchmarks', 'providers', 'settings', 'catalog', 'audit', 'launcher'];
 /** The question each rail group answers (group header tooltip). */
 export const RAIL_GROUP_HINT: Record<string, string> = {
   Now: 'What is going on right now, and what needs me?',
@@ -759,6 +761,6 @@ export function renderWorkspace(d0: WsData, st0: WsState): string {
   if (!body[st.view]) st = { ...st, view: 'overview' };
   const keys = `<div class="keys"><b>1–0</b> screens with a number in the rail <b>Tab</b> / <b>j/k</b> move <b>Space</b> select <b>Enter</b> inspect <b>/</b> filter <b>g</b> go to screen <b>Esc</b> clear <b>r</b> refresh <b>?</b> keys</div>`;
   const main = `<main class="mainw"><header class="mh"><h1>${esc(label(st.view))}</h1>${st.opts?.scope ? `<button class="link scope" data-opt="scope" data-val="" title="Clear scope">scope: ${esc(st.opts.scope)} ✕</button>` : ""}<span class="muted hint" title="${esc(hint(st.view))}">${esc(hint(st.view))}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}${keys}${statusStrip(d)}</main>`;
-  return `<div class="ws">${rail}${main}<aside class="side">${side(d, st.selected)}</aside>${screenPickerSource()}</div>`;
+  const detailData = st.view === 'compact' ? { ...d, sessions: compactSessions(d, st) } : d;
+  return `<div class="ws">${rail}${main}<aside class="side">${side(detailData, st.selected)}</aside>${screenPickerSource()}</div>`;
 }
-

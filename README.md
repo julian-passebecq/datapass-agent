@@ -1,4 +1,6 @@
-# DataPass Agent 0.8 prototype
+# DataPass Agent 0.9
+
+Adds a versioned scoped cockpit facade, compact observation, and reviewed incremental local export. See [cockpit contract and scope review](docs/COCKPIT-V1.md).
 
 Adds selected full conversation exports and a simple **DataPass: Start Here** entry point to the existing Agent cockpit. See [DataPass export and reconciliation guide](docs/DATAPASS.md). The T3 cockpit prototype lives separately in `D:\PROJ\t3code-datapass`.
 # Agent — local observer for Claude Code and Codex
@@ -21,6 +23,9 @@ One editor panel: a navigation rail, the main surface, and a result card for the
 
 | Screen | What it shows |
 |---|---|
+| Compact | Scope and Live/Factory/Backlog/Metrics/Attention controls; expandable Context and Assets; recorded roots and scoped drilldown |
+| Context activity | Registered scoped query receipts, backend, generation and freshness; consumption remains unknown |
+| Asset gallery | Bounded approved-root image files with hashes and unknown producer, plus separately registered provenance/publication states |
 | Overview | Live counts, attention count, sessions / commits / tests / tokens over 24 h, live agent cards (model · effort, context %, tokens, recorded cost, last action, lifecycle stages), the attention list and the 24 h swimlanes |
 | Attention | Where to look: input requested, last test failed in a live session, context ≥ 80 %, open turn without activity, idle beyond `agent.idleAlertMinutes` (30), ended with edits but no commit. Each item names its basis |
 | Board | Sessions in columns: needs input, running, idle, unknown, ended in the last 24 h |

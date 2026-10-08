@@ -41,7 +41,7 @@ const within = (root: string, file: string) => {
 };
 
 /** Resolve a not-yet-created destination through its nearest existing ancestor. */
-async function resolveDestination(file: string): Promise<string> {
+export async function resolveDestination(file: string): Promise<string> {
   try { return await fs.realpath(file); }
   catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
@@ -52,7 +52,7 @@ async function resolveDestination(file: string): Promise<string> {
 }
 
 /** No links, credentials or paths outside the provider root, including linked ancestors. */
-async function guardSource(root: string, file: string): Promise<void> {
+export async function guardSource(root: string, file: string): Promise<void> {
   if (!within(root, file) || isCredentialPath(file)) throw new Error('Unsafe provider artifact.');
   for (let current = file; current !== root; current = path.dirname(current)) {
     if (isCredentialPath(current)) throw new Error('Credential artifacts are not exported.');

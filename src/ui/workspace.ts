@@ -13,6 +13,7 @@ let panelSeq = 0;
 
 /** An Agent Workspace editor panel. Several can be open (one per tab), each with its own screen, scope and options. */
 export class WorkspacePanel implements vscode.Disposable {
+  private readonly feedKey = `panel:${++panelSeq}`;
   private panel?: vscode.WebviewPanel;
   private state: WsState = { view: 'overview', opts: {} };
   private timer?: NodeJS.Timeout;
@@ -24,7 +25,7 @@ export class WorkspacePanel implements vscode.Disposable {
   private sub: { dispose(): void };
   private terminals = new Map<string, vscode.Terminal>();
 
-  constructor(private store: SessionStore, private onMessage: (m: WebviewMessage) => void, private ternAvailable: () => boolean, private onClosed?: (p: WorkspacePanel) => void) {
+  constructor(private store: SessionStore, private onMessage: (m: WebviewMessage) => void, private ternAvailable: () => boolean, private onClosed?: (p: WorkspacePanel) => void, private readSessions?: () => import('../model').AgentSessionSnapshot[], private readInputs?: () => import('../cockpit/facade').ScopedInputs) {
     this.sub = store.onDidChange(() => this.storeChanged());
     for (const v of extraViews()) EXTRA_NAV.add(v.id);
   }
@@ -59,7 +60,7 @@ export class WorkspacePanel implements vscode.Disposable {
     const p = vscode.window.createWebviewPanel('agent.workspace', n === 1 ? 'Agent' : `Agent ${n}`, vscode.ViewColumn.Active, { enableScripts: true, enableCommandUris: false, localResourceRoots: [], retainContextWhenHidden: false });
     p.iconPath = new vscode.ThemeIcon('pulse');
     p.webview.onDidReceiveMessage(m => {
-      const msg = validateMessage(m, k => !!this.store.get(k));
+      const msg = validateMessage(m, k => (this.readSessions?.() ?? this.store.all()).some(s => s.key === k));
       if (!msg) return;
       if (msg.type === 'ready') return this.render(true);
       if (msg.type === 'nav') {
@@ -106,11 +107,11 @@ export class WorkspacePanel implements vscode.Disposable {
 
   private feedCtx(): FeedCtx {
     const cfg = vscode.workspace.getConfiguration('agent');
-    return { sessions: scoped({ sessions: this.store.all(), providers: [], events: [], now: Date.now(), ternAvailable: false }, this.state.opts?.scope).sessions, trusted: vscode.workspace.isTrusted, config: (k, f) => cfg.get(k.replace(/^agent\./, ''), f), now: Date.now() };
+    return { sessions: scoped({ sessions: this.readSessions?.() ?? this.store.all(), providers: [], events: [], now: Date.now(), ternAvailable: false }, this.state.opts?.scope).sessions, trusted: vscode.workspace.isTrusted && !this.readSessions, config: (k, f) => this.readSessions && k.replace(/^agent\./, '') === 'cockpit.assetRoots' ? f : cfg.get(k.replace(/^agent\./, ''), f), now: Date.now() };
   }
 
   private pumpFeeds(force = false): void {
-    setFeedScope(this.state.opts?.scope);
+    this.selectFeedScope();
     // The visible screen, or every pane of the Panes screen; a feed shared by two panes loads once.
     const feeds = new Map<string, Feed>();
     for (const v of this.visibleExtra()) for (const f of v.feeds ?? []) feeds.set(f.id, f);
@@ -129,6 +130,7 @@ export class WorkspacePanel implements vscode.Disposable {
   }
 
   private async act(name: string, arg: string): Promise<void> {
+    this.selectFeedScope();
     // On the Panes screen the first pane whose screen defines the action handles it.
     const fn = this.visibleExtra().find(x => x.actions?.[name])?.actions?.[name];
     if (!fn) return;
@@ -179,12 +181,18 @@ export class WorkspacePanel implements vscode.Disposable {
   }
 
   private body(): string {
-    setFeedScope(this.state.opts?.scope);
+    const sessions = this.readSessions?.() ?? this.store.all();
+    const allowed = new Set(sessions.map(s => s.key));
+    this.selectFeedScope();
     // Full event history only for screens that roll it up; otherwise just the selected session's events.
     const full = visibleViews(this.state.view, this.state.opts, allViews()).includes('activity');
-    const events = full ? this.store.timeline(undefined, 200_000) : this.state.selected ? this.store.timeline(this.state.selected) : [];
+    const events = (full ? this.store.timeline(undefined, 200_000) : this.state.selected ? this.store.timeline(this.state.selected) : []).filter(e => allowed.has(e.sessionKey));
     this.pumpFeeds();
-    return renderWorkspace({ sessions: this.store.all(), providers: this.store.providerStates, events, now: Date.now(), ternAvailable: this.ternAvailable(), git: { enabled: this.store.opts.git, lastMs: this.store.lastStats?.gitMs, at: this.store.lastStats?.at, progress: { ...this.store.gitProgress } }, idleAlertMinutes: vscode.workspace.getConfiguration('agent').get<number>('idleAlertMinutes', 30), timeline: (k, n) => this.store.timeline(k, n), stats: this.stats(), config: (k, f) => vscode.workspace.getConfiguration('agent').get(k.replace(/^agent\./, ''), f) }, this.state);
+    return renderWorkspace({ sessions, cockpitInputs: this.readInputs?.(), providers: this.readSessions ? [] : this.store.providerStates, events, now: Date.now(), ternAvailable: this.ternAvailable(), git: { enabled: this.store.opts.git, lastMs: this.store.lastStats?.gitMs, at: this.store.lastStats?.at, progress: { ...this.store.gitProgress } }, idleAlertMinutes: vscode.workspace.getConfiguration('agent').get<number>('idleAlertMinutes', 30), timeline: (k, n) => this.store.timeline(k, n).filter(e => allowed.has(e.sessionKey)), stats: this.readSessions ? undefined : this.stats(), config: (k, f) => vscode.workspace.getConfiguration('agent').get(k.replace(/^agent\./, ''), f) }, this.state);
+  }
+
+  private selectFeedScope(): void {
+    setFeedScope(this.readSessions ? `${this.feedKey}:${(this.readSessions()).map(s => s.key).join(',')}` : this.state.opts?.scope);
   }
 
   private stats() {

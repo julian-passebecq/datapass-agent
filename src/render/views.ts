@@ -149,7 +149,7 @@ export function renderGraph(sessions: AgentSessionSnapshot[]): string {
         out += `${pre} <a data-open="${esc(s.key)}">${esc(s.status === 'RUNNING' ? '●' : s.status === 'IDLE' ? '◐' : '○')} ${esc((s.title ?? s.sessionId).slice(0, 40))}</a> <span class="muted">${esc(s.branch ?? '')}</span>\n`;
         const kids = sessions.filter(c => c.parentSessionId === s.key);
         kids.slice(0, 12).forEach((c, ci) => {
-          out += `${lastR ? '   ' : '│  '}${lastS ? '   ' : '│  '}${ci === Math.min(kids.length, 12) - 1 ? '└─' : '├─'} <a data-open="${esc(c.key)}">${esc(c.status === 'ENDED' ? '○' : '●')} ${esc((c.workerLabel ?? c.title ?? c.sessionId).slice(0, 40))}</a>\n`;
+          out += `${lastR ? '   ' : '│  '}${lastS ? '   ' : '│  '}${ci === Math.min(kids.length, 12) - 1 ? '└─' : '├─'} <a data-open="${esc(c.key)}" title="${esc(statusText(c))}">${esc(c.status === 'RUNNING' ? '●' : c.status === 'IDLE' ? '◐' : '○')} ${esc((c.workerLabel ?? c.title ?? c.sessionId).slice(0, 40))}</a>\n`;
         });
         if (kids.length > 12) out += `${lastR ? '   ' : '│  '}${lastS ? '   ' : '│  '}   … ${kids.length - 12} more workers\n`;
       });

@@ -2,7 +2,7 @@
   "name": "agent-vscode",
   "displayName": "DataPass Agent",
   "description": "Local observer for Claude Code and Codex sessions: what is running, where, and what changed.",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "publisher": "juliandatapass",
   "private": true,
   "license": "UNLICENSED",
@@ -127,7 +127,7 @@
       },
       {
         "command": "agent.goToScreen",
-        "title": "Agent: Go to screen\u2026"
+        "title": "Agent: Go to screen…"
       },
       {
         "title": "DataPass: Start Here",
@@ -167,6 +167,30 @@
       {
         "command": "agent.openControlMap",
         "title": "Agent: Open Agent Map"
+      },
+      {
+        "command": "agent.openCompact",
+        "title": "Agent: Open Compact"
+      },
+      {
+        "command": "agent.reviewCockpitScope",
+        "title": "Agent: Review Cockpit Scope"
+      },
+      {
+        "command": "agent.revokeCockpitScopes",
+        "title": "Agent: Revoke Cockpit Scopes"
+      },
+      {
+        "command": "agent.importCockpitReceipts",
+        "title": "Agent: Import Scoped Context and Asset Receipts"
+      },
+      {
+        "command": "agent.exportIncremental",
+        "title": "Agent: Export Reviewed Incremental Sessions"
+      },
+      {
+        "command": "agent.selectAssetRoot",
+        "title": "Agent: Select Asset Root"
       }
     ],
     "keybindings": [
@@ -605,6 +629,14 @@
           "minimum": 0.1,
           "maximum": 500,
           "description": "Daily archive: size cap of the raw transcript copies, in GB."
+        },
+        "agent.cockpit.assetRoots": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Explicitly approved local image roots for bounded gallery reads; no recursive scan."
         }
       }
     }

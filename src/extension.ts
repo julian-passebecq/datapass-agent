@@ -17,10 +17,12 @@ import { registerKnowledgeCommands } from './ui/knowledge';
 import {Analyzer} from './ui/analyzer';
 import {agentLensContext} from './interop';
 import {developmentObservations} from './export/development';
+import { registerCockpit } from './ui/cockpit';
 
 const TERN_COMMANDS = ['tern.revealWorktree', 'tern.revealRevision', 'tern.revealChangeSet'];
 
 export interface AgentApi {
+  cockpitV1: import('./cockpit/facade').CockpitFacade['api'];
   store: SessionStore;
   openWorkspace(view?: string, key?: string): void;
   installed: { claude?: InstalledVersion; codex?: InstalledVersion };
@@ -43,7 +45,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
     // Paused until an Agent view shows (see syncGitEnded below).
     gitEnded: false,
   });
-  const api: AgentApi = { store, installed: {}, activationMs: 0, getDevelopmentObservations:()=>developmentObservations(store.all()), openWorkspace: (v, k) => workspace.open(v as any, k) };
+  const api = { store, installed: {}, activationMs: 0, getDevelopmentObservations:()=>developmentObservations(store.all()), openWorkspace: (v?: string, k?: string) => workspace.open(v as any, k) } as AgentApi;
 
   let ternAvailable = false;
   const checkTern = async () => {
@@ -58,6 +60,9 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
   const inspector = new Inspector(store, m => onMessage(m), () => ternAvailable, (view, key) => workspace.open(view, key));
   const tree = new SessionsTree(store);
   const workspace = new WorkspacePanel(store, m => onMessage(m), () => ternAvailable);
+  const facade = registerCockpit(ctx, store, () => ternAvailable, m => onMessage(m), () => api.installed);
+  api.cockpitV1 = facade.api;
+  ctx.subscriptions.push(vscode.commands.registerCommand('agent.openCompact', () => workspace.open('compact')));
   registerKnowledgeCommands(ctx, store);
   const analyzer=new Analyzer(store,()=>ternAvailable);
   ctx.subscriptions.push(analyzer,vscode.window.registerTreeDataProvider('agent.analyzer',analyzer),

@@ -3,7 +3,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { BacklogReport, parsePlan, PlanFile } from '../activity/backlog';
-import { isPlausibleLocalPath, normalizeCase } from '../util/paths';
+import { hasLinkedAncestor, isPlausibleLocalPath, normalizeCase } from '../util/paths';
 
 /** Files looked for in every repository root, in display order. */
 export const PLAN_FILES = ['handoff/PLAN.md', 'handoff/ROADMAP.md', 'PLAN.md', 'ROADMAP.md', 'TODO.md', 'handoff/TODO.md', 'docs/PLAN.md', 'docs/ROADMAP.md'];
@@ -22,6 +22,7 @@ export interface ScanInput {
 const cache = new Map<string, { size: number; mtime: number; file: PlanFile }>();
 
 async function statOf(p: string): Promise<fs.Stats | undefined> {
+  if (hasLinkedAncestor(p)) return undefined;
   try {
     return await fs.promises.stat(p);
   } catch {

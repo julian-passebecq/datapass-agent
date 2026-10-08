@@ -9,7 +9,7 @@ import { execFile } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { bounded } from '../util/redact';
-import { isPlausibleLocalPath, normalizeCase } from '../util/paths';
+import { hasLinkedAncestor, isPlausibleLocalPath, normalizeCase } from '../util/paths';
 import { resolveExe } from '../git/git';
 import { CodexConfig, frontMatter, isForbidden, LayerKind, parseToml, readCodexConfig, TomlValue } from './settings';
 
@@ -181,6 +181,7 @@ const SKIP_DIR = /^(secrets?|node_modules|\.git|credentials?)$/i;
 const fsp = fs.promises;
 
 async function stat(file: string): Promise<fs.Stats | undefined> {
+  if (hasLinkedAncestor(file)) return undefined;
   try {
     return await fsp.stat(file);
   } catch {
@@ -189,6 +190,7 @@ async function stat(file: string): Promise<fs.Stats | undefined> {
 }
 
 async function dirs(dir: string): Promise<string[]> {
+  if (hasLinkedAncestor(dir)) return [];
   try {
     return (await fsp.readdir(dir, { withFileTypes: true }))
       .filter(e => (e.isDirectory() || e.isSymbolicLink()) && !SKIP_DIR.test(e.name))
@@ -200,6 +202,7 @@ async function dirs(dir: string): Promise<string[]> {
 }
 
 async function filesIn(dir: string, re: RegExp): Promise<string[]> {
+  if (hasLinkedAncestor(dir)) return [];
   try {
     return (await fsp.readdir(dir, { withFileTypes: true }))
       .filter(e => e.isFile() && re.test(e.name))

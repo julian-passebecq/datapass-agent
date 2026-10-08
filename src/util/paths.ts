@@ -26,6 +26,14 @@ export function normalizeCase(p: string): string {
   return process.platform === 'win32' ? p.replace(/\//g, '\\').toLowerCase() : p;
 }
 
+/** Read-only feeds never follow a linked file or directory into another scope. */
+export function hasLinkedAncestor(file: string): boolean {
+  try {
+    for (let p = file; p !== path.dirname(p); p = path.dirname(p)) if (fs.lstatSync(p).isSymbolicLink()) return true;
+    return false;
+  } catch { return true; }
+}
+
 /** Repo-relative display path when `file` is inside `root`. */
 export function relTo(root: string | undefined, file: string): string {
   if (!root) return file;
