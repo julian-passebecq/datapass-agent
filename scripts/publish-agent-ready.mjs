@@ -8,7 +8,12 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.resolve(process.argv[2] ?? path.join(root, 'integration', 'COCKPIT-20261008-NIGHT4', 'AGENT'));
 const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'))).version;
-const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+const reportRevision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+const installed = JSON.parse(fs.readFileSync(path.join(root, '.datapass', 'night4', 'installed-latest.json')));
+const sourceSha = installed.sourceSha;
+if (!/^[a-f0-9]{40}$/.test(sourceSha)) throw new Error('Installed source revision is missing.');
+const changedRuntime = execFileSync('git', ['diff', '--name-only', sourceSha, '--', 'src', 'test', 'package.json', 'package-lock.json', 'README.md', 'scripts/build.mjs'], { cwd: root, encoding: 'utf8' }).trim();
+if (changedRuntime) throw new Error('Product source changed since installed qualification: ' + changedRuntime);
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const host = { hostId: 'host:' + sha(JSON.stringify(os.hostname())).slice(0, 16), os: process.platform, architecture: process.arch, runtimeVersion: process.version };
 fs.mkdirSync(out, { recursive: true });
@@ -25,11 +30,14 @@ function add(file, kind, label = path.basename(file)) {
 add(path.join(root, `agent-vscode-${version}.vsix`), 'vsix');
 add(path.join(root, 'src', 'cockpit', 'interfaces.ts'), 'source', 'cockpit-interfaces.ts');
 add(path.join(root, 'docs', 'COCKPIT-V1.md'), 'report');
-const installed = JSON.parse(fs.readFileSync(path.join(root, '.datapass', 'night4', 'installed-latest.json')));
+add(path.join(root, 'scripts', 'install-agent.ps1'), 'source');
 if (installed.error || installed.checks.some(c => !c.ok)) throw new Error('Installed path is not qualified.');
 if (installed.vsixSha256 !== artifacts.find(a => a.kind === 'vsix').sha256) throw new Error('Installed proof belongs to another VSIX.');
 const installedRef = add(path.join(installed.base, 'qualification.json'), 'report');
 add(path.join(installed.base, 'contract-probe.json'), 'fixture', 'redacted-installed-facade-example.json');
+for (const file of ['incremental-evidence.json', 'synthetic-incremental-pack.zip']) {
+  const p = path.join(root, '.datapass', 'night4', file); if (fs.existsSync(p)) add(p, 'fixture');
+}
 const testsRef = add(path.join(root, '.datapass', 'night4', 'tests.log'), 'report', 'local-ci-tests.log');
 const log = fs.readFileSync(path.join(root, '.datapass', 'night4', 'tests.log'), 'utf8');
 const passCount = Number(/pass (\d+)\s*(?:\r?\n|$)/.exec(log)?.[1]);
@@ -37,7 +45,7 @@ if (!passCount || !/fail 0\s*(?:\r?\n|$)/.test(log)) throw new Error('Required l
 for (const file of ['SHIP-REPORT.md', 'outcome.json', 'RESUME.md', 'public-interface-inventory.json']) {
   const p = path.join(root, 'handoff', 'night4', file); if (fs.existsSync(p)) add(p, 'report');
 }
-const ready = { schema: 'galaxy.component-ready/1', workstreamId: 'COCKPIT-20261008-NIGHT4', lane: 'AGENT', componentId: 'juliandatapass.agent-vscode', componentVersion: version, sourceSha, capturedAt: new Date().toISOString(), host, contractMajor: 1, contractMinor: 1,
+const ready = { schema: 'galaxy.component-ready/1', workstreamId: 'COCKPIT-20261008-NIGHT4', lane: 'AGENT', componentId: 'juliandatapass.agent-vscode', componentVersion: version, sourceSha, reportRevision, capturedAt: new Date().toISOString(), host, contractMajor: 1, contractMinor: 1,
   capabilities: ['summary', 'providerConfiguration', 'reveal', 'subscribe', 'incrementalExport', 'registeredContextReceipts', 'acceptedWork', 'assets', 'getScopes'].map(name => ({ name, version: 1, state: 'OK' })), artifacts,
   checks: [{ id: 'required-local-suite-' + passCount, status: 'PASS', evidenceRefs: [testsRef] }, { id: 'installed-synthetic-standalone-and-consumer-flow', status: 'PASS', evidenceRefs: [installedRef] }],
   unavailable: [{ capability: 'PM/Brain production integration', reason: 'Agent installed facade qualified with a synthetic same-host consumer; PM owns assembled multi-product installation.' }, { capability: 'real-history-export', reason: 'No real source scope selected; only owned synthetic fixtures exported.' }] };

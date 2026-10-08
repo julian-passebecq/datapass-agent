@@ -1,0 +1,338 @@
+{
+  "schema": "galaxy.lane-outcome/1",
+  "workstreamId": "COCKPIT-20261008-NIGHT4",
+  "lane": "AGENT",
+  "componentId": "juliandatapass.agent-vscode",
+  "componentVersion": "0.9.0",
+  "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+  "host": "local-windows-desktop",
+  "artifact": {
+    "relativePath": "agent-vscode-0.9.0.vsix",
+    "sha256": "4791276275f086b366b0250d2544560f794aa963021987da4949d02ee8dd5aec"
+  },
+  "productStates": {
+    "built": true,
+    "installed": "isolated synthetic-home VS Code profile",
+    "validated": "439 tests and installed standalone/same-host-consumer flow",
+    "merged": false,
+    "deployed": false,
+    "ownerVerified": false
+  },
+  "features": [
+    {
+      "featureId": "CK-017",
+      "title": "MCP, skills, mods and instruction inventory",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "000c6f9759b2c089a976992ce3e07e2a003299d3:projects/owner-cockpit/spec/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "CK-025",
+      "title": "Project-scoped compact Agent",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "000c6f9759b2c089a976992ce3e07e2a003299d3:projects/owner-cockpit/spec/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "CK-026",
+      "title": "Macro/project/session drilldown",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "000c6f9759b2c089a976992ce3e07e2a003299d3:projects/owner-cockpit/spec/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "CK-027",
+      "title": "Observed Factory lead/worker graph",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "000c6f9759b2c089a976992ce3e07e2a003299d3:projects/owner-cockpit/spec/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "CK-028",
+      "title": "Compact Backlog Metrics Alerts",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "000c6f9759b2c089a976992ce3e07e2a003299d3:projects/owner-cockpit/spec/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "CK-029",
+      "title": "Full Agent legacy preservation",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "000c6f9759b2c089a976992ce3e07e2a003299d3:projects/owner-cockpit/spec/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "CK-030",
+      "title": "Token/model/session metrics",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "000c6f9759b2c089a976992ce3e07e2a003299d3:projects/owner-cockpit/spec/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "CK-039",
+      "title": "Selected conversation export integration",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "000c6f9759b2c089a976992ce3e07e2a003299d3:projects/owner-cockpit/spec/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "CK-062",
+      "title": "Generated asset gallery and local preview",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "000c6f9759b2c089a976992ce3e07e2a003299d3:projects/owner-cockpit/spec/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "CK-064",
+      "title": "Asset provenance and publication states",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "000c6f9759b2c089a976992ce3e07e2a003299d3:projects/owner-cockpit/spec/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "BD-010",
+      "title": "Compact and full Context Activity",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "c55be7ac885098e58b66dd4bf7656bc8041fa25a:workstreams/COCKPIT-BRAIN-20261008-DELIVERY/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "BD-023",
+      "title": "Sanitized results and existing reader reuse",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "c55be7ac885098e58b66dd4bf7656bc8041fa25a:workstreams/COCKPIT-BRAIN-20261008-DELIVERY/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "FD-005",
+      "title": "Incremental new and changed conversation plan",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "4696806680ca93a29f54afceea26bb2ab34bf909:workstreams/PM-AGENT-BRAIN-20261008-FINAL/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "FD-006",
+      "title": "Crash-safe export cursors and deduplication",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "4696806680ca93a29f54afceea26bb2ab34bf909:workstreams/PM-AGENT-BRAIN-20261008-FINAL/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "FD-007",
+      "title": "Scope isolation before history export",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "4696806680ca93a29f54afceea26bb2ab34bf909:workstreams/PM-AGENT-BRAIN-20261008-FINAL/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "FD-018",
+      "title": "Context and provenance in Agent Compact",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "4696806680ca93a29f54afceea26bb2ab34bf909:workstreams/PM-AGENT-BRAIN-20261008-FINAL/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    },
+    {
+      "featureId": "FD-026",
+      "title": "User-reviewed mapping for pre-PM sessions",
+      "status": "IMPLEMENTED",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "selectionSource": "4696806680ca93a29f54afceea26bb2ab34bf909:workstreams/PM-AGENT-BRAIN-20261008-FINAL/features.csv",
+      "evidenceRefs": [
+        "test/cockpit.test.ts",
+        "test/incremental.test.ts",
+        "scripts/smoke-night4.mjs",
+        "public-interface-inventory.json",
+        "synthetic-incremental-pack.zip",
+        "incremental-evidence.json"
+      ],
+      "reason": "Agent-owned implementation and synthetic scope qualification complete. Production PM/Brain assembly and real-source consent remain separate product states.",
+      "nextAction": "PM consumes the published READY/VSIX; owner reviews actual local source scopes before export."
+    }
+  ],
+  "pending": [
+    {
+      "capability": "PM/Brain assembled installed product",
+      "owner": "PM",
+      "reason": "Agent publishes an installed qualified contract and package; final assembly belongs to PM."
+    },
+    {
+      "capability": "real-history export or publication",
+      "reason": "No real source scope selected; qualification used owned synthetic sources."
+    }
+  ],
+  "checks": {
+    "local": {
+      "state": "PASS",
+      "tests": 439
+    },
+    "installed": {
+      "state": "PASS",
+      "checks": 19
+    },
+    "github": {
+      "state": "PASS",
+      "sourceSha": "7b47beb877114c841aa8d2716df900b927d1eca5",
+      "url": "https://github.com/julian-passebecq/agent-vscode/actions/runs/37853529214"
+    }
+  }
+}
