@@ -80,6 +80,10 @@ test('compact keeps independent roots, escapes labels, isolates project/session 
     assert.doesNotMatch(html, /<script>/); assert.match(html, /independent leads/); assert.match(html, /Unknown/);
     const windows = usageWindows([f.snapshots[0], f.snapshots[0]], Date.now(), 3) as { sessions: number; coverage: { complete: boolean } }[];
     assert.equal(windows.length, 3); assert.ok(windows.every(w => w.sessions === 1 && !w.coverage.complete));
+    const at = Date.now(), lead = { ...f.snapshots[0], facts: { calls: [[at, 10, 4] as [number, number, number]] } };
+    const child = { ...f.snapshots[1], parentSessionId: lead.key, facts: { calls: [[at, 10, 4] as [number, number, number]] } };
+    const family = usageWindows([lead, child], at, 3) as { inputTokens: number; perSession: unknown[] }[];
+    assert.equal(family[0].inputTokens, 10); assert.equal(family[0].perSession.length, 2);
     const assets = path.join(f.temp, 'images'); await fs.mkdir(assets); await fs.writeFile(path.join(assets, 'image.png'), Buffer.from([137, 80, 78, 71]));
     const gallery = await scanAssets([assets]); assert.equal(gallery[0].state, 'FILE_OBSERVED'); assert.equal(gallery[0].producer, null);
   } finally { await fs.rm(f.temp, { recursive: true, force: true }); }

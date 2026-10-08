@@ -147,6 +147,7 @@ export class WorkspacePanel implements vscode.Disposable {
       openFile: async p => {
         // Central guard whatever screen asks: Agent never opens auth / credential files.
         if (isForbidden(p) || isCredentialPath(p)) return void vscode.window.showWarningMessage('Agent never opens credential or auth files.');
+        if (/\.(png|jpe?g|gif|webp)$/i.test(p)) { await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(p)); return; }
         await vscode.window.showTextDocument(vscode.Uri.file(p), { preview: true });
       },
       revealInOs: async p => void (await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(p))),

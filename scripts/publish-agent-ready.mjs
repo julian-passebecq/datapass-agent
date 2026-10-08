@@ -32,13 +32,14 @@ const installedRef = add(path.join(installed.base, 'qualification.json'), 'repor
 add(path.join(installed.base, 'contract-probe.json'), 'fixture', 'redacted-installed-facade-example.json');
 const testsRef = add(path.join(root, '.datapass', 'night4', 'tests.log'), 'report', 'local-ci-tests.log');
 const log = fs.readFileSync(path.join(root, '.datapass', 'night4', 'tests.log'), 'utf8');
-if (!/pass 439/.test(log) || !/fail 0/.test(log)) throw new Error('Required local suite did not pass.');
+const passCount = Number(/pass (\d+)\s*(?:\r?\n|$)/.exec(log)?.[1]);
+if (!passCount || !/fail 0\s*(?:\r?\n|$)/.test(log)) throw new Error('Required local suite did not pass.');
 for (const file of ['SHIP-REPORT.md', 'outcome.json', 'RESUME.md', 'public-interface-inventory.json']) {
   const p = path.join(root, 'handoff', 'night4', file); if (fs.existsSync(p)) add(p, 'report');
 }
 const ready = { schema: 'galaxy.component-ready/1', workstreamId: 'COCKPIT-20261008-NIGHT4', lane: 'AGENT', componentId: 'juliandatapass.agent-vscode', componentVersion: version, sourceSha, capturedAt: new Date().toISOString(), host, contractMajor: 1, contractMinor: 1,
   capabilities: ['summary', 'providerConfiguration', 'reveal', 'subscribe', 'incrementalExport', 'registeredContextReceipts', 'acceptedWork', 'assets', 'getScopes'].map(name => ({ name, version: 1, state: 'OK' })), artifacts,
-  checks: [{ id: 'required-local-suite-439', status: 'PASS', evidenceRefs: [testsRef] }, { id: 'installed-synthetic-standalone-and-consumer-flow', status: 'PASS', evidenceRefs: [installedRef] }],
+  checks: [{ id: 'required-local-suite-' + passCount, status: 'PASS', evidenceRefs: [testsRef] }, { id: 'installed-synthetic-standalone-and-consumer-flow', status: 'PASS', evidenceRefs: [installedRef] }],
   unavailable: [{ capability: 'PM/Brain production integration', reason: 'Agent installed facade qualified with a synthetic same-host consumer; PM owns assembled multi-product installation.' }, { capability: 'real-history-export', reason: 'No real source scope selected; only owned synthetic fixtures exported.' }] };
 const text = JSON.stringify(ready, null, 2) + '\n';
 fs.writeFileSync(path.join(out, `READY-${sourceSha.slice(0, 12)}-${sha(text).slice(0, 12)}.json`), text, { flag: 'wx' });

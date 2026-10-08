@@ -31,10 +31,15 @@ export function usageWindows(sessions: AgentSessionSnapshot[], now: number, hist
   return [1, 7, 30].map(days => {
     const since = now - days * 86400000;
     const selected = [...new Map(sessions.filter(s => (s.lastActivityAt ?? 0) >= since).map(s => [s.key, s])).values()];
-    const calls = selected.flatMap(s => (s.facts?.calls ?? []).filter(c => c[0] >= since));
-    return { window: days === 1 ? '24h' : days + 'd', since: new Date(since).toISOString(), capturedAt: new Date(now).toISOString(), basis: 'recorded per-session model-call samples; bounded provider history', sessions: selected.length, sampledSessions: selected.filter(s => s.facts?.calls?.some(c => c[0] >= since)).length,
+    const selectedKeys = new Set(selected.map(s => s.key));
+    const rootSessions = selected.filter(s => !s.parentSessionId || !selectedKeys.has(s.parentSessionId));
+    // A provider may include worker usage in its parent's records. Never add a linked
+    // child's samples to that parent's total without an explicit attribution contract.
+    const calls = rootSessions.flatMap(s => (s.facts?.calls ?? []).filter(c => c[0] >= since));
+    return { window: days === 1 ? '24h' : days + 'd', since: new Date(since).toISOString(), capturedAt: new Date(now).toISOString(), basis: 'recorded root/standalone model-call samples; linked children are reported separately, never summed into parents', sessions: selected.length, sampledSessions: rootSessions.filter(s => s.facts?.calls?.some(c => c[0] >= since)).length,
       repositories: new Set(selected.map(s => s.repository ?? s.cwd).filter(Boolean).map(r => repoId(r!))).size,
       inputTokens: calls.reduce((n, c) => n + c[1], 0), outputTokens: calls.reduce((n, c) => n + c[2], 0), calls: calls.length,
+      perSession: selected.map(s => ({ sourceId: s.key, parentId: s.parentSessionId && selectedKeys.has(s.parentSessionId) ? s.parentSessionId : null, model: s.model ? bounded(s.model, 80) : null, calls: (s.facts?.calls ?? []).filter(c => c[0] >= since).length, inputTokens: (s.facts?.calls ?? []).filter(c => c[0] >= since).reduce((n, c) => n + c[1], 0), outputTokens: (s.facts?.calls ?? []).filter(c => c[0] >= since).reduce((n, c) => n + c[2], 0) })),
       coverage: { loadedHistoryDays: historyDays, complete: false, reason: 'Session/reader caps and missing calls limit coverage; parent/worker aggregation semantics are provider-dependent.' }, billing: 'UNKNOWN; recorded tokens are not productivity or subscription bills' };
   });
 }
@@ -157,7 +162,7 @@ export class CockpitFacade {
     if (!this.policy.authorize({ requestId: 'register', scope: g.scope })) throw new Error('Scope unavailable.');
     if (!Array.isArray(data.contexts) || !Array.isArray(data.acceptedWork) || !Array.isArray(data.assets) || [data.contexts, data.acceptedWork, data.assets].some(a => a.length > 200)) throw new Error('Receipt bounds exceeded.');
     const contexts = data.contexts.map(c => {
-      if (!idOk(c.id) || !g.scope.projectIds.includes(c.projectId) || !idOk(c.backend) || !idOk(c.generationId) || !Number.isFinite(Date.parse(c.queriedAt)) || !Array.isArray(c.sourceIds) || c.sourceIds.length > 100 || !c.sourceIds.every(idOk)) throw new Error('Invalid context receipt.');
+      if (!idOk(c.id) || !g.scope.projectIds.includes(c.projectId) || !idOk(c.backend) || !idOk(c.generationId) || !Number.isFinite(Date.parse(c.queriedAt)) || !Array.isArray(c.sourceIds) || c.sourceIds.length > 100 || !c.sourceIds.every(idOk) || !['OK', 'PARTIAL', 'STALE', 'UNAVAILABLE', 'DENIED', 'ERROR'].includes(c.state)) throw new Error('Invalid context receipt.');
       return { id: c.id, projectId: c.projectId, sourceIds: c.sourceIds, backend: c.backend, generationId: c.generationId, queriedAt: c.queriedAt, state: bounded(c.state, 40), semantics: 'OBSERVED_QUERY_RECEIPT; consumption UNKNOWN' };
     });
     const acceptedWork = data.acceptedWork.map(w => {

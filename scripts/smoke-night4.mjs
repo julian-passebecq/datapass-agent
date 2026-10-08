@@ -19,7 +19,9 @@ const vsixSha256 = crypto.createHash('sha256').update(fs.readFileSync(path.join(
 const result = { schema: 'datapass.agent-installed-qualification/1', version, sourceSha: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), vsixSha256, checks: [], artifacts: [], privateHistory: 'not read; synthetic home only' };
 const check = (id, ok, detail = '') => { result.checks.push({ id, ok: !!ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'} ${id} ${detail}`); if (!ok) throw new Error(id + ': ' + detail); };
 fs.mkdirSync(path.join(profile, 'User'), { recursive: true }); fs.mkdirSync(home, { recursive: true });
-fs.writeFileSync(path.join(profile, 'User', 'settings.json'), JSON.stringify({ 'workbench.startupEditor': 'none', 'telemetry.telemetryLevel': 'off', 'update.mode': 'none', 'extensions.autoUpdate': false, 'workbench.tips.enabled': false, 'chat.disableAIFeatures': true, 'agent.catalog.cliProbes': false }));
+const images = path.join(home, 'approved-images'); fs.mkdirSync(images);
+fs.writeFileSync(path.join(images, 'fixture.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6gAAAABJRU5ErkJggg==', 'base64'));
+fs.writeFileSync(path.join(profile, 'User', 'settings.json'), JSON.stringify({ 'workbench.startupEditor': 'none', 'telemetry.telemetryLevel': 'off', 'update.mode': 'none', 'extensions.autoUpdate': false, 'workbench.tips.enabled': false, 'chat.disableAIFeatures': true, 'agent.catalog.runCli': false, 'agent.cockpit.assetRoots': [images] }));
 const env = { ...process.env, ...buildFixtureHome(home, { cwd: root }) }; delete env.ELECTRON_RUN_AS_NODE;
 const installed = execFileSync(exe, [cli, '--extensions-dir', extensions, '--user-data-dir', profile, '--install-extension', path.join(root, `agent-vscode-${version}.vsix`), '--force'], { encoding: 'utf8', env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, windowsHide: true });
 check('isolated-vsix-install', /successfully installed/i.test(installed));
@@ -54,6 +56,11 @@ try {
     await frame.locator(`[data-opt="compact-view"][data-val="${view}"]`).click(); await win.waitForTimeout(500);
     check('compact-view-' + view, await frame.locator('.agent-compact').innerText().then(t => t.length > 60));
   }
+  await frame.locator('[data-nav="asset-gallery"].nav').click();
+  await frame.locator('[data-act="preview-asset"]').first().waitFor({ state: 'visible', timeout: 15000 });
+  await frame.locator('[data-act="preview-asset"]').first().click();
+  await win.locator('.tab').filter({ hasText: 'fixture.png' }).first().waitFor({ state: 'visible', timeout: 15000 }); check('approved-local-image-preview', true);
+  await command(win, 'Agent: Open Compact'); frame = await frameContaining(win, 'All observed locally');
   await frame.locator('.compact-session').first().click(); await win.waitForTimeout(300);
   await frame.locator('[data-opt="compact-scope"][data-val="session"]').click(); await win.waitForTimeout(500);
   check('session-drilldown-selection', await frame.locator('.compact-session').count() >= 1);
