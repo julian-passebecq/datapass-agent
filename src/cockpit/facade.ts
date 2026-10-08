@@ -2,7 +2,7 @@ import * as os from 'node:os';
 import type { AgentSessionSnapshot } from '../model';
 import { scanBacklog } from '../feeds/backlog';
 import { bounded } from '../util/redact';
-import type { AgentCockpitV1, Capability, ChangeEvent, ExportReceipt, Fact, HostIdentity, Reply, Request, Scope, SessionRef, Summary } from './interfaces';
+import type { AgentCockpitV1, Capability, ChangeEvent, ExportPlan, ExportReceipt, Fact, HostIdentity, ProviderConfig, Reply, Request, Scope, SessionRef, Summary } from './interfaces';
 import { digest, idOk, LocalGrant, repoId, ScopePolicy, validateRequest } from './policy';
 import { ConfigRead, readConfiguration, safeLocalSource } from './configuration';
 import { IncrementalExporter } from '../export/incremental';
@@ -84,13 +84,14 @@ export class CockpitFacade {
     const reply = this.reply(r, result, stale ? 'STALE' : 'PARTIAL', ['Bounded local observation; recent does not prove a process is alive.', 'Missing metrics, receipts and assets remain unknown.']);
     if (start + limit < all.length) reply.nextCursor = String(start + limit); return reply;
   }
-  private async configuration(r: Request & { provider: 'codex' | 'claude' }): Promise<Reply<any>> {
+  private async configuration(r: Request & { provider: 'codex' | 'claude' }): Promise<Reply<ProviderConfig>> {
     if (validateRequest(r)) r = structuredClone(r);
+    const empty: ProviderConfig = { provider: 'UNKNOWN', cliVersion: { value: null, kind: 'UNKNOWN', sourceIds: [] }, layers: [], effective: {}, resolution: 'UNKNOWN', inventory: [], observedSessions: [], sourceOpenIds: [] };
     const g = this.policy.authorize(r);
-    if (!g?.configuration || !['codex', 'claude'].includes(r.provider)) return this.reply(r, null, 'DENIED');
+    if (!g?.configuration || !['codex', 'claude'].includes(r.provider)) return this.reply(r, empty, 'DENIED');
     const all = this.sessions(g), keys = new Set(all.map(s => s.key));
     const c = await (this.services.configuration ?? readConfiguration)(g, r.provider, all.map(s => sessionRef(s, keys)));
-    if (!this.policy.authorize(r)) return this.reply(r, null, 'DENIED');
+    if (!this.policy.authorize(r)) return this.reply(r, empty, 'DENIED');
     const installed = this.services.installed?.()[r.provider];
     if (installed?.version) c.config.cliVersion = { value: bounded(installed.version, 80), kind: 'OBSERVED', sourceIds: ['installed-version:' + r.provider], observedAt: new Date().toISOString(), reason: bounded(installed.source, 120) };
     this.configurations.set(g.scope.policyHash + ':' + r.provider, c);
@@ -137,20 +138,22 @@ export class CockpitFacade {
     const destination = this.destinations.get(destinationId); if (!destination) throw new Error('Pick a local destination.');
     this.approvals.set(planHash, { planHash, scopeHash: g.scope.policyHash, destination });
   }
-  private async plan(r: Request & { sourceIds: string[]; redactionProfileHash: string }): Promise<Reply<any>> {
+  private async plan(r: Request & { sourceIds: string[]; redactionProfileHash: string }): Promise<Reply<ExportPlan>> {
     if (validateRequest(r)) r = structuredClone(r);
+    const empty: ExportPlan = { id: '', hash: '', exporterVersion: 'incremental/1', newCount: 0, appendedCount: 0, rewrittenCount: 0, unchangedCount: 0, omittedCount: 0 };
     const g = this.policy.authorize(r), destination = this.activeDestination;
-    if (!g?.exportConsent) return this.reply(r, null, 'DENIED');
-    if (!destination) return this.reply(r, null, 'UNAVAILABLE', ['Pick a local export destination in Agent first.']);
+    if (!g?.exportConsent) return this.reply(r, empty, 'DENIED');
+    if (!destination) return this.reply(r, empty, 'UNAVAILABLE', ['Pick a local export destination in Agent first.']);
     try { return this.reply(r, await this.exporter.plan(g, this.sessions(g), r.sourceIds, r.redactionProfileHash, destination), 'OK'); }
-    catch { return this.reply(r, null, 'ERROR', ['Export plan rejected; selected source or identity could not be validated.']); }
+    catch { return this.reply(r, empty, 'ERROR', ['Export plan rejected; selected source or identity could not be validated.']); }
   }
-  private async execute(r: Request & { approval: { approvedPlanHash: string; destinationId: string; scopePolicyHash: string } }): Promise<Reply<any>> {
+  private async execute(r: Request & { approval: { approvedPlanHash: string; destinationId: string; scopePolicyHash: string } }): Promise<Reply<ExportReceipt>> {
     if (validateRequest(r)) r = structuredClone(r);
+    const empty: ExportReceipt = { id: '', manifestHash: '', state: 'DENIED', committedCursorIds: [], artifactRefs: [] };
     const g = this.policy.authorize(r), a = r?.approval, approved = a && this.approvals.get(a.approvedPlanHash);
-    if (!g || !a || !approved || approved.scopeHash !== g.scope.policyHash || a.scopePolicyHash !== g.scope.policyHash || this.destinations.get(a.destinationId) !== approved.destination) return this.reply(r, null, 'DENIED');
+    if (!g || !a || !approved || approved.scopeHash !== g.scope.policyHash || a.scopePolicyHash !== g.scope.policyHash || this.destinations.get(a.destinationId) !== approved.destination) return this.reply(r, empty, 'DENIED');
     try { return this.reply(r, await this.exporter.execute(g, a.approvedPlanHash, approved.destination), 'OK'); }
-    catch { return this.reply(r, null, 'ERROR', ['Export failed before a new cursor commit; inspect selected native source or destination.']); }
+    catch { return this.reply(r, { ...empty, state: 'ERROR' }, 'ERROR', ['Export failed before a new cursor commit; inspect selected native source or destination.']); }
   }
   private async receipt(r: Request & { id: string }): Promise<Reply<ExportReceipt>> {
     const empty: ExportReceipt = { id: '', manifestHash: '', state: 'UNAVAILABLE', committedCursorIds: [], artifactRefs: [] };
