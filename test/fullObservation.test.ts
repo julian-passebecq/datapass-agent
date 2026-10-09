@@ -77,3 +77,32 @@ test('ContextRef preserves exact scope/return target; ordinary drafts cannot ans
     facade.dispose();
   }finally{await fs.rm(f.temp,{recursive:true,force:true});}
 });
+
+test('registered session evidence follows current scoped observations through disappearance, repo drift and revocation',async()=>{
+  const f=await cockpitFixture();
+  const policy=new ScopePolicy();policy.set(f.grant);
+  let snapshots=f.snapshots;
+  const facade=new CockpitFacade({all:()=>snapshots,opts:{historyDays:3},lastStats:{at:Date.now()},onDidChange:()=>({dispose(){}})},policy,{open(){},async openSource(){}},new IncrementalExporter([f.adapter]));
+  try {
+    const r={requestId:'evidence:current',scope:f.grant.scope,epoch:policy.epoch};
+    const ref={id:'evidence:1',sessionId:f.snapshots[0].key,taskId:'task:1',presetHash:null,configHash:null,promptHash:null,sourceSha:null,qaReceiptId:null};
+    facade.registerInputs(f.grant,{contexts:[],acceptedWork:[],assets:[],evidenceRefs:[ref]});
+    assert.deepEqual((await facade.api.getSummary(r)).data.evidenceRefs,[ref]);
+    assert.deepEqual(facade.scopedInputs(f.grant).evidenceRefs,[ref]);
+    snapshots=[f.snapshots[1]];
+    assert.deepEqual((await facade.api.getSummary(r)).data.evidenceRefs,[]);
+    assert.deepEqual(facade.scopedInputs(f.grant).evidenceRefs,[]);
+    snapshots=f.snapshots;
+    const root=f.snapshots[0].repository,cwd=f.snapshots[0].cwd;
+    f.snapshots[0].repository=f.temp;f.snapshots[0].cwd=f.temp;
+    assert.equal((await facade.api.getObservation(r)).data.length,0);
+    assert.deepEqual((await facade.api.getSummary(r)).data.evidenceRefs,[]);
+    assert.deepEqual(facade.scopedInputs(f.grant).evidenceRefs,[]);
+    f.snapshots[0].repository=root;f.snapshots[0].cwd=cwd;
+    assert.deepEqual((await facade.api.getSummary(r)).data.evidenceRefs,[ref]);
+    policy.clear();policy.set(f.grant);
+    assert.equal((await facade.api.getSummary(r)).state,'DENIED');
+    assert.deepEqual((await facade.api.getSummary(r)).data.sessions,[]);
+    policy.clear();assert.deepEqual(facade.scopedInputs(f.grant),{contexts:[],acceptedWork:[],assets:[]});
+  }finally{facade.dispose();await fs.rm(f.temp,{recursive:true,force:true});}
+});

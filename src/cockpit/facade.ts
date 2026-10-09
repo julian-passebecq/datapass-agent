@@ -143,7 +143,7 @@ export class CockpitFacade {
     const all = this.sessions(g), keys = new Set(all.map(s => s.key)), start = Number(r.cursor ?? 0), limit = r.limit ?? 100;
     const plan = await scanBacklog({ roots: g.roots, now: Date.now() });
     if (!this.policy.authorize(r)) return this.reply(r, empty, 'DENIED');
-    const inputs = this.inputs.get(g.scope.policyHash) ?? { contexts: [], assets: [], acceptedWork: [] };
+    const inputs = this.scopedInputs(g);
     const result: Summary = { sessions: all.slice(start, start + limit).map(s => sessionRef(s, keys)), backlogGroups: [
       { kind: 'PM_ACCEPTED', state: inputs.acceptedWork.length ? 'OK' : 'UNAVAILABLE', items: inputs.acceptedWork },
       { kind: 'OBSERVED_REPO_PLAN', at: new Date(plan.at).toISOString(), basis: 'existing read-only plan scanner', repositories: plan.files.map(f => ({ repoId: repoId(f.root), source: f.rel, freshness: new Date(f.mtime).toISOString(), counts: { open: f.items.filter(i => i.state === 'open').length, active: f.items.filter(i => i.state === 'active').length, done: f.items.filter(i => i.state === 'done').length }, state: f.skipped ? 'PARTIAL' : 'OK' })) },
@@ -270,6 +270,14 @@ export class CockpitFacade {
     if(evidenceRefs.length>200)throw new Error('Evidence bounds exceeded.');
     this.inputs.set(g.scope.policyHash, { contexts, acceptedWork, assets, evidenceRefs }); this.changed();
   }
-  scopedInputs(g: LocalGrant): ScopedInputs { return structuredClone(this.policy.authorize({requestId:'read-inputs',scope:g.scope}) ? this.inputs.get(g.scope.policyHash) ?? { contexts: [], acceptedWork: [], assets: [] } : { contexts: [], acceptedWork: [], assets: [] }); }
+  scopedInputs(g: LocalGrant): ScopedInputs {
+    const current=this.policy.authorize({requestId:'read-inputs',scope:g.scope});
+    if(!current)return {contexts:[],acceptedWork:[],assets:[]};
+    const inputs=this.inputs.get(current.scope.policyHash) ?? {contexts:[],acceptedWork:[],assets:[]};
+    const keys=new Set(this.sessions(current).map(s=>s.key));
+    // Enrollment alone does not establish a current association after a reader
+    // drops a session or its repository drifts outside the reviewed scope.
+    return structuredClone({...inputs,evidenceRefs:(inputs.evidenceRefs ?? []).filter(ref=>keys.has(ref.sessionId))});
+  }
   dispose(): void { this.changeSub.dispose(); for (const sub of this.subscribers) { sub.disposed = true; if (sub.timer) clearTimeout(sub.timer); } this.subscribers.clear(); this.approvals.clear(); this.configurations.clear(); }
 }
