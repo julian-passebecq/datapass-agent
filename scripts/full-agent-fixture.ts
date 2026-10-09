@@ -11,7 +11,7 @@ async function main() {
   const f=await cockpitFixture();
   try {
     const policy=new ScopePolicy();policy.set(f.grant);const opened:unknown[]=[];
-    const facade=new CockpitFacade({all:()=>f.snapshots,opts:{historyDays:3},lastStats:{at:Date.now()},onDidChange:()=>({dispose(){}})},policy,{open:(view,grant,id,context)=>{opened.push({view,scope:grant.scope,id,context});},async openSource(){}},new IncrementalExporter([f.adapter]));
+    const facade=new CockpitFacade({all:()=>f.snapshots,opts:{historyDays:3},lastStats:{at:Date.now()},onDidChange:()=>({dispose(){}})},policy,{open:(view,grant,id,context,returnBinding)=>{opened.push({view,scope:grant.scope,id,context,returnBinding});},async openSource(){}},new IncrementalExporter([f.adapter]));
     const request={requestId:'fixture:context',scope:f.grant.scope,epoch:policy.epoch,generation:'fixture:generation:1'};
     const context:ContextRef={organizationId:f.grant.scope.organizationIds[0],privacyDomainId:f.grant.scope.privacyDomainIds[0],projectId:f.grant.scope.projectIds[0],repoId:repoId(f.repo),hostId:localHost().hostId,worktreeId:null,revision:null,selectedItemId:f.snapshots[0].key,returnToken:'pm:work:synthetic-1'};
     const contextRequest={...request,context};

@@ -1,6 +1,6 @@
 # FULL Agent observation additions
 
-Source contract: COCKPIT-NATIVE-20261009-FULL, Agent AO-001..012 and 17 inherited Agent clauses. Existing Agent API, screens, commands, readers, exports and Lens links remain available. The candidate is 0.10.0; cockpitV1 remains major 1 and negotiates additive methods through capabilities().
+Source contract: COCKPIT-NATIVE-20261009-FULL, Agent AO-001..012 and 17 inherited Agent clauses. Existing Agent API, screens, commands, readers, exports and Lens links remain available. The candidate is 0.10.1; cockpitV1 remains major 1 and negotiates additive methods through capabilities().
 
 ## Shared configuration collection
 
@@ -14,7 +14,7 @@ All requests carry the host-reviewed Scope, requestId, optional epoch and genera
 
 - `getObservation(request)`: bounded, paginated session census, native IDs/entrypoints, requested/observed model/effort/mode/Goal, recorded tools, input requests/results, source timestamps and provenance. Native process liveness, open turn, explicit end and one-shot completion remain separate. Missing telemetry stays null. Goal tool results are distinguished from Goal requests and Plan hints.
 - `getEventPage({...request, afterSequence})`: per-scope retained event sequence (256 events), bounded pages, oldest sequence, gap indication and epoch. Duplicate or unrelated-session refreshes do not advance a scope's sequence. A gap/reset requires a fresh observation; subscriptions coalesce and emit RESYNC_REQUIRED under backpressure. Disposal/revocation stops delivery.
-- `revealContext({...request, context})`: validates organization/privacy/project/repo/host/worktree/revision/selected native session and opaque return token. Unmapped context is denied. Full session detail stays inside the same bounded panel; Back to Compact preserves selection. A return token is data, never an imported executable command or fictional native URI.
+- `revealContext({...request, context})`: validates organization/privacy/project/repo/host/worktree/revision/selected native session and opaque return token. Unmapped context is denied. Full session detail stays inside the same bounded panel; Back to Compact preserves selection. Return to PM invokes only the negotiated literal `datapassPm.returnFromAgent` with the original request/token/generation/scope/epoch after source and grant rechecks. Missing PM support falls back to token copying. A return token is data, never an executable command or fictional native URI.
 - `prepareReply({...request, sessionId, questionId, text})`: pending observed ordinary input only. Returns a sanitized manual-copy draft, sent=false. Security/permission requests are denied. No verified native send transport is available; Agent does not emulate it.
 - `getResourceObservations(request)`: only exact diagnostic files selected locally in Agent. Reads metadata, distinguishes disabled/stale/absent/blocked, and leaves causality UNKNOWN. It never executes or repairs scripts/watchers/tasks or kills processes.
 

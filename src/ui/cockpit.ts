@@ -10,6 +10,7 @@ import { WorkspacePanel } from './workspace';
 import type { WebviewMessage } from '../render/html';
 import type { Scope } from '../cockpit/interfaces';
 import type { ImageProducerReceipt } from '../cockpit/images';
+import { contextSourceHash, returnToPm } from '../cockpit/contextReturn';
 
 export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStore, ternAvailable: () => boolean, onMessage: (m: WebviewMessage) => void, installed: () => import('../extension').AgentApi['installed']): CockpitFacade {
   const policy = new ScopePolicy(), panels = new Set<WorkspacePanel>();
@@ -21,12 +22,22 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
   }
   const facade = new CockpitFacade(store, policy, {
     installed,
-    open: (view, grant, id, context) => {
+    open: (view, grant, id, context, returnBinding) => {
       const epoch=policy.epoch;
       const valid=()=>!!policy.authorize({requestId:'panel',scope:grant.scope,epoch});
       const read = () => valid() ? policy.sessions(grant, store.all()).filter(s=>!context || repoId(s.repository ?? s.cwd ?? '')===context.repoId) : [];
+      const sourceHash=context ? contextSourceHash(context,read()):null;
+      const validReturn=()=>valid() && !!context && contextSourceHash(context,read())===sourceHash;
       let panel:WorkspacePanel;
       const scopedMessage=(m:WebviewMessage)=>{
+        if(m.type==='cmd' && (m.cmd==='returnToPm' || m.cmd==='copyReturnToken')){
+          if(!context || !returnBinding)return;
+          void returnToPm(context,returnBinding,validReturn,{commands:()=>vscode.commands.getCommands(true),execute:(command,payload)=>vscode.commands.executeCommand(command,payload),copy:token=>vscode.env.clipboard.writeText(token)},m.cmd==='copyReturnToken').then(result=>{
+            if(result==='COPIED')void vscode.window.showInformationMessage('Agent: return token copied. Restore the reviewed selection in PM.');
+            if(result==='DENIED')void vscode.window.showWarningMessage('Agent: source or reviewed scope changed. Reopen the current project before returning.');
+          }).catch(()=>{void vscode.window.showWarningMessage('Agent: PM refused the return. Reopen the current project and review its selection.');});
+          return;
+        }
         if(!valid())return;
         if(m.type==='open'){panel.open('transcript',m.key);return;}
         if(m.type==='cmd' && m.cmd==='openWorkspaceNewTab'){panel.open('compact');return;}

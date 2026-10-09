@@ -10,6 +10,7 @@ import { observeSession } from './observation';
 import type { ContextRef, EventPage, NativeObservation } from './interfaces';
 import { observeResources, validateResources, SelectedResource } from './resources';
 import { intakeImage, ImageProducerReceipt } from './images';
+import type { ContextReturnBinding } from './contextReturn';
 
 export interface ContextReceipt { id: string; projectId: string; sourceIds: string[]; backend: string; generationId: string; queriedAt: string; state: string; }
 export interface AcceptedWork { projectId: string; revision: string; counts: { open: number; active: number; done: number; }; }
@@ -22,7 +23,7 @@ interface HostServices {
   host?: HostIdentity;
   configuration?: typeof readConfiguration;
   installed?: () => { codex?: { version?: string; source: string }; claude?: { version?: string; source: string } };
-  open(view: 'compact' | 'session' | 'settings' | 'catalog' | 'project', grant: LocalGrant, id: string, context?:ContextRef): Promise<void> | void;
+  open(view: 'compact' | 'session' | 'settings' | 'catalog' | 'project', grant: LocalGrant, id: string, context?:ContextRef, returnBinding?:ContextReturnBinding): Promise<void> | void;
   openSource(file: string): Promise<void>;
 }
 export const localHost = (): HostIdentity => ({ hostId: 'host:' + digest(os.hostname()).slice(0, 16), os: process.platform, architecture: process.arch, runtimeVersion: process.version });
@@ -119,7 +120,9 @@ export class CockpitFacade {
     if(!g || !c || !g.scope.organizationIds.includes(c.organizationId) || !g.scope.privacyDomainIds.includes(c.privacyDomainId) || !g.scope.projectIds.includes(c.projectId) || !g.scope.repoIds.includes(c.repoId) || c.hostId!==this.host.hostId || !idOk(c.returnToken) || c.selectedItemId!==null && !idOk(c.selectedItemId) || c.worktreeId!==null && !idOk(c.worktreeId) || c.revision!==null && !/^[a-f0-9]{7,40}$/.test(c.revision))return this.reply(r,empty,'DENIED');
     const sessions=this.sessions(g).filter(s=>repoId(s.repository ?? s.cwd ?? '')===c.repoId),selected=c.selectedItemId ? sessions.find(s=>s.key===c.selectedItemId):undefined;
     if(!sessions.length || c.selectedItemId && !selected || c.worktreeId && !sessions.some(s=>s.worktree && repoId(s.worktree)===c.worktreeId) || c.revision && !(selected ? [selected]:sessions).some(s=>s.headAfter===c.revision || s.headBefore===c.revision))return this.reply(r,empty,'DENIED',['Canonical context cannot be mapped to the reviewed native observations.']);
-    await this.services.open(selected?'session':'project',g,selected?.key ?? c.projectId,structuredClone(c));
+    const returnBinding={returnToken:c.returnToken,requestId:r.requestId,generation:r.generation ?? null,scopeHash:digest(g.scope),epoch:this.policy.epoch};
+    await this.services.open(selected?'session':'project',g,selected?.key ?? c.projectId,structuredClone(c),returnBinding);
+    if(!this.policy.authorize({...r,epoch:returnBinding.epoch}))return this.reply(r,empty,'DENIED');
     return this.reply(r,{opened:true,returnToken:c.returnToken},'OK');
   }
   private async prepareReply(r:Request & {sessionId:string;questionId:string;text:string}):Promise<Reply<{text:string|null;transport:'MANUAL_COPY'|'UNSUPPORTED';sent:false}>> {
