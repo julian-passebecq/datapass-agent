@@ -67,6 +67,11 @@ test('ContextRef preserves exact scope/return target; ordinary drafts cannot ans
     assert.equal((await facade.api.revealContext({...r,context:{...context,revision:'badbeef'}})).state,'DENIED');
     const draft=await facade.api.prepareReply({...r,sessionId:f.snapshots[0].key,questionId:'q:ordinary',text:'English'});assert.equal(draft.data.transport,'MANUAL_COPY');assert.equal(draft.data.sent,false);
     assert.equal((await facade.api.prepareReply({...r,sessionId:f.snapshots[0].key,questionId:'q:security',text:'approve'})).state,'DENIED');
+    const configHash='a'.repeat(64),sourceSha='b'.repeat(40);
+    facade.registerInputs(f.grant,{contexts:[],acceptedWork:[],assets:[],evidenceRefs:[{id:'evidence:1',sessionId:f.snapshots[0].key,taskId:'task:1',presetHash:null,configHash,promptHash:null,sourceSha,qaReceiptId:'qa:1'}]});
+    assert.equal((await facade.api.getSummary(r)).data.evidenceRefs?.length,1);
+    assert.throws(()=>facade.registerInputs(f.grant,{contexts:[],acceptedWork:[],assets:[],evidenceRefs:[{id:'evidence:2',sessionId:f.snapshots[1].key,taskId:null,presetHash:null,configHash:null,promptHash:null,sourceSha:null,qaReceiptId:null}]}),/Invalid session evidence/);
+    const originalRepo=f.snapshots[0].repository;f.snapshots[0].repository=f.temp;assert.equal((await facade.api.getObservation(r)).data.length,0);f.snapshots[0].repository=originalRepo;
     const data={sessions:f.snapshots,providers:[],events:[],now:Date.now(),ternAvailable:false};assert.deepEqual(compactSessions(data,{view:'compact',opts:{'compact-scope':'project'}}),[]);
     assert.match(renderCompact({...data,cockpitInputs:{contexts:[],acceptedWork:[],assets:[],panelContext:{valid:false,projectId:'fixture'}}},{view:'compact'}),/No fallback to All/);
     facade.dispose();

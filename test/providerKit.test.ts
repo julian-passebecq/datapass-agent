@@ -15,7 +15,7 @@ test('standalone kit uses the Agent collector, stable safe hashes and no history
     const homes = { claudeHome: f.claudeHome, codexHome: f.codexHome, managedFile: path.join(f.temp, 'absent-managed.json') };
     const selection: CaptureSelection = { provider: 'codex', surface: 'IDE', nativeVersion: null, hostId: 'host:fixture', accountId: null, roots: [f.repo], policyHash: f.grant.scope.policyHash, homes };
     const one = await captureConfiguration(selection), two = await captureConfiguration(selection);
-    assert.equal(providerKitVersion, '1.0.1'); assert.equal(one.sourceHash, two.sourceHash);
+    assert.equal(providerKitVersion, '1.0.2'); assert.equal(one.sourceHash, two.sourceHash);
     assert.equal(one.configuration.effective.model.value, 'fixture-model');
     const agent = await readConfiguration(f.grant, 'codex', [], homes);
     assert.deepEqual(one.configuration.layers, agent.config.layers);

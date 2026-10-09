@@ -4,7 +4,7 @@ import { defaultHomes } from '../feeds/settings';
 import { canonicalJson, sha256 } from '../galaxy';
 import { hasLinkedAncestor, isPlausibleLocalPath } from '../util/paths';
 
-export const providerKitVersion = '1.0.1' as const;
+export const providerKitVersion = '1.0.2' as const;
 export const providerKitSchema = 'datapass.provider-kit-capture/1' as const;
 export { safeLocalSource, defaultHomes };
 export type { ProviderConfig, Fact, SessionRef } from '../cockpit/interfaces';

@@ -51,7 +51,10 @@ export async function collectConfiguration(selection: { roots: string[]; policyH
     }
   }
   const inventory: unknown[] = [
-    ...(snapshot.catalog?.items ?? []).filter(i => i.provider === provider).map(i => ({ ...i, installed: i.active, probed: 'UNKNOWN', used: 'UNKNOWN' })),
+    ...(snapshot.catalog?.items ?? []).filter(i => i.provider === provider).map(i => {
+      const plugin=i.plugin ? snapshot.catalog?.plugins.find(p=>p.provider===provider && p.id===i.plugin):undefined;
+      return {...i,installed:i.source==='plugin' ? plugin?.installed ?? 'UNKNOWN':true,enabled:i.source==='plugin' ? plugin?.enabled ?? 'UNKNOWN':'UNKNOWN',authenticated:'UNKNOWN',probed:'UNKNOWN',used:'UNKNOWN'};
+    }),
     ...catalog.items.filter(i=>i.provider===provider).map(i=>({kind:'declared-native-role',itemKind:i.kind,name:bounded(i.name,80),source:i.source,sourceIds:sourceFor(i.file),requestedModel:i.model?bounded(i.model,80):null,requestedEffort:i.effort?bounded(i.effort,30):null,declaredTools:i.tools?bounded(i.tools,140):null,observedModel:null,inheritance:'NATIVE_PROVIDER_OWNED'})),
     ...catalog.hooks.filter(h=>{
       const relative=path.relative(homes.codexHome,h.file),isCodex=relative!=='' && !relative.startsWith('..') && !path.isAbsolute(relative);

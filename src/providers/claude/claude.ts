@@ -610,7 +610,7 @@ export class ClaudeAdapter implements ProviderAdapter {
       }
       const r = this.registry.get(acc.sessionId);
       const alive = r ? pidAlive(r.pid) : false;
-      acc.live = { providerHasRegistry: true, registryAlive: alive, registryStatus: r?.status, lastActivityAt: acc.lastActivityAt };
+      acc.live = { providerHasRegistry: true, registryAlive: r ? alive : undefined, registryStatus: r?.status, lastActivityAt: acc.lastActivityAt };
       if (r && alive) {
         if (r.name && !acc.evidence.has('title')) {
           acc.title = r.name;

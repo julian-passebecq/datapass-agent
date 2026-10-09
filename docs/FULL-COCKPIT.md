@@ -4,7 +4,7 @@ Source contract: COCKPIT-NATIVE-20261009-FULL, Agent AO-001..012 and 17 inherite
 
 ## Shared configuration collection
 
-`npm run build:provider-kit` builds the Agent-owned `@datapass/provider-kit` 1.0.1. `captureConfiguration(selection)` calls the same `collectConfiguration` implementation as cockpitV1's provider configuration method. Explicit homes, reviewed roots, SHA256 policy hash, provider, surface, native version, host and account identity are required. Unknown version/account is null. The package has no history reader or CLI probe, and does not create an Agent scope grant.
+`npm run build:provider-kit` builds the Agent-owned `@datapass/provider-kit` 1.0.2. `captureConfiguration(selection)` calls the same `collectConfiguration` implementation as cockpitV1's provider configuration method. Explicit homes, reviewed roots, SHA256 policy hash, provider, surface, native version, host and account identity are required. Unknown version/account is null. The package has no history reader or CLI probe, and does not create an Agent scope grant.
 
 The capture includes sanitized ProviderConfig, opaque source references, timestamp, safe-projection hash and omissions. Multi-root effective values are UNKNOWN; individual layers remain visible. Role inventory carries requested model/effort/tool declarations separately from an UNKNOWN observed model. Hook inventory exposes event/type/source metadata and omits executable payloads. Config owns desired presets, version-specific resolution and capture persistence. Installed/configured entries never imply authentication or usability.
 
