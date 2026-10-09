@@ -8,9 +8,9 @@ import { ConfigRead, readConfiguration, safeLocalSource } from './configuration'
 import { IncrementalExporter } from '../export/incremental';
 import { observeSession } from './observation';
 import type { ContextRef, EventPage, NativeObservation } from './interfaces';
-import { observeResources, validateResources, SelectedResource } from './resources';
+import { correlateResourceTime, observeResources, validateResources, SelectedResource } from './resources';
 import { intakeImage, ImageProducerReceipt } from './images';
-import type { ContextReturnBinding } from './contextReturn';
+import { contextSourceHash, type ContextReturnBinding } from './contextReturn';
 
 export interface ContextReceipt { id: string; projectId: string; sourceIds: string[]; backend: string; generationId: string; queriedAt: string; state: string; }
 export interface AcceptedWork { projectId: string; revision: string; counts: { open: number; active: number; done: number; }; }
@@ -90,10 +90,12 @@ export class CockpitFacade {
     this.inputs.set(g.scope.policyHash,{...existing,assets:[...existing.assets.filter(a=>a.id!==asset.id),asset].slice(-200)});this.changed();return asset;
   }
   private async resources(r:Request) {
+    if(validateRequest(r))r={...structuredClone(r),epoch:r.epoch ?? this.policy.epoch};
     const g=this.policy.authorize(r),epoch=this.policy.epoch;
     if(!g)return this.reply(r,[],'DENIED');
     const data=await observeResources(this.selectedResources.get(g.scope.policyHash) ?? [],()=>epoch===this.policy.epoch && !!this.policy.authorize(r));
-    return this.reply(r,data,epoch===this.policy.epoch && this.policy.authorize(r)?'PARTIAL':'DENIED',['Explicit selected metadata only; disabled/stale watcher does not establish the cause of another failure.']);
+    const authorized=epoch===this.policy.epoch && !!this.policy.authorize(r);
+    return this.reply(r,authorized?data.map(item=>correlateResourceTime(item,this.sessions(g))):[],authorized?'PARTIAL':'DENIED',['Explicit selected metadata only; disabled/stale watcher does not establish the cause of another failure.']);
   }
   private async observation(r:Request):Promise<Reply<NativeObservation[]>> {
     const g=this.policy.authorize(r); if(!g) return this.reply(r,[],'DENIED');
@@ -116,13 +118,15 @@ export class CockpitFacade {
     return this.reply(r,{events,nextSequence:events.at(-1)?.sequence ?? stream.sequence,oldestSequence:oldest,gap,epoch:stream.epoch},gap?'STALE':'OK',gap?['Retained event gap or generation reset; resync getObservation before continuing.']:[]);
   }
   private async revealContext(r:Request & {context:ContextRef}):Promise<Reply<{opened:boolean;returnToken:string|null}>> {
+    if(validateRequest(r))r={...structuredClone(r),epoch:r.epoch ?? this.policy.epoch};
     const g=this.policy.authorize(r),c=r?.context,empty={opened:false,returnToken:null};
     if(!g || !c || !g.scope.organizationIds.includes(c.organizationId) || !g.scope.privacyDomainIds.includes(c.privacyDomainId) || !g.scope.projectIds.includes(c.projectId) || !g.scope.repoIds.includes(c.repoId) || c.hostId!==this.host.hostId || !idOk(c.returnToken) || c.selectedItemId!==null && !idOk(c.selectedItemId) || c.worktreeId!==null && !idOk(c.worktreeId) || c.revision!==null && !/^[a-f0-9]{7,40}$/.test(c.revision))return this.reply(r,empty,'DENIED');
     const sessions=this.sessions(g).filter(s=>repoId(s.repository ?? s.cwd ?? '')===c.repoId),selected=c.selectedItemId ? sessions.find(s=>s.key===c.selectedItemId):undefined;
     if(!sessions.length || c.selectedItemId && !selected || c.worktreeId && !sessions.some(s=>s.worktree && repoId(s.worktree)===c.worktreeId) || c.revision && !(selected ? [selected]:sessions).some(s=>s.headAfter===c.revision || s.headBefore===c.revision))return this.reply(r,empty,'DENIED',['Canonical context cannot be mapped to the reviewed native observations.']);
-    const returnBinding={returnToken:c.returnToken,requestId:r.requestId,generation:r.generation ?? null,scopeHash:digest(g.scope),epoch:this.policy.epoch};
+    const returnBinding={returnToken:c.returnToken,requestId:r.requestId,generation:r.generation ?? null,scopeHash:digest(r.scope),epoch:this.policy.epoch};
+    const sourceHash=contextSourceHash(c,sessions);
     await this.services.open(selected?'session':'project',g,selected?.key ?? c.projectId,structuredClone(c),returnBinding);
-    if(!this.policy.authorize({...r,epoch:returnBinding.epoch}))return this.reply(r,empty,'DENIED');
+    if(!this.policy.authorize({...r,epoch:returnBinding.epoch}) || contextSourceHash(c,this.sessions(g))!==sourceHash)return this.reply(r,empty,'DENIED');
     return this.reply(r,{opened:true,returnToken:c.returnToken},'OK');
   }
   private async prepareReply(r:Request & {sessionId:string;questionId:string;text:string}):Promise<Reply<{text:string|null;transport:'MANUAL_COPY'|'UNSUPPORTED';sent:false}>> {

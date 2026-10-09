@@ -40,3 +40,25 @@ test('facade passes exact return binding and denies revocation during host openi
     assert.equal((await facade.api.revealContext({...r,context})).state,'DENIED');assert.deepEqual(binding,{returnToken:context.returnToken,requestId:r.requestId,generation:r.generation,scopeHash:digest(r.scope),epoch});facade.dispose();
   }finally{await fs.rm(f.temp,{recursive:true,force:true});}
 });
+
+test('return scope hash matches the actual reply for a valid reordered caller scope',async()=>{
+  const f=await cockpitFixture();
+  try {
+    const policy=new ScopePolicy();policy.set(f.grant);
+    const scope=Object.fromEntries(Object.entries(f.grant.scope).reverse()) as typeof f.grant.scope;
+    const r={requestId:'open:reordered',scope,generation:'generation:1'};
+    const context={organizationId:'local',privacyDomainId:'fixture',projectId:'fixture',repoId:repoId(f.repo),hostId:localHost().hostId,worktreeId:null,revision:null,selectedItemId:f.snapshots[0].key,returnToken:'pm:work:7'};
+    let hash:string|undefined;const facade=new CockpitFacade({all:()=>f.snapshots,opts:{historyDays:3},onDidChange:()=>({dispose(){}})},policy,{open(_v,_g,_id,_context,returned){hash=returned?.scopeHash;},async openSource(){}},new IncrementalExporter([f.adapter]));
+    const reply=await facade.api.revealContext({...r,context});assert.equal(reply.state,'OK');assert.equal(hash,reply.scopeHash);assert.equal(hash,digest(scope));facade.dispose();
+  }finally{await fs.rm(f.temp,{recursive:true,force:true});}
+});
+
+test('context open refuses source identity drift during an asynchronous host open',async()=>{
+  const f=await cockpitFixture();
+  try {
+    const policy=new ScopePolicy();policy.set(f.grant);
+    const context={organizationId:'local',privacyDomainId:'fixture',projectId:'fixture',repoId:repoId(f.repo),hostId:localHost().hostId,worktreeId:null,revision:null,selectedItemId:f.snapshots[0].key,returnToken:'pm:work:7'};
+    const facade=new CockpitFacade({all:()=>f.snapshots,opts:{historyDays:3},onDidChange:()=>({dispose(){}})},policy,{async open(){f.snapshots[0].repository=f.temp;},async openSource(){}},new IncrementalExporter([f.adapter]));
+    assert.equal((await facade.api.revealContext({requestId:'open:drift',scope:f.grant.scope,context})).state,'DENIED');facade.dispose();
+  }finally{await fs.rm(f.temp,{recursive:true,force:true});}
+});
