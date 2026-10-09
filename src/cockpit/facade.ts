@@ -78,7 +78,7 @@ export class CockpitFacade {
     return this.reply(undefined, ['summary', 'providerConfiguration', 'reveal', 'subscribe', 'incrementalExport', 'registeredContextReceipts', 'acceptedWork', 'assets', 'getScopes','getObservation','getEventPage','revealContext','prepareReply','getResourceObservations'].map(name => ({ name, version: 1, state: 'OK' as const })), 'OK', ['Scopes require explicit local review; no caller-created grants.','prepareReply provides manual-copy fallback; native send and provider permissions are not owned by Agent.']);
   }
   private sessions(g: LocalGrant): AgentSessionSnapshot[] { return this.policy.sessions(g, this.store.all()); }
-  /** Only host file-picker selections may enroll resources; paths never come from API request JSON. */
+  /** Only explicit host file/PID selections enroll resources; targets never come from API request JSON. */
   registerResources(g:LocalGrant,items:SelectedResource[]):void {
     if(!this.policy.authorize({requestId:'register-resource',scope:g.scope}))throw new Error('Scope unavailable.');
     validateResources(g,items);this.selectedResources.set(g.scope.policyHash,structuredClone(items));

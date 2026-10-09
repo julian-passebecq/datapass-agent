@@ -1,6 +1,6 @@
 # FULL Agent observation additions
 
-Source contract: COCKPIT-NATIVE-20261009-FULL, Agent AO-001..012 and 17 inherited Agent clauses. Existing Agent API, screens, commands, readers, exports and Lens links remain available. The candidate is 0.10.1; cockpitV1 remains major 1 and negotiates additive methods through capabilities().
+Source contract: COCKPIT-NATIVE-20261009-FULL, Agent AO-001..012 and 17 inherited Agent clauses. Existing Agent API, screens, commands, readers, exports and Lens links remain available. The candidate is 0.10.2; cockpitV1 remains major 1 and negotiates additive methods through capabilities().
 
 ## Shared configuration collection
 
@@ -16,7 +16,7 @@ All requests carry the host-reviewed Scope, requestId, optional epoch and genera
 - `getEventPage({...request, afterSequence})`: per-scope retained event sequence (256 events), bounded pages, oldest sequence, gap indication and epoch. Duplicate or unrelated-session refreshes do not advance a scope's sequence. A gap/reset requires a fresh observation; subscriptions coalesce and emit RESYNC_REQUIRED under backpressure. Disposal/revocation stops delivery.
 - `revealContext({...request, context})`: validates organization/privacy/project/repo/host/worktree/revision/selected native session and opaque return token. Unmapped context is denied. Full session detail stays inside the same bounded panel; Back to Compact preserves selection. Return to PM invokes only the negotiated literal `datapassPm.returnFromAgent` with the original request/token/generation/scope/epoch after source and grant rechecks. Missing PM support falls back to token copying. A return token is data, never an executable command or fictional native URI.
 - `prepareReply({...request, sessionId, questionId, text})`: pending observed ordinary input only. Returns a sanitized manual-copy draft, sent=false. Security/permission requests are denied. No verified native send transport is available; Agent does not emulate it.
-- `getResourceObservations(request)`: only exact diagnostic files selected locally in Agent. Reads metadata, distinguishes disabled/stale/absent/blocked, and leaves causality UNKNOWN. It never executes or repairs scripts/watchers/tasks or kills processes.
+- `getResourceObservations(request)`: only exact diagnostic files or PIDs selected locally in Agent. File metadata distinguishes disabled/stale/absent/blocked; enabled status explicitly identifies a host-reviewed assertion. Selected PID reads return process existence plus available name/parent/start time, excluding arguments/environment/executable paths. Windows uses one local CIM PID query; other hosts expose PID existence only with unavailable metadata null. Birth-time mismatch refuses PID reuse. A long-running process is never labelled stale merely from its age. Source and capture timestamps support comparison; causality remains UNKNOWN. No scripts/watchers/tasks are executed or repaired, and observed processes are never killed.
 
 ## Export and evidence
 

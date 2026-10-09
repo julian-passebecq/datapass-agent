@@ -55,6 +55,18 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
     return pick && policy.authorize({ requestId: 'local-picker', scope: pick.scope });
   };
   ctx.subscriptions.push(facade, { dispose: () => { panels.forEach(p => p.dispose()); panels.clear(); } },
+    vscode.commands.registerCommand('agent.inspectSelectedProcess',async()=>{
+      const g=await chooseScope();if(!g)return;
+      const epoch=policy.epoch;
+      const input=await vscode.window.showInputBox({title:'Inspect one reviewed local process ID',placeHolder:'PID only; arguments and environment are excluded',validateInput:value=>/^[1-9][0-9]{0,9}$/.test(value) && Number(value)<=2147483647?undefined:'Enter one positive process ID.'});if(!input)return;
+      if(!policy.authorize({requestId:'local-process-select',scope:g.scope,epoch}))return;
+      const pid=Number(input),id='process:'+pid;
+      facade.registerResources(g,[{id,kind:'PROCESS',pid,expectedStartedAt:null}]);
+      const reply=await facade.api.getResourceObservations({requestId:'local-process-read',scope:g.scope,epoch});
+      const observed=reply.data.find(item=>item.id===id);
+      if(observed?.state==='OBSERVED' && observed.process?.startedAt)facade.registerResources(g,[{id,kind:'PROCESS',pid,expectedStartedAt:observed.process.startedAt}]);
+      await vscode.window.showTextDocument(await vscode.workspace.openTextDocument({language:'json',content:JSON.stringify(reply,null,2)}),{preview:true});
+    }),
     vscode.commands.registerCommand('agent.inspectSelectedResources',async()=>{
       const g=await chooseScope();if(!g)return;
       const files=await vscode.window.showOpenDialog({title:'Select exact diagnostic files (metadata only; no execution)',canSelectMany:true});if(!files?.length)return;
