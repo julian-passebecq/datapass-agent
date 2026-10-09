@@ -119,11 +119,15 @@ export interface AgentSessionSnapshot {
   artifactPath: string;
   /** Size of the provider artifact when last read (bytes). */
   artifactBytes?: number;
+  nativeProcess?: { alive: boolean | null; openTurn: boolean | null; explicitEnded: boolean | null; oneShotDone: boolean | null };
   diagnostics: string[];
 }
 
 /** Per-session detail extracted from transcripts / rollouts. All OBSERVED unless noted. */
 export interface SessionFacts {
+  nativeGoal?: {requested:string|null;observed:string|null;nativeThreadId:string|null;source:string;at:number|null};
+  nativeInputs?: NativeInput[];
+  requestedTrace?: { model: string | null; effort: string | null; inheritance: string | null; goal: string | null; source: string; at: number | null }[];
   /** Tool name → calls (e.g. Bash, Edit, Read, Task, exec_command, apply_patch, web_search). */
   toolCounts?: Record<string, number>;
   /** Tool calls whose result the provider flagged as error. */
@@ -188,6 +192,13 @@ export interface SessionFacts {
 }
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed';
+export interface NativeInput {
+  id: string; questionIds: string[]; at: number | null;
+  requestClass: 'ORDINARY_INPUT' | 'SECURITY_PERMISSION' | 'UNKNOWN';
+  questions: { id: string|null; text: string; options: string[] }[];
+  state: 'REQUESTED' | 'ANSWER_RECEIVED' | 'CANCELLED';
+  answer: string | null; answeredAt: number | null; source: string;
+}
 export interface TodoList {
   /** When the list was last written (epoch ms). */
   at: number;

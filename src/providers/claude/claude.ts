@@ -405,6 +405,7 @@ export class ClaudeAdapter implements ProviderAdapter {
       }
       if (c?.type !== 'tool_result' || typeof c.tool_use_id !== 'string') continue;
       acc.toolEnd(c.tool_use_id, c.is_error === true);
+      acc.nativeAnswer(c.tool_use_id, c.content, at, c.is_error === true);
       acc.toolResult(c.tool_use_id, resultChars(c.content), at);
       const r = o.toolUseResult && typeof o.toolUseResult === 'object' ? o.toolUseResult : undefined;
       const t = this.pendingTests.get(c.tool_use_id);
@@ -507,6 +508,8 @@ export class ClaudeAdapter implements ProviderAdapter {
       acc.counts.tools++;
       const id = typeof c.id === 'string' ? c.id : undefined;
       const input = c.input ?? {};
+      if (c.name === 'AskUserQuestion' || /permission_request|approval_request/.test(c.name)) acc.nativeRequest(id, input, c.name, at);
+      if (c.name === 'Task' || c.name === 'Agent') acc.nativeTrace({ model: input.model, effort: input.effort, inheritance: input.model === undefined ? 'DEFAULT_REQUESTED_NOT_OBSERVED' : 'EXPLICIT_REQUEST', source: c.name + ' arguments; child observation separate' }, at);
       acc.toolStart(bounded(c.name, 60), toolDetail(c.name, input), at, id);
       if (c.name.startsWith('mcp__')) acc.mcp(bounded(c.name.split('__')[1] || 'mcp', 60));
       else if (c.name === 'WebFetch' || c.name === 'WebSearch') acc.bump('web');

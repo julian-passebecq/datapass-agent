@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "rootDir": "src", "outDir": ".provider-kit/types", "declaration": true, "emitDeclarationOnly": true },
+  "include": ["src/provider-kit/index.ts"]
+}

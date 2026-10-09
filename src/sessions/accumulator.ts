@@ -41,6 +41,10 @@ export class SessionAccumulator {
   lastAction?: string;
   lastActionAt?: number;
   private lastUsage?: { id: string; total: number; out: number; cached: number; extra: CallUsageExtra };
+  private nativeInputs: NonNullable<SessionFacts['nativeInputs']> = [];
+  private requestedTrace: NonNullable<SessionFacts['requestedTrace']> = [];
+  private nativeGoal?:SessionFacts['nativeGoal'];
+  private goalCalls=new Set<string>();
   malformed = 0;
   seenIds = new Set<string>();
   /** Long-lived one-shot markers (e.g. "start", "meta"); never trimmed. */
@@ -62,6 +66,45 @@ export class SessionAccumulator {
     if (this.startedAt === undefined || at < this.startedAt) this.startedAt = at;
     if (this.lastActivityAt === undefined || at > this.lastActivityAt) this.lastActivityAt = at;
     this.tick(at);
+  }
+
+  /** Inert native request observation; transport and security remain provider-owned. */
+  nativeRequest(id: string | undefined, input: unknown, source: string, at?: number): void {
+    if (!id || id.length > 160 || this.nativeInputs.some(q => q.id === id)) return;
+    const value = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+    const ordinary = /(?:^|[._])request_user_input(?:_async)?$|^AskUserQuestion$/.test(source);
+    const security = /permission|approval|security/i.test(source) || value.requestClass === 'SECURITY_PERMISSION';
+    const questions = (Array.isArray(value.questions) ? value.questions : []).slice(0, 3).map(q => {
+      const v = q && typeof q === 'object' ? q as Record<string, unknown> : {};
+      return { id: typeof v.id==='string' && /^[a-zA-Z0-9._:/-]{1,160}$/.test(v.id)?v.id:null, text: bounded(v.question ?? v.title, 1000), options: (Array.isArray(v.options) ? v.options : []).slice(0, 10).map(o => bounded(typeof o === 'string' ? o : o?.label, 120)) };
+    });
+    this.nativeInputs.push({ id: bounded(id, 160), questionIds: questions.map(q => q.id).filter((value):value is string=>value!==null), at: at ?? null, requestClass: security ? 'SECURITY_PERMISSION' : ordinary ? 'ORDINARY_INPUT' : 'UNKNOWN', questions, state: 'REQUESTED', answer: null, answeredAt: null, source: bounded(source, 100) });
+    this.nativeInputs = this.nativeInputs.slice(-50); this.fx.v++;
+    this.ev('facts.nativeInputs', 'OBSERVED', 'bounded native request metadata and matching result');
+  }
+  nativeAnswer(id: string, result: unknown, at?: number, cancelled = false): void {
+    const request = this.nativeInputs.find(q => q.id === id);
+    if (!request) return;
+    request.state = cancelled ? 'CANCELLED' : 'ANSWER_RECEIVED'; request.answeredAt = at ?? null;
+    request.answer = request.requestClass === 'ORDINARY_INPUT' ? bounded(typeof result === 'string' ? result : JSON.stringify(result), 2000) : null;
+    this.fx.v++;
+  }
+  nativeTrace(input: { model?: unknown; effort?: unknown; inheritance?: unknown; goal?: unknown; source: string }, at?: number): void {
+    const trace = { model: bounded(input.model, 80) || null, effort: bounded(input.effort, 30) || null, inheritance: bounded(input.inheritance, 40) || null, goal: bounded(input.goal, 40) || null, source: bounded(input.source, 100), at: at ?? null };
+    if (JSON.stringify(this.requestedTrace.at(-1)) === JSON.stringify(trace)) return;
+    this.requestedTrace.push(trace); this.requestedTrace = this.requestedTrace.slice(-50); this.fx.v++;
+  }
+  nativeGoalRequest(id:string|undefined,name:string,status:unknown,at?:number):void {
+    if(!id || id.length>160)return;
+    this.goalCalls.add(id);if(this.goalCalls.size>50)this.goalCalls.delete(this.goalCalls.values().next().value!);
+    this.nativeGoal={requested:name==='create_goal'?'active':typeof status==='string'?bounded(status,30):null,observed:null,nativeThreadId:null,source:'native '+name+' request; execution not yet observed',at:at ?? null};this.fx.v++;
+  }
+  nativeGoalResult(id:string,value:unknown,at?:number):void {
+    if(!this.goalCalls.has(id))return;this.goalCalls.delete(id);
+    let output:any=value;if(typeof value==='string'){if(value.length>65536)return;try{output=JSON.parse(value);}catch{return;}}
+    const goal=output?.goal;
+    if(!goal || !['active','paused','blocked','complete','budget_limit','usage_limit'].includes(goal.status))return;
+    this.nativeGoal={requested:this.nativeGoal?.requested ?? null,observed:goal.status,nativeThreadId:typeof goal.threadId==='string' && /^[a-zA-Z0-9._:/-]{1,160}$/.test(goal.threadId)?goal.threadId:null,source:'recorded native Goal tool result; not inferred from Plan or prompt',at:at ?? null};this.fx.v++;
   }
 
   event(at: number | undefined, type: EventType, label: string, kind: EvidenceKind = 'OBSERVED', dedupeId?: string): void {
@@ -398,6 +441,9 @@ export class SessionAccumulator {
     for (const p of fx.pending.values()) if (!current || p.startedAt >= current.startedAt) current = p;
     const cwd = this.cwd;
     const facts: SessionFacts = {
+      nativeGoal:this.nativeGoal ? {...this.nativeGoal}:undefined,
+      nativeInputs: this.nativeInputs.length ? structuredClone(this.nativeInputs) : undefined,
+      requestedTrace: this.requestedTrace.length ? structuredClone(this.requestedTrace) : undefined,
       toolCounts: rec(fx.toolCounts),
       toolErrors: fx.toolCounts.size || fx.toolErrors ? fx.toolErrors : undefined,
       currentTool: current && { ...current },
@@ -470,6 +516,7 @@ export class SessionAccumulator {
       artifactPath: this.artifactPath,
       artifactBytes: this.cursor?.size,
       diagnostics: [...this.diagnostics, ...(this.malformed ? [`${this.malformed} malformed/oversize line(s) skipped`] : [])],
+      nativeProcess: { alive: this.live.registryAlive ?? null, openTurn: this.live.openTurn ?? null, explicitEnded: this.live.explicitEnded ?? null, oneShotDone: this.live.oneShotDone ?? null },
     };
   }
 

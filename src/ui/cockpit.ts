@@ -3,12 +3,13 @@ import * as fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import type { SessionStore } from '../sessions/store';
 import { CockpitFacade, ScopedInputs } from '../cockpit/facade';
-import { digest, idOk, LocalGrant, makeGrant, ScopePolicy } from '../cockpit/policy';
+import { digest, idOk, LocalGrant, makeGrant, ScopePolicy, repoId } from '../cockpit/policy';
 import { safeLocalSource } from '../cockpit/configuration';
 import { IncrementalExporter } from '../export/incremental';
 import { WorkspacePanel } from './workspace';
 import type { WebviewMessage } from '../render/html';
 import type { Scope } from '../cockpit/interfaces';
+import type { ImageProducerReceipt } from '../cockpit/images';
 
 export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStore, ternAvailable: () => boolean, onMessage: (m: WebviewMessage) => void, installed: () => import('../extension').AgentApi['installed']): CockpitFacade {
   const policy = new ScopePolicy(), panels = new Set<WorkspacePanel>();
@@ -20,9 +21,19 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
   }
   const facade = new CockpitFacade(store, policy, {
     installed,
-    open: (view, grant, id) => {
-      const read = () => policy.authorize({ requestId: 'panel', scope: grant.scope }) ? policy.sessions(grant, store.all()) : [];
-      const panel = new WorkspacePanel(store, onMessage, ternAvailable, p => { panels.delete(p); p.dispose(); }, read, () => facade.scopedInputs(grant));
+    open: (view, grant, id, context) => {
+      const epoch=policy.epoch;
+      const valid=()=>!!policy.authorize({requestId:'panel',scope:grant.scope,epoch});
+      const read = () => valid() ? policy.sessions(grant, store.all()).filter(s=>!context || repoId(s.repository ?? s.cwd ?? '')===context.repoId) : [];
+      let panel:WorkspacePanel;
+      const scopedMessage=(m:WebviewMessage)=>{
+        if(!valid())return;
+        if(m.type==='open'){panel.open('transcript',m.key);return;}
+        if(m.type==='cmd' && m.cmd==='openWorkspaceNewTab'){panel.open('compact');return;}
+        if(m.type==='cmd' && ['readTranscript','openTimeline','timelineAll','openWorkspace','knowledge'].includes(m.cmd)){panel.open(m.cmd==='readTranscript'?'transcript':m.cmd==='knowledge'?'context-activity':m.cmd==='openWorkspace'?'compact':'activity',m.key || undefined);return;}
+        onMessage(m);
+      };
+      panel = new WorkspacePanel(store, scopedMessage, ternAvailable, p => { panels.delete(p); p.dispose(); }, read, () => ({...(valid()?facade.scopedInputs(grant):{contexts:[],acceptedWork:[],assets:[]}),panelContext:{valid:valid(),context,projectId:grant.scope.projectIds.join(', ')}}));
       panels.add(panel); panel.open(view === 'settings' || view === 'catalog' ? view : 'compact', view === 'session' ? id : undefined, { 'compact-scope': view === 'session' ? 'session' : 'all', 'compact-view': view === 'project' ? 'factory' : 'live' });
     },
     openSource: async file => { await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true }); },
@@ -33,6 +44,22 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
     return pick && policy.authorize({ requestId: 'local-picker', scope: pick.scope });
   };
   ctx.subscriptions.push(facade, { dispose: () => { panels.forEach(p => p.dispose()); panels.clear(); } },
+    vscode.commands.registerCommand('agent.inspectSelectedResources',async()=>{
+      const g=await chooseScope();if(!g)return;
+      const files=await vscode.window.showOpenDialog({title:'Select exact diagnostic files (metadata only; no execution)',canSelectMany:true});if(!files?.length)return;
+      facade.registerResources(g,files.slice(0,50).map(f=>({id:'resource:'+digest(f.fsPath).slice(0,24),file:f.fsPath,kind:/\.lock$/i.test(f.fsPath)?'LOCK':/\.(py|ps1|js|mjs)$/i.test(f.fsPath)?'SCRIPT':'FILE',enabled:null,staleAfterMs:3600000})));
+      const reply=await facade.api.getResourceObservations({requestId:'local-resource-read',scope:g.scope});
+      await vscode.window.showTextDocument(await vscode.workspace.openTextDocument({language:'json',content:JSON.stringify(reply,null,2)}),{preview:true});
+    }),
+    vscode.commands.registerCommand('agent.importImageReceipt',async()=>{
+      const g=await chooseScope();if(!g)return;
+      const receipts=await vscode.window.showOpenDialog({title:'Select reviewed image producer receipt',canSelectMany:false,filters:{JSON:['json']}});if(!receipts?.[0])return;
+      const receiptFile=receipts[0].fsPath;if(!await safeLocalSource(receiptFile) || (await fs.stat(receiptFile)).size>16384)throw new Error('Unsafe or oversized image receipt.');
+      const receipt=JSON.parse(await fs.readFile(receiptFile,'utf8')) as ImageProducerReceipt;
+      const images=await vscode.window.showOpenDialog({title:'Select exact image to verify against this receipt',canSelectMany:false,filters:{Images:['png','jpg','jpeg','gif','webp']}});if(!images?.[0])return;
+      const result=await facade.registerImageReceipt(g,images[0].fsPath,receipt);
+      void vscode.window.showInformationMessage('Agent: image hash verified; producer '+(result.producer ?? 'UNKNOWN')+'; publication not approved.');
+    }),
     vscode.commands.registerCommand('agent.reviewCockpitScope', async () => {
       const sessions = store.all();
       const selected = await vscode.window.showQuickPick(sessions.map(s => ({ label: s.title ?? s.sessionId, description: `${s.provider} · ${s.repository ?? s.cwd ?? 'unassigned'}`, key: s.key })), { title: 'Associate native sessions to a cockpit project', canPickMany: true, placeHolder: 'Select exact sessions; title matches are suggestions only.' });
@@ -69,6 +96,7 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
       if (approved !== 'Export selected plan') return;
       facade.approve(p.hash, g, destinationId);
       const receipt = await facade.api.executeApprovedLocalExport({ ...request, approval: { approvedPlanHash: p.hash, destinationId, scopePolicyHash: g.scope.policyHash } });
+      if(receipt.state==='OK')await vscode.window.showTextDocument(await vscode.workspace.openTextDocument({language:'json',content:JSON.stringify({schema:'datapass.committed-export-handoff/1',scope:g.scope,receipt:receipt.data,destinationId},null,2)}),{preview:true});
       void vscode.window.showInformationMessage(`Agent export: ${receipt.state}${receipt.state === 'OK' ? ' · ' + receipt.data.manifestHash : ''}`);
     }),
     vscode.commands.registerCommand('agent.selectAssetRoot', async () => {

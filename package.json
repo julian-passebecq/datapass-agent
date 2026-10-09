@@ -2,7 +2,7 @@
   "name": "agent-vscode",
   "displayName": "DataPass Agent",
   "description": "Local observer for Claude Code and Codex sessions: what is running, where, and what changed.",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "publisher": "juliandatapass",
   "private": true,
   "license": "UNLICENSED",
@@ -191,6 +191,14 @@
       {
         "command": "agent.selectAssetRoot",
         "title": "Agent: Select Asset Root"
+      },
+      {
+        "command": "agent.inspectSelectedResources",
+        "title": "Agent: Inspect Selected Diagnostic Resources"
+      },
+      {
+        "command": "agent.importImageReceipt",
+        "title": "Agent: Import Scoped Image Producer Receipt"
       }
     ],
     "keybindings": [
@@ -653,7 +661,8 @@
     "archive": "npm run compile-tests && node out-test/scripts/archive.js",
     "benchmarks": "npm run compile-tests && node out-test/scripts/benchmarks.js",
     "export:conversations": "node dist/export-conversations.cjs",
-    "export:provider-history": "node dist/export-provider-history.cjs"
+    "export:provider-history": "node dist/export-provider-history.cjs",
+    "build:provider-kit": "tsc -p tsconfig.provider-kit.json && node scripts/build-provider-kit.mjs"
   },
   "devDependencies": {
     "@galaxy/dev-context": "file:vendor/galaxy-dev-context-0.1.0.tgz",

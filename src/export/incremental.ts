@@ -115,7 +115,8 @@ export class IncrementalExporter {
     this.plans.set(hash, plan); return this.publicPlan(plan);
   }
   private publicPlan(p: Plan): ExportPlan { const { sources: _sources, scopeHash: _scopeHash, destination: _destination, ...publicPlan } = p; return publicPlan; }
-  async execute(grant: LocalGrant, planHash: string, destination: string, signal?: AbortSignal): Promise<ExportReceipt> {
+  async execute(grant: LocalGrant, planHash: string, destination: string, signal?: AbortSignal, stillAuthorized:()=>boolean=()=>true): Promise<ExportReceipt> {
+    const check=()=>{checkAbort(signal);if(!stillAuthorized())throw new Error('Scope revoked; cursor unchanged.');};
     const p = this.plans.get(planHash);
     if (!p || !grant.exportConsent || p.scopeHash !== grant.scope.policyHash) throw new Error('Approved plan is absent or scope changed.');
     await plainDirectory(path.resolve(destination));
@@ -125,7 +126,7 @@ export class IncrementalExporter {
     const lock = path.join(out, '.export-lock'); await fs.mkdir(lock).catch(() => { throw new Error('Another export owns the destination; do not steal its lock.'); });
     const stage = path.join(out, '.stage-' + randomUUID());
     try {
-      checkAbort(signal);
+      check();
       const manifests = await this.manifests(out), committed = manifests.find(m => m.planHash === p.hash);
       if (committed) {
         for (const a of committed.artifacts) {
@@ -140,11 +141,11 @@ export class IncrementalExporter {
       await fs.mkdir(stage); await fs.mkdir(path.join(out, 'objects'), { recursive: true }); await fs.mkdir(path.join(out, 'commits'), { recursive: true });
       const artifacts: Manifest['artifacts'] = [];
       for (const c of p.sources.filter(c => c.kind !== 'unchanged')) {
-        checkAbort(signal); await guardSource(c.root, c.file);
+        check(); await guardSource(c.root, c.file);
         if (await hashPrefix(c.file, c.bytes) !== c.prefixHash) throw new Error('Source changed after preview.');
         const records: string[] = []; let bytes = 0;
         for await (const row of jsonLines(c.file, c.bytes)) {
-          checkAbort(signal); if (row.invalid) throw new Error('Malformed stable record; cursor unchanged.');
+          check(); if (row.invalid) throw new Error('Malformed stable record; cursor unchanged.');
           const event = sharedDialogue(row.value); if (!event) continue;
           const line = JSON.stringify({ sourceId: c.sourceId, nativeLine: row.line, event }) + '\n';
           bytes += Buffer.byteLength(line); if (bytes > 64 * 1024 * 1024) throw new Error('Shared pack bound exceeded.'); records.push(line);
@@ -158,12 +159,12 @@ export class IncrementalExporter {
         try { await fs.link(staged, target); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'EEXIST' || (await fs.lstat(target)).isSymbolicLink() || textHash(await fs.readFile(target, 'utf8')) !== hash) throw e; }
         artifacts.push({ file, hash, records: records.length });
       }
-      checkAbort(signal);
+      check();
       const manifest: Manifest = { schema: 'datapass.incremental-history/1', planHash: p.hash, committedAt: new Date().toISOString(), scopeHash: p.scopeHash, cursors: p.sources.map(({ id, sourceId, identity, bytes, prefixHash }) => ({ id, sourceId, identity, bytes, prefixHash })), artifacts, projection: 'selected-full-session-resnapshot' };
       const hash = digest(manifest), temp = path.join(stage, hash + '.json');
       await fs.writeFile(temp, JSON.stringify(manifest), { flag: 'wx', mode: 0o600 });
       // The immutable manifest is the cursor commit. Recovery derives cursors only from committed manifests.
-      checkAbort(signal); await fs.rename(temp, path.join(out, 'commits', hash + '.json'));
+      check(); await fs.rename(temp, path.join(out, 'commits', hash + '.json'));
       return this.receipt(manifest);
     } finally { await fs.rm(stage, { recursive: true, force: true }); await fs.rmdir(lock); }
   }
@@ -172,4 +173,12 @@ export class IncrementalExporter {
     this.receipts.set(receipt.id, { scopeHash: m.scopeHash, receipt }); return structuredClone(receipt);
   }
   getReceipt(grant: LocalGrant, id: string): ExportReceipt | undefined { const r = this.receipts.get(id); return r?.scopeHash === grant.scope.policyHash ? structuredClone(r.receipt) : undefined; }
+  async recoverReceipt(grant:LocalGrant,id:string,destination:string):Promise<ExportReceipt|undefined> {
+    if(!/^receipt:[a-f0-9]{64}$/.test(id))return undefined;
+    const out=await resolveDestination(path.resolve(destination));
+    const manifest=(await this.manifests(out)).find(m=>'receipt:'+digest(m)===id && m.scopeHash===grant.scope.policyHash);
+    if(!manifest)return undefined;
+    for(const artifact of manifest.artifacts){const file=path.join(out,artifact.file);await plainDirectory(file);const st=await fs.stat(file);if(await hashPrefix(file,st.size)!==artifact.hash)throw new Error('Committed receipt artifact drift.');}
+    return this.receipt(manifest);
+  }
 }

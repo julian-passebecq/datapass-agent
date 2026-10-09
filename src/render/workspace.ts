@@ -1,5 +1,5 @@
 import {controlMap} from './controlMap';
-import { compactSessions } from './extra/compact';
+import { compactSessions, renderContextBridge } from './extra/compact';
 // Agent Workspace: one editor panel with a navigation rail, a main surface and a selection pane.
 // Pure string rendering from snapshots; every value is escaped here.
 import { AgentSessionSnapshot, ProviderState, SourceState, TimelineEvent } from '../model';
@@ -760,7 +760,7 @@ export function renderWorkspace(d0: WsData, st0: WsState): string {
   const body = bodies(d, st);
   if (!body[st.view]) st = { ...st, view: 'overview' };
   const keys = `<div class="keys"><b>1–0</b> screens with a number in the rail <b>Tab</b> / <b>j/k</b> move <b>Space</b> select <b>Enter</b> inspect <b>/</b> filter <b>g</b> go to screen <b>Esc</b> clear <b>r</b> refresh <b>?</b> keys</div>`;
-  const main = `<main class="mainw"><header class="mh"><h1>${esc(label(st.view))}</h1>${st.opts?.scope ? `<button class="link scope" data-opt="scope" data-val="" title="Clear scope">scope: ${esc(st.opts.scope)} ✕</button>` : ""}<span class="muted hint" title="${esc(hint(st.view))}">${esc(hint(st.view))}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${body[st.view]()}${keys}${statusStrip(d)}</main>`;
+  const main = `<main class="mainw"><header class="mh"><h1>${esc(label(st.view))}</h1>${st.opts?.scope ? `<button class="link scope" data-opt="scope" data-val="" title="Clear scope">scope: ${esc(st.opts.scope)} ✕</button>` : ""}<span class="muted hint" title="${esc(hint(st.view))}">${esc(hint(st.view))}</span><span class="right"><span class="muted">updated ${hhmm(d.now)}</span> <button class="link" data-cmd="refresh">Refresh</button></span></header>${renderContextBridge(d)}${body[st.view]()}${keys}${statusStrip(d)}</main>`;
   const detailData = st.view === 'compact' ? { ...d, sessions: compactSessions(d, st) } : d;
   return `<div class="ws">${rail}${main}<aside class="side">${side(detailData, st.selected)}</aside>${screenPickerSource()}</div>`;
 }

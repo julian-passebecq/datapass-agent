@@ -29,22 +29,29 @@ export function validateRequest(value: unknown): value is Request {
       const a = s[k as keyof Scope]; return Array.isArray(a) && a.length <= 100 && a.every(idOk);
     }) && typeof s.policyHash === 'string' && typeof s.sourceVectorHash === 'string' && /^[a-f0-9]{64}$/.test(s.policyHash) && /^[a-f0-9]{64}$/.test(s.sourceVectorHash) &&
     (r.limit === undefined || Number.isInteger(r.limit) && r.limit > 0 && r.limit <= 500) &&
-    (r.cursor === undefined || /^[0-9]{1,6}$/.test(r.cursor));
+    (r.cursor === undefined || /^[0-9]{1,6}$/.test(r.cursor)) &&
+    (r.epoch === undefined || Number.isSafeInteger(r.epoch) && r.epoch>=0) &&
+    (r.generation === undefined || idOk(r.generation));
 }
 /** Only host-owned grants authorize; request fields never create grants. */
 export class ScopePolicy {
   private grants = new Map<string, LocalGrant>();
-  set(grant: LocalGrant): void { this.grants.set(grant.scope.scopeId, structuredClone(grant)); }
-  clear(): void { this.grants.clear(); }
+  private revision = 0;
+  get epoch(): number { return this.revision; }
+  set(grant: LocalGrant): void { if(!this.grants.has(grant.scope.scopeId) && this.grants.size>=100)throw new Error('Reviewed scope bound exceeded.');this.grants.set(grant.scope.scopeId, structuredClone(grant)); this.revision++; }
+  clear(): void { this.grants.clear(); this.revision++; }
   scopes(): Scope[] { return [...this.grants.values()].map(g => structuredClone(g.scope)); }
   authorize(request: Request): LocalGrant | undefined {
-    if (!validateRequest(request)) return undefined;
+    if (!validateRequest(request) || request.epoch !== undefined && request.epoch !== this.revision || request.generation !== undefined && !idOk(request.generation)) return undefined;
     const g = this.grants.get(request.scope.scopeId);
     // Compare semantic fields, independently of caller object property order.
     const same = g && (Object.keys(g.scope) as (keyof Scope)[]).every(k => JSON.stringify(g.scope[k]) === JSON.stringify(request.scope[k]));
     return same ? structuredClone(g) : undefined;
   }
   sessions(g: LocalGrant, sessions: AgentSessionSnapshot[]): AgentSessionSnapshot[] {
-    const keys = new Set(g.sessionKeys); return sessions.filter(s => keys.has(s.key));
+    const keys = new Set(g.sessionKeys); return sessions.filter(s => {
+      const root=s.repository ?? s.cwd;
+      return keys.has(s.key) && (root?g.scope.repoIds.includes(repoId(root)):g.scope.repoIds.length===0);
+    });
   }
 }

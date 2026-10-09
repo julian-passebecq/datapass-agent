@@ -45,7 +45,8 @@ test('late config answer after grant revocation is denied, and subscriber failur
     const events: string[] = [];
     facade.api.subscribe(r, () => { throw new Error('consumer failed'); });
     const sub = facade.api.subscribe(r, e => { events.push(e.kind); });
-    for (let i = 0; i < 40; i++) changed();
+    // Backpressure must count distinct scoped state changes, not duplicate store notifications.
+    for (let i = 0; i < 40; i++) { f.snapshots[0].diagnostics=['fixture-change-'+i]; changed(); }
     await new Promise(resolve => setTimeout(resolve, 40)); assert.deepEqual(events, ['RESYNC_REQUIRED']);
     sub.dispose(); changed(); await new Promise(resolve => setTimeout(resolve, 40)); assert.equal(events.length, 1);
     const late = facade.api.getProviderConfiguration({ ...r, provider: 'codex' }); policy.clear();

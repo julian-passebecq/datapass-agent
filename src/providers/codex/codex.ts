@@ -387,6 +387,8 @@ export class CodexAdapter implements ProviderAdapter {
     if ((p.type === 'function_call' || p.type === 'custom_tool_call') && typeof p.name === 'string') this.callStart(acc, p, at);
     if ((p.type === 'function_call_output' || p.type === 'custom_tool_call_output') && typeof p.call_id === 'string') {
       acc.toolEnd(p.call_id);
+      acc.nativeAnswer(p.call_id, p.output, at);
+      acc.nativeGoalResult(p.call_id,p.output,at);
       acc.toolResult(p.call_id, outputChars(p.output), at);
     }
     if (p.type === 'function_call' && typeof p.name === 'string') {
@@ -427,6 +429,10 @@ export class CodexAdapter implements ProviderAdapter {
     } else {
       const args = typeof p.arguments === 'string' ? safeParse(p.arguments.length > 64 * 1024 ? '' : p.arguments) : p.arguments;
       if (args && typeof args === 'object') {
+        if (/request_user_input|permission_request|approval_request/.test(p.name)) acc.nativeRequest(id, args, p.name, at);
+        if (p.name === 'spawn_agent') acc.nativeTrace({ model: args.model, effort: args.reasoning_effort, inheritance: args.model === undefined ? 'DEFAULT_REQUESTED_NOT_OBSERVED' : 'EXPLICIT_REQUEST', source: 'spawn_agent arguments; child observation separate' }, at);
+        if (p.name === 'create_goal' || p.name === 'update_goal') acc.nativeTrace({ goal: p.name === 'create_goal' ? 'CREATE_REQUESTED' : args.status, source: p.name + ' arguments; execution not attested' }, at);
+        if (['create_goal','update_goal','get_goal'].includes(p.name)) acc.nativeGoalRequest(id,p.name,args.status,at);
         const cmd = args.cmd ?? args.command;
         if (cmd !== undefined) detail = bounded(commandLabel(commandText(cmd)), 80);
         else if (typeof args.task_name === 'string') detail = bounded(args.task_name, 80);
