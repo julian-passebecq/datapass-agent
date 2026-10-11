@@ -72,6 +72,8 @@ if(pmFixture){
 const workspace = pmFixture?.repository ?? root;
 // Synthetic home (--fixture-home): rebuilt before each launch so its newest record is always a minute old.
 const homeDir = fixtureHome ? fs.mkdtempSync(path.join(os.tmpdir(), 'agent-smoke-home-')) : undefined;
+const createdHome=homeDir?{path:path.resolve(homeDir),parent:path.resolve(os.tmpdir()),role:'GENERATED_DIRECT_TEMP_CHILD'}:undefined;
+result.createdFixtureHome=createdHome;
 const homeEnv = () => (homeDir ? { ...process.env, ...buildFixtureHome(homeDir, { cwd: workspace }) } : undefined);
 if(pmFixture)pmFixture.homeDir=homeDir;
 if (homeDir) console.log(`Fixture home: ${homeDir}`);
@@ -436,6 +438,6 @@ result.fixtureHome = !!homeDir;
 result.fixtureCleanup={state:result.pmAgent?.shutdownAllowed===false?'RETAINED_ACTIVE_HOST_DRAFT_GUARD':'PENDING',homeRemoved:false};
 result.passed = result.checks.every(c => c.ok) && result.errors.length === 0;
 fs.writeFileSync(path.join(shots, '..', 'smoke-result.json'), JSON.stringify(result, null, 2));
-if(homeDir&&result.pmAgent?.shutdownAllowed!==false){try{fs.rmSync(homeDir,{recursive:true,force:true,maxRetries:3});result.fixtureCleanup={state:'REMOVED_AFTER_HOST_CLOSE',homeRemoved:true};}catch(error){result.errors.push('Owned fixture home cleanup failed: '+String(error.message).slice(0,300));result.fixtureCleanup={state:'CLEANUP_FAILED_RETAINED',homeRemoved:false};result.passed=false;}fs.writeFileSync(path.join(shots,'..','smoke-result.json'),JSON.stringify(result,null,2));}
+if(homeDir&&result.pmAgent?.shutdownAllowed!==false){try{const target=path.resolve(homeDir),parent=path.resolve(os.tmpdir());if(!createdHome||target!==createdHome.path||parent!==createdHome.parent||path.dirname(target)!==parent||!/^agent-smoke-home-[A-Za-z0-9]{6}$/.test(path.basename(target)))throw Error('Recursive cleanup target differs from the generated direct-child home receipt.');fs.rmSync(target,{recursive:true,force:true,maxRetries:3});result.fixtureCleanup={state:'REMOVED_AFTER_HOST_CLOSE',homeRemoved:true};}catch(error){result.errors.push('Owned fixture home cleanup failed: '+String(error.message).slice(0,300));result.fixtureCleanup={state:'CLEANUP_FAILED_RETAINED',homeRemoved:false};result.passed=false;}fs.writeFileSync(path.join(shots,'..','smoke-result.json'),JSON.stringify(result,null,2));}
 console.log(result.passed ? 'SMOKE PASS' : 'SMOKE FAIL');
 process.exit(result.passed ? 0 : 1);
