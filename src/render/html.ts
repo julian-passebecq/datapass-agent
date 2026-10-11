@@ -55,7 +55,7 @@ th { font-weight: 600; color: var(--vscode-descriptionForeground); font-size: 11
 .nav { display: flex; justify-content: space-between; align-items: center; text-align: left; background: none; border: none; color: var(--vscode-foreground); padding: 5px 8px; border-radius: 4px; cursor: pointer; font: inherit; }
 .nav:hover { background: var(--vscode-list-hoverBackground); } .nav.on { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
 .nb { font-size: 11px; min-width: 16px; text-align: center; border-radius: 8px; padding: 0 5px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); } .nb.hot { background: color-mix(in srgb, var(--bad) 30%, transparent); color: var(--vscode-foreground); box-shadow: inset 0 0 0 1px var(--bad); }
-.rail { overflow-y: auto; } .rg { display: flex; flex-direction: column; gap: 1px; margin-bottom: 4px; }
+.rail { overflow-y: auto; min-width: 0; max-width: 100%; box-sizing: border-box; } .rg { display: flex; flex-direction: column; gap: 1px; margin-bottom: 4px; }
 .rail .railg { display: flex; align-items: center; gap: 4px; width: 100%; background: none; border: none; cursor: pointer; font: inherit; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--vscode-descriptionForeground); margin: 6px 0 2px; padding: 2px 4px; border-radius: 3px; }
 .rail .railg:hover { background: var(--vscode-list-hoverBackground); } .rail .chev { width: 10px; } .rail .rgc { margin-left: auto; font-size: 11px; }
 .nav .dk { font: inherit; font-size: 11px; min-width: 10px; text-align: center; color: var(--vscode-descriptionForeground); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; } .nav > .nb, .nav > .dk { margin-left: auto; } .nav > .nb + .dk { margin-left: 4px; }
@@ -196,6 +196,8 @@ const SCRIPT = `
 const vscode = acquireVsCodeApi();
 const root = document.getElementById('root');
 const q = document.getElementById('q');
+const initialState = document.getElementById('agent-state');
+if (initialState) { try { vscode.setState(JSON.parse(initialState.textContent)); } catch {} }
 const DIGITS = ${JSON.stringify(DIGIT_VIEWS)};
 // Minified builds rename functions: bind the helper by value, not by its declared name.
 const loadNote = ${loadNote.toString()};
@@ -220,6 +222,8 @@ setInterval(tickLoading, 1000);
 // Rows and clickable non-buttons become reachable with Tab; the filter box sits in the screen header.
 function decorate() {
   for (const el of root.querySelectorAll('[data-select]:not([tabindex]), [data-opt]:not(button):not(select):not([tabindex]), [data-act]:not(button):not([tabindex])')) el.setAttribute('tabindex', '0');
+  const activeNav = root.querySelector('.rail .nav.on');
+  if (activeNav) activeNav.scrollIntoView({block:'nearest',inline:'nearest'});
   if (!q) return;
   const mh = root.querySelector('.mh');
   if (mh) { if (q.parentNode !== mh) mh.insertBefore(q, mh.querySelector(':scope > .right')); }
@@ -233,6 +237,7 @@ window.addEventListener('message', e => {
     const fk = a && a !== q && root.contains(a) && a.dataset ? a.dataset.select : undefined;
     const qf = !!q && a === q, qs = q ? [q.selectionStart, q.selectionEnd] : [];
     root.innerHTML = m.html;
+    if (m.state) vscode.setState(m.state);
     if (m.top) window.scrollTo(0, 0);
     decorate();
     applyFilter();
@@ -323,7 +328,7 @@ document.addEventListener('keydown', e => {
   if (gp && gp.el.contains(e.target)) return;
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'k' || e.key === 'K')) { gpOpen(); e.preventDefault(); return; }
   if (e.target === q) { if (e.key === 'Escape') { q.value = ''; applyFilter(); q.blur(); } return; }
-  if (e.ctrlKey || e.metaKey || e.altKey || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  if (!document.hasFocus() || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input,select,textarea,[contenteditable="true"],[role="textbox"]')) return;
   if (/^[0-9]$/.test(e.key)) {
     const v = DIGITS[e.key === '0' ? 9 : +e.key - 1];
     const b = v && root.querySelector('[data-nav="' + v + '"].nav');
@@ -388,9 +393,10 @@ document.addEventListener('change', e => { const el = e.target; if (el && el.tag
 document.addEventListener('dblclick', e => { const el = e.target.closest('[data-select]'); if (el) vscode.postMessage({ type: 'open', key: el.dataset.select }); });
 `;
 
-export function page(cspSource: string, body: string, opts: { filter?: boolean; css?: string } = {}): string {
+export function page(cspSource: string, body: string, opts: { filter?: boolean; css?: string; state?:unknown } = {}): string {
   const n = nonce();
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp(cspSource, n)}"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${STYLE}${opts.css ?? ''}</style></head><body>${opts.filter ? '<input id="q" class="q" type="search" placeholder="Filter sessions  ( / )" aria-label="Filter sessions">' : ''}<div id="root">${body}</div><script nonce="${n}">${SCRIPT}</script></body></html>`;
+  const state = opts.state ? `<script id="agent-state" type="application/json" nonce="${n}">${JSON.stringify(opts.state).replace(/</g,'\\u003c')}</script>` : '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp(cspSource, n)}"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${STYLE}${opts.css ?? ''}</style></head><body>${opts.filter ? '<input id="q" class="q" type="search" placeholder="Filter sessions  ( / )" aria-label="Filter sessions">' : ''}${state}<div id="root">${body}</div><script nonce="${n}">${SCRIPT}</script></body></html>`;
 }
 
 /** Kept in sync with WS_VIEWS (render/workspace.ts); duplicated so validation has no UI dependency. */
@@ -406,9 +412,9 @@ export type WebviewMessage =
   | { type: 'nav'; view: string; key: string }
   | { type: 'opt'; name: string; value: string; key: string }
   | { type: 'act'; name: string; arg: string; key: '' }
-  | { type: 'cmd'; cmd: 'refresh' | 'timelineAll' | 'revealWorktree' | 'copySessionId' | 'openTimeline' | 'openInTern' | 'openArtifactFolder' | 'openWorkspace' | 'openWorkspaceNewTab' | 'readTranscript' | 'knowledge' | 'exportConversations' | 'returnToPm' | 'copyReturnToken'; key: string };
+  | { type: 'cmd'; cmd: 'refresh' | 'timelineAll' | 'revealWorktree' | 'copySessionId' | 'openTimeline' | 'openInTern' | 'openArtifactFolder' | 'openWorkspace' | 'openWorkspaceNewTab' | 'readTranscript' | 'knowledge' | 'exportConversations' | 'returnToPm' | 'copyReturnToken' | 'reviewCockpitScope' | 'openScopedLens'; key: string };
 
-const CMDS = new Set(['refresh', 'timelineAll', 'revealWorktree', 'copySessionId', 'openTimeline', 'openInTern', 'openArtifactFolder', 'openWorkspace', 'openWorkspaceNewTab', 'readTranscript', 'knowledge', 'exportConversations', 'returnToPm', 'copyReturnToken']);
+const CMDS = new Set(['refresh', 'timelineAll', 'revealWorktree', 'copySessionId', 'openTimeline', 'openInTern', 'openArtifactFolder', 'openWorkspace', 'openWorkspaceNewTab', 'readTranscript', 'knowledge', 'exportConversations', 'returnToPm', 'copyReturnToken', 'reviewCockpitScope', 'openScopedLens']);
 
 /** Strict validation of anything a webview posts back. Unknown shapes are dropped. */
 export function validateMessage(m: unknown, knownKey: (k: string) => boolean): WebviewMessage | undefined {

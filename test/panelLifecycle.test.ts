@@ -1,0 +1,45 @@
+import { test } from 'node:test';
+import * as assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { createRequire } from 'node:module';
+import * as ts from 'typescript';
+import { workspaceMetadata } from '../src/cockpit/workspaceState';
+import { allViews } from '../src/render/workspace';
+
+test('serializer adopts existing public panel, restores selected screen, persists metadata and denies stale source actions',()=>{
+  const callbacks:{message?:(m:unknown)=>void;dispose?:()=>void}={};
+  const received:unknown[]=[];let created=0;
+  const panel={visible:true,active:true,title:'Agent',iconPath:undefined as unknown,webview:{options:{},cspSource:'self',html:'',onDidReceiveMessage(fn:(m:unknown)=>void){callbacks.message=fn;},postMessage(m:unknown){received.push(m);return Promise.resolve(true);}},onDidChangeViewState(){},onDidDispose(fn:()=>void){callbacks.dispose=fn;},reveal(){},dispose(){}};
+  const vscode={ThemeIcon:class{},ViewColumn:{Active:1},window:{createWebviewPanel(){created++;return panel;}},workspace:{isTrusted:false,getConfiguration(){return {get(_k:string,f:unknown){return f;}};}}};
+  const source=fs.readFileSync(path.resolve(__dirname,'../../src/ui/workspace.ts'),'utf8');
+  const compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+  const localRequire=createRequire(path.resolve(__dirname,'../src/ui/workspace.js'));
+  const module={exports:{} as {WorkspacePanel:new(...args:any[])=>any}};
+  const pumped:string[]=[];
+  new Function('require','module','exports',compiled)((id:string)=>id==='vscode'?vscode:id==='../render/extra/feeds'?{...localRequire(id),pump(feeds:{id:string}[]){pumped.push(...feeds.map(f=>f.id));}}:localRequire(id),module,module.exports);
+  const store={all:()=>[],onDidChange:()=>({dispose(){}}),version:1,opts:{git:false},providerStates:[],timeline:()=>[],gitProgress:{done:0,total:0}};
+  const calls:unknown[]=[];
+  const p=new module.exports.WorkspacePanel(store,(m:unknown)=>calls.push(m),()=>false);
+  const context={organizationId:'local',privacyDomainId:'fixture',projectId:'fixture',repoId:'repo:fixture',hostId:'host:fixture',worktreeId:null,revision:null,selectedItemId:null,returnToken:'pm:fixture'};
+  p.restore(panel,workspaceMetadata({view:'providers',opts:{scope:'fixture'}},allViews(),true,context));
+  assert.equal(created,0,'adopts serializer panel');assert.match(panel.webview.html,/The extension host restarted/);assert.match(panel.webview.html,/>Sources<\/h1>/);
+  callbacks.message!({type:'cmd',cmd:'openWorkspaceNewTab',key:''});callbacks.message!({type:'cmd',cmd:'returnToPm',key:''});assert.deepEqual(calls,[],'blocked state never escapes into unrestricted panels or uses stale approval');
+  callbacks.message!({type:'cmd',cmd:'reviewCockpitScope',key:''});assert.equal(calls.length,1);
+  callbacks.message!({type:'nav',view:'board',key:''});
+  const update=received.at(-1) as {state:{view:string;context:unknown;scoped:boolean}};assert.equal(update.state.view,'board');assert.deepEqual(update.state.context,context);assert.equal(update.state.scoped,true);
+  p.dispose();
+  const independent=new module.exports.WorkspacePanel(store,()=>{},()=>false);
+  independent.open('providers',undefined,{'catalog.tab':'models','settings.scope':'project'});
+  callbacks.dispose!(); // setState was destroyed by close; the main panel owner retains its safe navigation.
+  independent.open();
+  assert.match(panel.webview.html,/>Sources<\/h1>/);assert.match(panel.webview.html,/"catalog.tab":"models"/);assert.match(panel.webview.html,/"settings.scope":"project"/);
+  assert.equal(created,2,'close/reopen creates only the explicitly requested replacement');independent.dispose();
+  const suspended=new module.exports.WorkspacePanel(store,()=>{},()=>false);
+  suspended.restore(panel,workspaceMetadata({view:'workflows'},allViews(),true,context));
+  assert.match(panel.webview.html,/collectors are suspended/);assert.doesNotMatch(panel.webview.html,/Scanning ~\/\.claude|data-loading=/);
+  suspended.dispose();
+  pumped.length=0;
+  const scoped=new module.exports.WorkspacePanel(store,()=>{},()=>false,undefined,()=>[],()=>({contexts:[],acceptedWork:[],assets:[],panelContext:{valid:true,context,projectId:'fixture'}}),context);
+  scoped.open('workflows');assert.deepEqual(pumped,[],'provider-wide scanner is not pumped by reviewed scoped navigation');assert.match(panel.webview.html,/no scoped provider-wide scan was performed/);assert.doesNotMatch(panel.webview.html,/Scanning ~\/\.claude/);scoped.dispose();
+});

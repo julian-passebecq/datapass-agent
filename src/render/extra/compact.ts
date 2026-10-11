@@ -15,9 +15,9 @@ import { Feed, feedValue } from './feeds';
 const rootOf = (s: AgentSessionSnapshot) => s.repository ?? s.cwd ?? '';
 export function renderContextBridge(d:WsData):string {
   const panel=d.cockpitInputs?.panelContext;if(!panel)return '';
-  if(!panel.valid)return '<p role="alert">Scope changed or revoked. Review Cockpit Scope and reopen this project. No sources are granted by navigation.</p>';
+  if(!panel.valid)return `<p role="alert">${esc(panel.reason ?? 'Scope changed or revoked. Review Cockpit Scope and reopen this project.')} No sources are granted by navigation. <button class="link" data-cmd="reviewCockpitScope">Review Cockpit Scope</button></p>`;
   const c=panel.context;
-  return `<div class="context-bridge"><b>Reviewed project: ${esc(panel.projectId)}</b>${c?` · organization ${esc(c.organizationId)} · repo ${esc(c.repoId)} · revision ${esc(c.revision ?? 'UNKNOWN')} · return ${esc(c.returnToken)} <button class="link" data-cmd="returnToPm">Return to PM</button> <button class="link" data-cmd="copyReturnToken">Copy return token</button>`:''} <button class="link" data-nav="compact"${c?.selectedItemId?` data-key="${esc(c.selectedItemId)}"`:''}>Back to Compact</button></div>`;
+  return `<div class="context-bridge"><b>Reviewed project: ${esc(panel.projectId)}</b>${c?` · organization ${esc(c.organizationId)} · repo ${esc(c.repoId)} · revision ${esc(c.revision ?? 'UNKNOWN')} · return ${esc(c.returnToken)} <button class="link" data-cmd="returnToPm">Return to PM</button> <button class="link" data-cmd="copyReturnToken">Copy return token</button> <button class="link" data-cmd="openScopedLens">Inspect context in Lens</button>`:''} <button class="link" data-nav="compact"${c?.selectedItemId?` data-key="${esc(c.selectedItemId)}"`:''}>Back to Compact</button></div>`;
 }
 const questionId=(s:AgentSessionSnapshot,id:string)=>digest([s.key,id]).slice(0,32);
 export function nativeAttention(sessions:AgentSessionSnapshot[]):string {

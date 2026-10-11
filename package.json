@@ -2,7 +2,7 @@
   "name": "agent-vscode",
   "displayName": "DataPass Agent",
   "description": "Local observer for Claude Code and Codex sessions: what is running, where, and what changed.",
-  "version": "0.10.4",
+  "version": "0.10.5",
   "publisher": "juliandatapass",
   "private": true,
   "license": "UNLICENSED",
@@ -22,7 +22,8 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onWebviewPanel:agent.workspace"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -203,6 +204,46 @@
       {
         "command": "agent.importImageReceipt",
         "title": "Agent: Import Scoped Image Producer Receipt"
+      },
+      {
+        "command": "agent.numberedScreen0",
+        "title": "Agent: Numbered Screen 0"
+      },
+      {
+        "command": "agent.numberedScreen1",
+        "title": "Agent: Numbered Screen 1"
+      },
+      {
+        "command": "agent.numberedScreen2",
+        "title": "Agent: Numbered Screen 2"
+      },
+      {
+        "command": "agent.numberedScreen3",
+        "title": "Agent: Numbered Screen 3"
+      },
+      {
+        "command": "agent.numberedScreen4",
+        "title": "Agent: Numbered Screen 4"
+      },
+      {
+        "command": "agent.numberedScreen5",
+        "title": "Agent: Numbered Screen 5"
+      },
+      {
+        "command": "agent.numberedScreen6",
+        "title": "Agent: Numbered Screen 6"
+      },
+      {
+        "command": "agent.numberedScreen7",
+        "title": "Agent: Numbered Screen 7"
+      },
+      {
+        "command": "agent.numberedScreen8",
+        "title": "Agent: Numbered Screen 8"
+      },
+      {
+        "command": "agent.numberedScreen9",
+        "title": "Agent: Numbered Screen 9"
       }
     ],
     "keybindings": [
@@ -211,6 +252,66 @@
         "key": "ctrl+alt+g",
         "mac": "cmd+alt+g",
         "when": "activeWebviewPanelId == 'agent.workspace'"
+      },
+      {
+        "command": "agent.numberedScreen0",
+        "key": "ctrl+alt+0",
+        "mac": "cmd+alt+0",
+        "when": "activeWebviewPanelId == 'agent.workspace' && !inputFocus"
+      },
+      {
+        "command": "agent.numberedScreen1",
+        "key": "ctrl+alt+1",
+        "mac": "cmd+alt+1",
+        "when": "activeWebviewPanelId == 'agent.workspace' && !inputFocus"
+      },
+      {
+        "command": "agent.numberedScreen2",
+        "key": "ctrl+alt+2",
+        "mac": "cmd+alt+2",
+        "when": "activeWebviewPanelId == 'agent.workspace' && !inputFocus"
+      },
+      {
+        "command": "agent.numberedScreen3",
+        "key": "ctrl+alt+3",
+        "mac": "cmd+alt+3",
+        "when": "activeWebviewPanelId == 'agent.workspace' && !inputFocus"
+      },
+      {
+        "command": "agent.numberedScreen4",
+        "key": "ctrl+alt+4",
+        "mac": "cmd+alt+4",
+        "when": "activeWebviewPanelId == 'agent.workspace' && !inputFocus"
+      },
+      {
+        "command": "agent.numberedScreen5",
+        "key": "ctrl+alt+5",
+        "mac": "cmd+alt+5",
+        "when": "activeWebviewPanelId == 'agent.workspace' && !inputFocus"
+      },
+      {
+        "command": "agent.numberedScreen6",
+        "key": "ctrl+alt+6",
+        "mac": "cmd+alt+6",
+        "when": "activeWebviewPanelId == 'agent.workspace' && !inputFocus"
+      },
+      {
+        "command": "agent.numberedScreen7",
+        "key": "ctrl+alt+7",
+        "mac": "cmd+alt+7",
+        "when": "activeWebviewPanelId == 'agent.workspace' && !inputFocus"
+      },
+      {
+        "command": "agent.numberedScreen8",
+        "key": "ctrl+alt+8",
+        "mac": "cmd+alt+8",
+        "when": "activeWebviewPanelId == 'agent.workspace' && !inputFocus"
+      },
+      {
+        "command": "agent.numberedScreen9",
+        "key": "ctrl+alt+9",
+        "mac": "cmd+alt+9",
+        "when": "activeWebviewPanelId == 'agent.workspace' && !inputFocus"
       }
     ],
     "menus": {

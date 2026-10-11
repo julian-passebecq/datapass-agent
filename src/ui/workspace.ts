@@ -4,20 +4,25 @@ import { EXTRA_NAV, page, validateMessage, WebviewMessage } from '../render/html
 import { allViews, coreFeeds, renderWorkspace, scoped, WsState, WsView } from '../render/workspace';
 import { extraViews, extraCss } from '../render/extra';
 import { ActCtx } from '../render/extra/kit';
-import { Feed, FeedCtx, pump, setFeedScope } from '../render/extra/feeds';
+import { Feed, FeedCtx, pump, setFeedScope, scopedPanelFeed, unavailableFeed } from '../render/extra/feeds';
 import { visibleViews } from '../activity/panes';
 import { isForbidden } from '../feeds/settings';
 import { isCredentialPath } from '../util/redact';
+import { workspaceMetadata, restoreWorkspaceMetadata, type WorkspaceMetadata } from '../cockpit/workspaceState';
+import type { ContextRef } from '../cockpit/interfaces';
 
 let panelSeq = 0;
 
 /** An Agent Workspace editor panel. Several can be open (one per tab), each with its own screen, scope and options. */
 export class WorkspacePanel implements vscode.Disposable {
+  private static panels = new Set<WorkspacePanel>();
+  static focused(): WorkspacePanel | undefined { return [...this.panels].find(p=>p.active); }
   private readonly feedKey = `panel:${++panelSeq}`;
   private panel?: vscode.WebviewPanel;
   private state: WsState = { view: 'overview', opts: {} };
   private timer?: NodeJS.Timeout;
   private last = '';
+  private lastMetadata = '';
   /** Store version and time of the last built page, and whether a feed landed since (see `storeChanged`). */
   private renderedVersion = -1;
   private renderedAt = 0;
@@ -25,8 +30,9 @@ export class WorkspacePanel implements vscode.Disposable {
   private sub: { dispose(): void };
   private terminals = new Map<string, vscode.Terminal>();
 
-  constructor(private store: SessionStore, private onMessage: (m: WebviewMessage) => void, private ternAvailable: () => boolean, private onClosed?: (p: WorkspacePanel) => void, private readSessions?: () => import('../model').AgentSessionSnapshot[], private readInputs?: () => import('../cockpit/facade').ScopedInputs) {
+  constructor(private store: SessionStore, private onMessage: (m: WebviewMessage) => void, private ternAvailable: () => boolean, private onClosed?: (p: WorkspacePanel) => void, private readSessions?: () => import('../model').AgentSessionSnapshot[], private readInputs?: () => import('../cockpit/facade').ScopedInputs, private context?: ContextRef) {
     this.sub = store.onDidChange(() => this.storeChanged());
+    WorkspacePanel.panels.add(this);
     for (const v of extraViews()) EXTRA_NAV.add(v.id);
   }
 
@@ -47,6 +53,20 @@ export class WorkspacePanel implements vscode.Disposable {
   /** Called when the panel shows, hides or closes. */
   onVisibility?: () => void;
 
+  /** Public VS Code serializer adoption: no new panel, grant, or provider state. */
+  restore(panel: vscode.WebviewPanel, value: unknown): void {
+    const {metadata,reason} = restoreWorkspaceMetadata(value, allViews());
+    this.state = {view:metadata.view,selected:metadata.selected,opts:metadata.opts};
+    this.context = metadata.context;
+    if (reason) {
+      this.readSessions = () => [];
+      this.readInputs = () => ({contexts:[],acceptedWork:[],assets:[],panelContext:{valid:false,context:metadata.context,projectId:metadata.context?.projectId ?? 'UNKNOWN',reason}});
+    }
+    this.attach(panel);
+  }
+
+  private metadata(): WorkspaceMetadata { return workspaceMetadata(this.state,allViews(),!!this.readSessions,this.context); }
+
   open(view?: WsView, selected?: string, opts?: Record<string, string>): void {
     if (view) this.state.view = view;
     if (selected) this.state.selected = selected;
@@ -58,10 +78,16 @@ export class WorkspacePanel implements vscode.Disposable {
     }
     const n = ++panelSeq;
     const p = vscode.window.createWebviewPanel('agent.workspace', n === 1 ? 'Agent' : `Agent ${n}`, vscode.ViewColumn.Active, { enableScripts: true, enableCommandUris: false, localResourceRoots: [], retainContextWhenHidden: false });
+    this.attach(p);
+  }
+
+  private attach(p: vscode.WebviewPanel): void {
+    p.webview.options = {enableScripts:true,enableCommandUris:false,localResourceRoots:[]};
     p.iconPath = new vscode.ThemeIcon('pulse');
     p.webview.onDidReceiveMessage(m => {
       const msg = validateMessage(m, k => (this.readSessions?.() ?? this.store.all()).some(s => s.key === k));
       if (!msg) return;
+      if (this.readInputs?.().panelContext?.valid===false && (msg.type==='act' || msg.type==='open' || msg.type==='cmd' && msg.cmd!=='reviewCockpitScope')) return;
       if (msg.type === 'ready') return this.render(true);
       if (msg.type === 'nav') {
         this.state.view = msg.view;
@@ -98,7 +124,7 @@ export class WorkspacePanel implements vscode.Disposable {
     this.panel = p;
     this.onVisibility?.();
     this.updateTitle();
-    p.webview.html = page(p.webview.cspSource, this.body(), { filter: true, css: extraCss() });
+    p.webview.html = page(p.webview.cspSource, this.body(), { filter: true, css: extraCss(), state:this.metadata() });
   }
 
   private updateTitle(): void {
@@ -111,11 +137,13 @@ export class WorkspacePanel implements vscode.Disposable {
   }
 
   private pumpFeeds(force = false): void {
+    if(this.readInputs?.().panelContext?.valid===false)return;
     this.selectFeedScope();
     // The visible screen, or every pane of the Panes screen; a feed shared by two panes loads once.
     const feeds = new Map<string, Feed>();
     for (const v of this.visibleExtra()) for (const f of v.feeds ?? []) feeds.set(f.id, f);
     for (const id of visibleViews(this.state.view, this.state.opts, allViews())) for (const f of coreFeeds(id)) feeds.set(f.id, f);
+    if(this.readSessions)for(const [id]of feeds)if(!scopedPanelFeed(id)){feeds.delete(id);unavailableFeed(id);}
     if (feeds.size)
       pump([...feeds.values()], this.feedCtx(), () => {
         this.feedPending = true;
@@ -224,12 +252,15 @@ export class WorkspacePanel implements vscode.Disposable {
     this.renderedAt = Date.now();
     this.feedPending = false;
     const html = this.body();
-    if (!force && html === this.last) return;
+    const state=this.metadata(),metadata=JSON.stringify(state);
+    if (!force && html === this.last && metadata===this.lastMetadata) return;
     this.last = html;
-    void p.webview.postMessage({ type: 'render', html, top });
+    this.lastMetadata=metadata;
+    void p.webview.postMessage({ type: 'render', html, top, state });
   }
 
   dispose(): void {
+    WorkspacePanel.panels.delete(this);
     this.sub.dispose();
     if (this.timer) clearTimeout(this.timer);
     for (const t of this.terminals.values()) t.dispose();

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { SessionStore } from '../sessions/store';
 import { CockpitFacade, ScopedInputs } from '../cockpit/facade';
@@ -11,25 +12,30 @@ import type { WebviewMessage } from '../render/html';
 import type { Scope } from '../cockpit/interfaces';
 import type { ImageProducerReceipt } from '../cockpit/images';
 import { contextSourceHash, returnToPm } from '../cockpit/contextReturn';
+import { revealContextInLens } from '../cockpit/lensContext';
 
 export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStore, ternAvailable: () => boolean, onMessage: (m: WebviewMessage) => void, installed: () => import('../extension').AgentApi['installed']): CockpitFacade {
   const policy = new ScopePolicy(), panels = new Set<WorkspacePanel>();
-  const saved = ctx.globalState.get<LocalGrant[]>('cockpit.scopes.v1', []);
-  for (const g of saved.slice(0, 100)) {
-    if (g?.scope && Array.isArray(g.sessionKeys) && Array.isArray(g.roots) && g.sessionKeys.every(idOk)) {
-      policy.set(g); if (!policy.authorize({ requestId: 'restore', scope: g.scope })) policy.clear();
-    }
-  }
+  // Previously saved grants are retired. Navigation restoration never restores authority.
+  void ctx.globalState.update('cockpit.scopes.v1', undefined);
   const facade = new CockpitFacade(store, policy, {
     installed,
     open: (view, grant, id, context, returnBinding) => {
       const epoch=policy.epoch;
       const valid=()=>!!policy.authorize({requestId:'panel',scope:grant.scope,epoch});
-      const read = () => valid() ? policy.sessions(grant, store.all()).filter(s=>!context || repoId(s.repository ?? s.cwd ?? '')===context.repoId) : [];
+      const read = () => valid() ? policy.sessions(grant, store.all()).filter(s=>(!context || repoId(s.repository ?? s.cwd ?? '')===context.repoId) && existsSync(s.artifactPath)) : [];
       const sourceHash=context ? contextSourceHash(context,read()):null;
       const validReturn=()=>valid() && !!context && contextSourceHash(context,read())===sourceHash;
       let panel:WorkspacePanel;
       const scopedMessage=(m:WebviewMessage)=>{
+        if(m.type==='cmd' && m.cmd==='reviewCockpitScope'){void vscode.commands.executeCommand('agent.reviewCockpitScope');return;}
+        if(m.type==='cmd' && (m.cmd==='openScopedLens' || m.cmd==='openInTern')){
+          if(!context || !returnBinding)return;
+          void revealContextInLens(context,returnBinding,read(),validReturn,{commands:()=>vscode.commands.getCommands(true),execute:(command,payload)=>vscode.commands.executeCommand(command,payload)}).then(result=>{
+            if(result!=='OPENED')void vscode.window.showInformationMessage(`Agent: Lens context ${result}. Review the selected repository in Lens and reopen this project from PM.`);
+          }).catch(()=>void vscode.window.showWarningMessage('Agent: Lens could not validate this reviewed repository context.'));
+          return;
+        }
         if(m.type==='cmd' && (m.cmd==='returnToPm' || m.cmd==='copyReturnToken')){
           if(!context || !returnBinding)return;
           void returnToPm(context,returnBinding,validReturn,{commands:()=>vscode.commands.getCommands(true),execute:(command,payload)=>vscode.commands.executeCommand(command,payload),copy:token=>vscode.env.clipboard.writeText(token)},m.cmd==='copyReturnToken').then(result=>{
@@ -38,13 +44,15 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
           }).catch(()=>{void vscode.window.showWarningMessage('Agent: PM refused the return. Reopen the current project and review its selection.');});
           return;
         }
-        if(!valid())return;
+        if(!valid() || context && !validReturn())return;
         if(m.type==='open'){panel.open('transcript',m.key);return;}
         if(m.type==='cmd' && m.cmd==='openWorkspaceNewTab'){panel.open('compact');return;}
         if(m.type==='cmd' && ['readTranscript','openTimeline','timelineAll','openWorkspace','knowledge'].includes(m.cmd)){panel.open(m.cmd==='readTranscript'?'transcript':m.cmd==='knowledge'?'context-activity':m.cmd==='openWorkspace'?'compact':'activity',m.key || undefined);return;}
         onMessage(m);
       };
-      panel = new WorkspacePanel(store, scopedMessage, ternAvailable, p => { panels.delete(p); p.dispose(); }, read, () => ({...(valid()?facade.scopedInputs(grant):{contexts:[],acceptedWork:[],assets:[]}),panelContext:{valid:valid(),context,projectId:grant.scope.projectIds.join(', ')}}));
+      const reason=()=>!valid()?'The reviewed source grant changed or was revoked.':!read().length?'The reviewed provider source disappeared or is unavailable. Activity is UNKNOWN.':context && !validReturn()?'The selected provider source disappeared or its repository, worktree, or revision changed.':undefined;
+      const guardedRead=()=>reason()?[]:read();
+      panel = new WorkspacePanel(store, scopedMessage, ternAvailable, p => { panels.delete(p); p.dispose(); }, guardedRead, () => ({...(!reason()?facade.scopedInputs(grant):{contexts:[],acceptedWork:[],assets:[]}),panelContext:{valid:!reason(),context,projectId:grant.scope.projectIds.join(', '),reason:reason()}}),context);
       panels.add(panel); panel.open(view === 'settings' || view === 'catalog' ? view : 'compact', view === 'session' ? id : undefined, { 'compact-scope': view === 'session' ? 'session' : 'all', 'compact-view': view === 'project' ? 'factory' : 'live' });
     },
     openSource: async file => { await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true }); },
@@ -93,11 +101,9 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
       const permission = await vscode.window.showQuickPick([{ label: 'Observation only', configuration: false, exportConsent: false }, { label: 'Observation and sanitized provider configuration', configuration: true, exportConsent: false }, { label: 'Observation, sanitized configuration, and reviewed local export', configuration: true, exportConsent: true }], { title: 'Allowed cockpit scope', placeHolder: 'Export still requires a specific plan review and destination.' }); if (!permission) return;
       const grant = makeGrant({ id: organization + ':' + project, organization, project, privacy, sessions: sessions.filter(s => selected.some(p => p.key === s.key)), ...permission });
       policy.set(grant);
-      const grants = policy.scopes().map(scope => policy.authorize({ requestId: 'persist', scope })!);
-      await ctx.globalState.update('cockpit.scopes.v1', grants);
       void vscode.window.showInformationMessage(`Agent: reviewed ${grant.sessionKeys.length} sessions for ${project}.`);
     }),
-    vscode.commands.registerCommand('agent.revokeCockpitScopes', async () => { policy.clear(); await ctx.globalState.update('cockpit.scopes.v1', []); }),
+    vscode.commands.registerCommand('agent.revokeCockpitScopes', async () => { policy.clear(); await ctx.globalState.update('cockpit.scopes.v1', undefined); }),
     vscode.commands.registerCommand('agent.importCockpitReceipts', async () => {
       const g = await chooseScope(); if (!g) return;
       const files = await vscode.window.showOpenDialog({ title: 'Import registered scoped receipts', canSelectMany: false, filters: { JSON: ['json'] } }); if (!files?.[0]) return;

@@ -12,7 +12,7 @@ import { keyOf, SessionsTree } from './ui/sessionsTree';
 import { AgentView, Inspector } from './ui/webviews';
 import { WorkspacePanel } from './ui/workspace';
 import { screenIndex } from './render/workspace';
-import { WebviewMessage } from './render/html';
+import { DIGIT_VIEWS, WebviewMessage } from './render/html';
 import { registerKnowledgeCommands } from './ui/knowledge';
 import {Analyzer} from './ui/analyzer';
 import {agentLensContext} from './interop';
@@ -77,6 +77,13 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
     p.onVisibility = syncGitEnded;
     p.open(view ?? (workspace as any).state?.view, key, opts);
   };
+  ctx.subscriptions.push(vscode.window.registerWebviewPanelSerializer('agent.workspace', {
+    async deserializeWebviewPanel(panel, state) {
+      const p = new WorkspacePanel(store,m=>onMessage(m),()=>ternAvailable,x=>{tabs.delete(x);x.dispose();});
+      tabs.add(p); p.onVisibility=syncGitEnded; p.restore(panel,state);
+    },
+  }));
+  for (const [index,view] of DIGIT_VIEWS.entries()) ctx.subscriptions.push(vscode.commands.registerCommand(`agent.numberedScreen${index===9?0:index+1}`,()=>WorkspacePanel.focused()?.open(view)));
 
   // Git correlation of ENDED sessions only feeds what a view shows: paused while no Agent view is visible, resumed
   // (with a refresh) as soon as one is. Live sessions keep being correlated.
@@ -141,7 +148,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
     { dispose: () => tabs.forEach(t => t.dispose()) },
     // Jump to any screen: label + group + hint, then navigate the focused Agent tab (else the main workspace).
     vscode.commands.registerCommand('agent.goToScreen', async () => {
-      const target = [workspace, ...tabs].find(p => p.active) ?? workspace;
+      const target = WorkspacePanel.focused() ?? workspace;
       const pick = await vscode.window.showQuickPick(
         screenIndex().map(s => ({ label: s.label, description: s.group, detail: s.hint || undefined, id: s.id })),
         { title: 'Agent: Go to screen', placeHolder: 'Type to filter screens', matchOnDescription: true, matchOnDetail: true },

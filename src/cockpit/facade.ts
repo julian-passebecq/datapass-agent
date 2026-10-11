@@ -1,4 +1,7 @@
 import * as os from 'node:os';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { isCredentialPath } from '../util/redact';
 import type { AgentSessionSnapshot } from '../model';
 import { scanBacklog } from '../feeds/backlog';
 import { bounded } from '../util/redact';
@@ -7,7 +10,7 @@ import { digest, idOk, LocalGrant, repoId, ScopePolicy, validateRequest } from '
 import { ConfigRead, readConfiguration, safeLocalSource } from './configuration';
 import { IncrementalExporter } from '../export/incremental';
 import { observeSession } from './observation';
-import type { ContextRef, EventPage, NativeObservation } from './interfaces';
+import type { ContextRef, ContextMapping, EventPage, NativeObservation } from './interfaces';
 import { correlateResourceTime, observeResources, validateResources, SelectedResource } from './resources';
 import { intakeImage, ImageProducerReceipt } from './images';
 import { contextSourceHash, type ContextReturnBinding } from './contextReturn';
@@ -17,7 +20,7 @@ export interface AcceptedWork { projectId: string; revision: string; counts: { o
 export type AssetState = 'FILE_OBSERVED' | 'GENERATED_REPORTED' | 'GENERATED_VERIFIED' | 'SELECTED' | 'PUBLISHED';
 export interface AssetRef { id: string; sha256: string; state: AssetState; producer: string | null; bytes: number; sourceId: string; }
 export interface SessionEvidenceRef { id:string;sessionId:string;taskId:string|null;presetHash:string|null;configHash:string|null;promptHash:string|null;sourceSha:string|null;qaReceiptId:string|null; }
-export interface ScopedInputs { contexts: ContextReceipt[]; acceptedWork: AcceptedWork[]; assets: AssetRef[]; evidenceRefs?:SessionEvidenceRef[]; panelContext?:{valid:boolean;context?:ContextRef;projectId:string}; }
+export interface ScopedInputs { contexts: ContextReceipt[]; acceptedWork: AcceptedWork[]; assets: AssetRef[]; evidenceRefs?:SessionEvidenceRef[]; panelContext?:{valid:boolean;context?:ContextRef;projectId:string;reason?:string}; }
 interface StoreRead { all(): AgentSessionSnapshot[]; onDidChange(fn: () => void): { dispose(): void }; lastStats?: { at: number }; opts: { historyDays: number }; }
 interface HostServices {
   host?: HostIdentity;
@@ -66,7 +69,7 @@ export class CockpitFacade {
   constructor(private store: StoreRead, readonly policy: ScopePolicy, private services: HostServices, private exporter: IncrementalExporter) {
     this.host = services.host ?? localHost();
     // Only bounded read/approved-effect methods cross the extension API boundary.
-    const api: typeof this.api = { major: 1, capabilities: () => this.capabilities(), getScopes: async () => this.reply(undefined, policy.scopes(), 'OK'), getSummary: r => this.summary(r), getProviderConfiguration: r => this.configuration(r), reveal: r => this.reveal(r), subscribe: (r, l) => this.subscribe(r, l), planExport: r => this.plan(r), executeApprovedLocalExport: r => this.execute(r), getExportReceipt: r => this.receipt(r), getObservation:r=>this.observation(r),getEventPage:r=>this.eventPage(r),revealContext:r=>this.revealContext(r),prepareReply:r=>this.prepareReply(r),getResourceObservations:r=>this.resources(r) };
+    const api: typeof this.api = { major: 1, capabilities: () => this.capabilities(), getScopes: async () => this.reply(undefined, policy.scopes(), 'OK'), getSummary: r => this.summary(r), getProviderConfiguration: r => this.configuration(r), reveal: r => this.reveal(r), subscribe: (r, l) => this.subscribe(r, l), planExport: r => this.plan(r), executeApprovedLocalExport: r => this.execute(r), getExportReceipt: r => this.receipt(r), getObservation:r=>this.observation(r),getEventPage:r=>this.eventPage(r),revealContext:r=>this.revealContext(r),prepareReply:r=>this.prepareReply(r),getResourceObservations:r=>this.resources(r),getContextMappings:r=>this.contextMappings(r) };
     api.getResourceObservations=r=>this.resources(r);
     this.api = Object.freeze(api);
     this.changeSub = store.onDidChange(() => this.changed());
@@ -75,9 +78,31 @@ export class CockpitFacade {
     return structuredClone({ schema: 'datapass.agent-cockpit/1', requestId: r && idOk(r.requestId) ? r.requestId : 'capabilities', scopeHash: r && validateRequest(r) ? digest(r.scope) : '', capturedAt: new Date().toISOString(), host: this.host, state, data, omissions, epoch:this.policy.epoch,...(r?.generation && idOk(r.generation) ? {generation:r.generation}:{}), errors: state === 'DENIED' ? [{ code: 'SCOPE_DENIED', message: 'Host-reviewed local scope is required.' }] : [] });
   }
   private async capabilities(): Promise<Reply<Capability[]>> {
-    return this.reply(undefined, ['summary', 'providerConfiguration', 'reveal', 'subscribe', 'incrementalExport', 'registeredContextReceipts', 'acceptedWork', 'assets', 'getScopes','getObservation','getEventPage','revealContext','prepareReply','getResourceObservations'].map(name => ({ name, version: 1, state: 'OK' as const })), 'OK', ['Scopes require explicit local review; no caller-created grants.','prepareReply provides manual-copy fallback; native send and provider permissions are not owned by Agent.']);
+    return this.reply(undefined, ['summary', 'providerConfiguration', 'reveal', 'subscribe', 'incrementalExport', 'registeredContextReceipts', 'acceptedWork', 'assets', 'getScopes','getObservation','getEventPage','revealContext','prepareReply','getResourceObservations','getContextMappings'].map(name => ({ name, version: 1, state: 'OK' as const })), 'OK', ['Scopes require explicit local review; no caller-created grants.','prepareReply provides manual-copy fallback; native send and provider permissions are not owned by Agent.']);
   }
   private sessions(g: LocalGrant): AgentSessionSnapshot[] { return this.policy.sessions(g, this.store.all()); }
+  private async contextMappings(r:Request):Promise<Reply<ContextMapping[]>> {
+    if(validateRequest(r))r={...structuredClone(r),epoch:r.epoch ?? this.policy.epoch};
+    const g=this.policy.authorize(r);if(!g)return this.reply(r,[],'DENIED');
+    const fields=(sessions:AgentSessionSnapshot[])=>sessions.map(s=>[s.key,s.repository ?? s.cwd,s.worktree,s.headBefore,s.headAfter,s.artifactPath]);
+    const sessions=structuredClone(this.sessions(g)),sourceHash=digest(fields(sessions)),data:ContextMapping[]=[],omissions:string[]=[];
+    const safeDirectory=async(root:string)=>{
+      if(!path.isAbsolute(root) || isCredentialPath(root) || /[\x00-\x1f]/.test(root))return false;
+      try{for(let p=root;p!==path.dirname(p);p=path.dirname(p))if((await fs.lstat(p)).isSymbolicLink())return false;return (await fs.stat(root)).isDirectory();}catch{return false;}
+    };
+    for(const s of sessions.slice(Number(r.cursor ?? 0),Number(r.cursor ?? 0)+(r.limit ?? 100))){
+      const root=s.repository ?? s.cwd;
+      if(!root || !await safeDirectory(root) || !await safeLocalSource(s.artifactPath)){omissions.push('Source or local repository is unavailable for '+s.key+'. Mapping omitted; activity UNKNOWN.');continue;}
+      const worktree=s.worktree && await safeDirectory(s.worktree)?s.worktree:null;
+      const revision=[s.headAfter,s.headBefore].find(sha=>typeof sha==='string' && /^[a-f0-9]{7,40}$/.test(sha)) ?? null;
+      data.push({repoId:repoId(root),path:path.resolve(root),worktreeId:worktree?repoId(worktree):null,worktreePath:worktree?path.resolve(worktree):null,revision,sessionId:s.key});
+      if(!revision || s.worktree && !worktree)omissions.push('Revision or worktree evidence is UNKNOWN for '+s.key+'.');
+    }
+    if(digest(fields(this.sessions(g)))!==sourceHash || !this.policy.authorize(r))return this.reply(r,[],'DENIED',['Reviewed source mapping changed while it was being observed.']);
+    const reply=this.reply(r,data,omissions.length || !data.length?'PARTIAL':'OK',omissions);
+    const next=Number(r.cursor ?? 0)+(r.limit ?? 100);if(next<sessions.length)reply.nextCursor=String(next);
+    return reply;
+  }
   /** Only explicit host file/PID selections enroll resources; targets never come from API request JSON. */
   registerResources(g:LocalGrant,items:SelectedResource[]):void {
     if(!this.policy.authorize({requestId:'register-resource',scope:g.scope}))throw new Error('Scope unavailable.');
@@ -123,10 +148,12 @@ export class CockpitFacade {
     if(!g || !c || !g.scope.organizationIds.includes(c.organizationId) || !g.scope.privacyDomainIds.includes(c.privacyDomainId) || !g.scope.projectIds.includes(c.projectId) || !g.scope.repoIds.includes(c.repoId) || c.hostId!==this.host.hostId || !idOk(c.returnToken) || c.selectedItemId!==null && !idOk(c.selectedItemId) || c.worktreeId!==null && !idOk(c.worktreeId) || c.revision!==null && !/^[a-f0-9]{7,40}$/.test(c.revision))return this.reply(r,empty,'DENIED');
     const sessions=this.sessions(g).filter(s=>repoId(s.repository ?? s.cwd ?? '')===c.repoId),selected=c.selectedItemId ? sessions.find(s=>s.key===c.selectedItemId):undefined;
     if(!sessions.length || c.selectedItemId && !selected || c.worktreeId && !sessions.some(s=>s.worktree && repoId(s.worktree)===c.worktreeId) || c.revision && !(selected ? [selected]:sessions).some(s=>s.headAfter===c.revision || s.headBefore===c.revision))return this.reply(r,empty,'DENIED',['Canonical context cannot be mapped to the reviewed native observations.']);
+    const mappings=await this.contextMappings({...r,limit:500,cursor:undefined});
+    if(mappings.state==='DENIED' || !mappings.data.some(m=>m.repoId===c.repoId && (!c.selectedItemId || m.sessionId===c.selectedItemId) && (!c.worktreeId || m.worktreeId===c.worktreeId)))return this.reply(r,empty,'DENIED',['The reviewed provider source or local repository disappeared. Reconnect requires a fresh reviewed mapping.']);
     const returnBinding={returnToken:c.returnToken,requestId:r.requestId,generation:r.generation ?? null,scopeHash:digest(r.scope),epoch:this.policy.epoch};
     const sourceHash=contextSourceHash(c,sessions);
     await this.services.open(selected?'session':'project',g,selected?.key ?? c.projectId,structuredClone(c),returnBinding);
-    if(!this.policy.authorize({...r,epoch:returnBinding.epoch}) || contextSourceHash(c,this.sessions(g))!==sourceHash)return this.reply(r,empty,'DENIED');
+    if(!(await Promise.all((selected?[selected]:sessions).map(s=>safeLocalSource(s.artifactPath)))).every(Boolean) || contextSourceHash(c,this.sessions(g))!==sourceHash || !this.policy.authorize({...r,epoch:returnBinding.epoch}))return this.reply(r,empty,'DENIED');
     return this.reply(r,{opened:true,returnToken:c.returnToken},'OK');
   }
   private async prepareReply(r:Request & {sessionId:string;questionId:string;text:string}):Promise<Reply<{text:string|null;transport:'MANUAL_COPY'|'UNSUPPORTED';sent:false}>> {

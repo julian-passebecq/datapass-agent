@@ -22,6 +22,7 @@ export interface ContextRef {
   organizationId:string; privacyDomainId:string; projectId:string; repoId:string;
   hostId:string; worktreeId:string|null; revision:string|null; selectedItemId:string|null; returnToken:string;
 }
+export interface ContextMapping { repoId:string;path:string;worktreeId:string|null;worktreePath:string|null;revision:string|null;sessionId:string; }
 export interface NativeObservation {
   session:SessionRef; nativeId:string; surface:Fact<string>;
   process:AgentNativeProcess; timestamps:{startedAt:string|null;lastProviderEventAt:string|null;capturedAt:string};
@@ -59,6 +60,7 @@ export interface AgentCockpitV1 {
   revealContext(request:Request & {context:ContextRef}):Promise<Reply<{opened:boolean;returnToken:string|null}>>;
   prepareReply(request:Request & {sessionId:string;questionId:string;text:string}):Promise<Reply<{text:string|null;transport:'MANUAL_COPY'|'UNSUPPORTED';sent:false}>>;
   getResourceObservations(request:Request):Promise<Reply<import('./resources').ResourceObservation[]>>;
+  getContextMappings(request:Request):Promise<Reply<ContextMapping[]>>;
 }
 export interface BrainCapabilities { protocolMajor:1; capabilities:Capability[]; actualBackends:string[]; runtime:HostIdentity; generationIds:string[]; }
 export interface ReadyManifest {

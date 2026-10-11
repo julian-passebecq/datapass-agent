@@ -91,6 +91,14 @@ export function setFeedValue<T>(id: string, value: T, at = Date.now()): void {
   cache.set(k(id), { value, at });
 }
 
+/** Scoped companion panels cannot run collectors that discover provider-wide roots. */
+export function scopedPanelFeed(id:string):boolean {
+  return ['compact.backlog','compact.assets','transcript.settings','hud.lessons','health.config','runs.config'].includes(id);
+}
+export function unavailableFeed(id:string):void {
+  cache.set(k(id),{error:'UNKNOWN — this collector requires independent local-source review; no scoped provider-wide scan was performed.',at:Date.now()});
+}
+
 export function clearFeeds(): void {
   cache.clear();
 }

@@ -1,4 +1,8 @@
-# DataPass Agent 0.9
+# DataPass Agent 0.10.5
+
+Agent editor tabs now restore their navigation and minimal context through the public VS Code webview serializer. Reviewed source grants remain in memory: after an extension-host restart, scoped tabs explain the missing authority and offer **Review Cockpit Scope** before reopening the project from PM. The selected project context can continue to Lens using its independently reviewed repository mapping. See [integration release notes and qualification limits](docs/AGENTS-WINDOW-INTEGRATION-20261011.md).
+
+Use **Ctrl+Alt+1…0** (**Cmd+Alt+1…0** on macOS) to navigate numbered screens while an Agent editor is active. Bare digits work inside the focused webview and leave search boxes and editable text alone. **Agent: Go to screen…** reaches all 47 screens, including scoped and restored tabs.
 
 Adds a versioned scoped cockpit facade, compact observation, and reviewed incremental local export. See [cockpit contract and scope review](docs/COCKPIT-V1.md).
 
