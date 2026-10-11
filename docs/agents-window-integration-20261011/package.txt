@@ -12,8 +12,8 @@ built dist/search-knowledge.cjs
 built dist/export-provider-history.cjs
  INFO  Files included in the VSIX:
 agent-vscode-0.10.5.vsix
-├─ [Content_Types].xml 
-├─ extension.vsixmanifest 
+├─ [Content_Types].xml
+├─ extension.vsixmanifest
 └─ extension/
    ├─ LICENSE.md [0.12 KB]
    ├─ package.json [25.97 KB]

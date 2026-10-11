@@ -1,4 +1,3 @@
 
 > agent-vscode@0.10.5 check
 > tsc -p . --noEmit
-

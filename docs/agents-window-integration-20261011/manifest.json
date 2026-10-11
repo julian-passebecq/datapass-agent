@@ -10,8 +10,8 @@
     },
     {
       "path": "package.txt",
-      "sha256": "2f35508a462b5ad7e46da0ac62a039e500019768be18584046b7227b302996f1",
-      "bytes": 974,
+      "sha256": "1fba076c9b39765ab9a910a068743961a3edee55d9b44cb07f7c4d8c28f052c4",
+      "bytes": 941,
       "privacy": "SANITIZED_PRODUCT_QA"
     },
     {
@@ -34,14 +34,14 @@
     },
     {
       "path": "tests.txt",
-      "sha256": "a9307b4e5f0910cf5e9c375c9c4250c72dbdc428bccc530d07b8c697ed54c2e9",
-      "bytes": 49112,
+      "sha256": "5ceb386be0599ca1f52357c46acb04c0663e90cea7c0c67f63e2c9e9315a4da5",
+      "bytes": 48554,
       "privacy": "SANITIZED_PRODUCT_QA"
     },
     {
       "path": "typecheck.txt",
-      "sha256": "e49eba4b0364fc2beb8249b1950cd367158d3231926aef185404c8a8f63d36a3",
-      "bytes": 54,
+      "sha256": "776225a3f8aa6bdd46a4effe0783c193ec23cffc2a8ef090cc557c2dace364f3",
+      "bytes": 49,
       "privacy": "SANITIZED_PRODUCT_QA"
     }
   ]
