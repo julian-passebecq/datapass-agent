@@ -272,22 +272,22 @@ async function workspacePass(app, win, ck, theme, views) {
 }
 
 async function runCommand(win, label) {
-  // Never dismiss a legitimate picker or authorization dialog to open the palette.
-  if(await win.locator('.monaco-dialog-box:visible').count())throw Error('Command palette cannot interrupt a pending dialog: '+label);
-  const pending=win.locator('.quick-input-widget:visible');
-  if(await pending.count()){
-    const pendingInput=pending.locator('input:visible').first();
-    if((await pendingInput.inputValue()).startsWith('>'))await pendingInput.press('Escape');
-    await pending.waitFor({state:'hidden',timeout:10000});
+  for(let attempt=0;attempt<2;attempt++){
+    const action={label,attempt:attempt+1,openedAt:Date.now(),phase:'PRECONDITION',selectionAttempted:false,transport:'ACTUAL_VISIBLE_PALETTE'};result.commandPaletteAttempts??=[];result.commandPaletteAttempts.push(action);
+    if(await win.locator('.monaco-dialog-box:visible').count())throw Error('Command palette cannot interrupt a pending dialog: '+label);
+    const pending=win.locator('.quick-input-widget:visible');
+    if(await pending.count()){const oldInput=pending.locator('input:visible').first();if((await oldInput.inputValue()).startsWith('>'))await oldInput.press('Escape');await pending.waitFor({state:'hidden',timeout:10000});}
+    let hiddenSince=null;const closedDeadline=Date.now()+10000;
+    while(Date.now()<closedDeadline){if(!await win.locator('.quick-input-widget:visible').count()&&!await win.locator('.monaco-dialog-box:visible').count()){hiddenSince??=Date.now();if(Date.now()-hiddenSince>=500)break;}else hiddenSince=null;await win.waitForTimeout(100);}
+    if(hiddenSince===null||Date.now()-hiddenSince<500)throw Error('Prior owned quick input did not settle closed: '+label);
+    try{
+      action.phase='OPENING';await win.keyboard.press('Control+Shift+P');const palette=win.locator('.quick-input-widget:visible');await palette.waitFor({state:'visible',timeout:2500});if(await palette.count()!==1)throw Error('Expected one visible owned command palette: '+label);
+      const input=palette.locator('input:visible').first();action.phase='FILLING';await input.fill('>'+label,{timeout:1500});action.query=await input.inputValue();action.focusedInput=await input.evaluate(el=>el===document.activeElement);if(action.query!=='>'+label||!action.focusedInput)throw Error('Command palette lost its explicit focused query: '+label);
+      if(label.startsWith('Fixture QA:')){result.observerPaletteActions??=[];result.observerPaletteActions.push(action);const row=palette.locator('.quick-input-list .monaco-list-row:visible').filter({hasText:label}).first();await row.waitFor({state:'visible',timeout:2500});action.visibleMatchingRows=await palette.locator('.quick-input-list .monaco-list-row:visible').filter({hasText:label}).count();action.selectedAriaLabel=await row.getAttribute('aria-label');action.selectionAttempted=true;action.phase='SELECTING';await row.click({timeout:2500});await palette.waitFor({state:'hidden',timeout:10000});}
+      else{await win.waitForTimeout(600);action.selectionAttempted=true;action.phase='SELECTING';await input.press('Enter',{timeout:2500});}
+      action.phase='SELECTED';action.selectedAt=Date.now();return;
+    }catch(error){action.error=String(error.message).slice(0,300);const callback=label==='Fixture QA: Preserve generated previews'?'PRESERVE':label==='Fixture QA: Observe installed PM and Agent'?'OBSERVE':null;let callbackBegan=false;if(callback&&pmFixture?.observerDiagnosticFile&&fs.existsSync(pmFixture.observerDiagnosticFile)){const events=JSON.parse(fs.readFileSync(pmFixture.observerDiagnosticFile,'utf8')).events;callbackBegan=events.some(e=>e.name===callback+'.begin'&&e.at>=action.openedAt);}if(action.selectionAttempted||callbackBegan||attempt===1)throw error;action.phase='RETRY_BEFORE_SELECTION_ONLY';await win.waitForTimeout(300);}
   }
-  await win.keyboard.press('Control+Shift+P');
-  const palette=win.locator('.quick-input-widget:visible');await palette.waitFor({state:'visible',timeout:10000});
-  if(await palette.count()!==1)throw Error('Expected one visible owned command palette: '+label);
-  const input=palette.locator('input:visible').first();await input.fill('>'+label);if(await input.inputValue()!=='>'+label||!await input.evaluate(el=>el===document.activeElement))throw Error('Command palette input did not retain the explicit focused query: '+label);
-  if(label.startsWith('Fixture QA:')){
-    const action={label,query:await input.inputValue(),openedAt:Date.now(),transport:'ACTUAL_VISIBLE_PALETTE_COMMAND_ROW'};result.observerPaletteActions??=[];result.observerPaletteActions.push(action);
-    const row=palette.locator('.quick-input-list .monaco-list-row:visible').filter({hasText:label}).first();await row.waitFor({state:'visible',timeout:15000});action.focusedInput=true;action.visibleMatchingRows=await palette.locator('.quick-input-list .monaco-list-row:visible').filter({hasText:label}).count();action.selectedAriaLabel=await row.getAttribute('aria-label');await row.click();await palette.waitFor({state:'hidden',timeout:10000});action.selectedAt=Date.now();
-  }else{await win.waitForTimeout(600);await input.press('Enter');}
 }
 
 // Analyzer is the default 0.8 pane; legacy views start collapsed.
