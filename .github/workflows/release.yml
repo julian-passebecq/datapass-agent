@@ -138,6 +138,7 @@ jobs:
             .smoke/screenshots/*.png
             .smoke/smoke-result.json
             .smoke/pm-agent-result.json
+            .smoke/observer-diagnostic.json
             .smoke/pm-agent-drafts/*.txt
             test/fixtures/installed-pm/datapass-pm-*.vsix
             test/fixtures/installed-pm/receipt.json

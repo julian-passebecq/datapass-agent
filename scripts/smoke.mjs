@@ -8,6 +8,7 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { createHash } from 'node:crypto';
 import { buildFixtureHome } from './smoke-fixture.mjs';
 import { preparePmAgentFixture, qualifyPmAgent, installObserver } from './smoke-pm-agent.mjs';
 
@@ -61,6 +62,12 @@ if(pmFixture){
   const installConfig=execFileSync(codeExe,[cliJs,'--extensions-dir',extDir,'--user-data-dir',userData,'--install-extension',pmFixture.configDependency.path,'--force'],{encoding:'utf8',env:{...process.env,ELECTRON_RUN_AS_NODE:'1',VSCODE_DEV:''}});
   check('Unchanged Config dependency installs for PM preparation only',/successfully installed/i.test(installConfig));
   installObserver(extDir,pmFixture);
+  const observerVsix=path.join(base,'fixture-pm-agent-observer-1.0.0.vsix');
+  execFileSync(process.execPath,[path.join(root,'node_modules','@vscode','vsce','vsce'),'package','--no-dependencies','--allow-missing-repository','--skip-license','--out',observerVsix],{cwd:pmFixture.observerDirectory,encoding:'utf8',windowsHide:true});
+  const installedObserver=execFileSync(codeExe,[cliJs,'--extensions-dir',extDir,'--user-data-dir',userData,'--install-extension',observerVsix,'--force'],{encoding:'utf8',env:{...process.env,ELECTRON_RUN_AS_NODE:'1',VSCODE_DEV:''}});
+  check('Fixed generated public observer VSIX installs through actual CLI',/successfully installed/i.test(installedObserver));
+  pmFixture.observerPackage={role:'FIXED_RUNNER_QUALIFICATION_SUPPORT',extensionId:'fixture.pm-agent-observer',version:'1.0.0',bytes:fs.statSync(observerVsix).size,sha256:createHash('sha256').update(fs.readFileSync(observerVsix)).digest('hex'),sourceSha256:createHash('sha256').update(fs.readFileSync(path.join(pmFixture.observerDirectory,'extension.cjs'))).digest('hex'),transport:'ACTUAL_PUBLIC_VSCODE_CLI_INSTALL',productTransportMocked:false};
+  const diagnostic=JSON.parse(fs.readFileSync(pmFixture.observerDiagnosticFile,'utf8'));diagnostic.events.push({name:'PUBLIC_CLI_INSTALLED',at:Date.now(),success:/successfully installed/i.test(installedObserver)});fs.writeFileSync(pmFixture.observerDiagnosticFile,JSON.stringify(diagnostic,null,2));
 }
 const workspace = pmFixture?.repository ?? root;
 // Synthetic home (--fixture-home): rebuilt before each launch so its newest record is always a minute old.
@@ -268,6 +275,7 @@ async function runCommand(win, label) {
   await win.waitForSelector('.quick-input-widget input', { timeout: 10_000 });
   await win.keyboard.type(label);
   await win.waitForTimeout(600);
+  if(label.startsWith('Fixture QA:'))await win.locator('.quick-input-list .monaco-list-row').filter({hasText:label}).first().waitFor({state:'visible',timeout:15000});
   await win.keyboard.press('Enter');
 }
 
@@ -398,12 +406,14 @@ try {
 const logs = [];
 (function walk(d) { for (const e of fs.existsSync(d) ? fs.readdirSync(d, { withFileTypes: true }) : []) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (/exthost.*\.log$|Agent\.log$|renderer\.log$/i.test(e.name)) logs.push(p); } })(path.join(userData, 'logs'));
 const agentErrors = [];
+const fixtureObserverErrors=[];
 const shutdownNoise = [];
 let activated = [];
 for (const l of logs) {
   const txt = fs.readFileSync(l, 'utf8');
   let terminating = false;
   for (const line of txt.split('\n')) {
+    if(/\[error\]/i.test(line)&&/fixture\.pm-agent-observer|fixture\.observePmAgent|fixture\.preserveDrafts|fixture\.invalidPmReturn/.test(line))fixtureObserverErrors.push(line.trim().slice(0,400));
     if (/Extension host terminating/.test(line)) terminating = true;
     if (/\[error\]/i.test(line) && /agent-vscode|juliandatapass|agent\./i.test(line)) {
       // VS Code cancels in-flight RPCs when the extension host is torn down for a reload; reported, not counted.
@@ -415,14 +425,17 @@ for (const l of logs) {
 }
 check('Extension host: no Agent errors', agentErrors.length === 0, agentErrors.slice(0, 3).join(' || '));
 check('Agent output log shows activation + discovery timing', activated.length > 0, activated.slice(0, 4).join(' || '));
+result.fixtureObserverErrors=fixtureObserverErrors;
+if(pmFixture&&fs.existsSync(pmFixture.observerDiagnosticFile)){const diagnostic=JSON.parse(fs.readFileSync(pmFixture.observerDiagnosticFile,'utf8'));diagnostic.extensionHostErrors=fixtureObserverErrors;fs.writeFileSync(pmFixture.observerDiagnosticFile,JSON.stringify(diagnostic,null,2));}
 result.activationLog = activated;
 result.agentErrors = agentErrors;
 result.shutdownCancellations = shutdownNoise;
 if (shutdownNoise.length) console.log(`NOTE ${shutdownNoise.length} cancellation(s) logged while the extension host was terminating for reload`);
 if (result.loadingTimeouts?.length) console.log(`NOTE still loading after 20 s: ${result.loadingTimeouts.join(', ')}`);
 result.fixtureHome = !!homeDir;
-if (homeDir) fs.rmSync(homeDir, { recursive: true, force: true, maxRetries: 3 });
+result.fixtureCleanup={state:result.pmAgent?.shutdownAllowed===false?'RETAINED_ACTIVE_HOST_DRAFT_GUARD':'PENDING',homeRemoved:false};
 result.passed = result.checks.every(c => c.ok) && result.errors.length === 0;
 fs.writeFileSync(path.join(shots, '..', 'smoke-result.json'), JSON.stringify(result, null, 2));
+if(homeDir&&result.pmAgent?.shutdownAllowed!==false){try{fs.rmSync(homeDir,{recursive:true,force:true,maxRetries:3});result.fixtureCleanup={state:'REMOVED_AFTER_HOST_CLOSE',homeRemoved:true};}catch(error){result.errors.push('Owned fixture home cleanup failed: '+String(error.message).slice(0,300));result.fixtureCleanup={state:'CLEANUP_FAILED_RETAINED',homeRemoved:false};result.passed=false;}fs.writeFileSync(path.join(shots,'..','smoke-result.json'),JSON.stringify(result,null,2));}
 console.log(result.passed ? 'SMOKE PASS' : 'SMOKE FAIL');
 process.exit(result.passed ? 0 : 1);
