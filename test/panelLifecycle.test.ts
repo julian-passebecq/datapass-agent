@@ -34,7 +34,13 @@ test('serializer adopts existing public panel, restores selected screen, persist
   callbacks.dispose!(); // setState was destroyed by close; the main panel owner retains its safe navigation.
   independent.open();
   assert.match(panel.webview.html,/>Sources<\/h1>/);assert.match(panel.webview.html,/"catalog.tab":"models"/);assert.match(panel.webview.html,/"settings.scope":"project"/);
-  assert.equal(created,2,'close/reopen creates only the explicitly requested replacement');independent.dispose();
+  assert.equal(created,2,'close/reopen creates only the explicitly requested replacement');
+  const initialHtml=panel.webview.html;
+  independent.numberedNavigation('live');
+  assert.deepEqual(received.at(-1),{type:'numberedNav',view:'live'},'public numbered command asks the active client to verify actual input focus');
+  assert.equal(panel.webview.html,initialHtml,'host command does not directly navigate before client approval');
+  const delivered=received.length;panel.active=false;independent.numberedNavigation('overview');assert.equal(received.length,delivered,'inactive editors receive no numbered request');
+  panel.active=true;independent.numberedNavigation('settings');assert.equal(received.length,delivered,'only fixed numbered screens are accepted');independent.dispose();
   const suspended=new module.exports.WorkspacePanel(store,()=>{},()=>false);
   suspended.restore(panel,workspaceMetadata({view:'workflows'},allViews(),true,context));
   assert.match(panel.webview.html,/collectors are suspended/);assert.doesNotMatch(panel.webview.html,/Scanning ~\/\.claude|data-loading=/);

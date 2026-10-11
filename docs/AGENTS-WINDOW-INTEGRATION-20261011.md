@@ -1,4 +1,4 @@
-# Agent 0.10.5 integration candidate
+# Agent 0.10.6 integration candidate
 
 Focused integration increment within COCKPIT-NATIVE-20261009-FULL. Baseline `8c120be6d4046c85cb16e7aa1f70e98de9f4c0bc`; dedicated branch `codex/agents-window-integration-20261011`. The canonical destination remains `julian-passebecq/agent-vscode`. No merge, owner-profile installation, live configuration apply, authentication automation or provider task launch is included.
 
@@ -10,7 +10,7 @@ Agent now exposes scoped `getContextMappings` so PM can compare its selected loc
 
 Suspended panels stop source collectors and hide their data bodies. In a reviewed scoped panel, legacy collectors that discover provider-wide roots remain UNKNOWN/unavailable; exact-source Compact, transcript settings and bounded repository lessons remain available. The independent Agent workspace retains those provider-wide screens/readers. Scoped provider configuration stays available through the validated cockpit API and Config. A scoped cache cannot reuse independent local history.
 
-Narrow rails constrain their width and bring the active screen into view. Existing bare digit shortcuts ignore editable content and unfocused documents. Public Ctrl+Alt numbered commands provide navigation when an Agent editor is active, with Go to screen available for every screen and scoped tab.
+Narrow rails constrain their width and bring the active screen into view. Existing bare digit shortcuts ignore editable content and unfocused documents. Public Ctrl+Alt numbered commands provide navigation when an Agent editor is active, with Go to screen available for every screen and scoped tab. The client independently checks actual editable focus, composition and document focus before accepting a numbered command: VS Code's `inputFocus` context does not describe inputs inside webviews. Installed qualification discovered that boundary; version 0.10.6 fixes it without expanding panel authority.
 
 ## Scoped acceptance disposition
 
@@ -33,6 +33,6 @@ Meaningful negative cases cover caller-created scopes, wrong repository/revision
 
 ## Native gate and installation path
 
-Use the packaged `agent-vscode-0.10.5.vsix` with the family package hash vector in an owned draft-free disposable Stable/Insiders profile. Install through supported VS Code extension UI/CLI and open Agent: Open Workspace. For scoped qualification, review a synthetic project scope, select that exact repository in PM, open Agent Compact, inspect context in reviewed Lens, and return to PM. Reload only the disposable draft-free window. Confirm the selected screen and suspended context reappear, review the scope, and obtain a fresh PM handoff. Close/reopen the panel and repeat source disappearance/revocation cases.
+Use the packaged `agent-vscode-0.10.6.vsix` with the family package hash vector in an owned draft-free disposable Stable/Insiders profile. Install through supported VS Code extension UI/CLI and open Agent: Open Workspace. For scoped qualification, review a synthetic project scope, select that exact repository in PM, open Agent Compact, inspect context in reviewed Lens, and return to PM. Reload only the disposable draft-free window. Confirm the selected screen and suspended context reappear, review the scope, and obtain a fresh PM handoff. Close/reopen the panel and repeat source disappearance/revocation cases.
 
 Shared-desktop native automation remains blocked until nonintrusive PID/HWND/capture identity can be verified. Authentication, trust prompts and Agents Window opt-in are owner-controlled manual prerequisites. Native reload, host restart, installed keybindings, actual four-product journey and exact-head remote CI are UNTESTED here; do not promote the fixture checks to those gates. No login state is inferred from installation. PM owns the integrated family readiness and publication receipts.

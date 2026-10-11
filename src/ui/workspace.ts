@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { SessionStore, viewNeedsRender } from '../sessions/store';
-import { EXTRA_NAV, page, validateMessage, WebviewMessage } from '../render/html';
+import { DIGIT_VIEWS, EXTRA_NAV, page, validateMessage, WebviewMessage } from '../render/html';
 import { allViews, coreFeeds, renderWorkspace, scoped, WsState, WsView } from '../render/workspace';
 import { extraViews, extraCss } from '../render/extra';
 import { ActCtx } from '../render/extra/kit';
@@ -48,6 +48,12 @@ export class WorkspacePanel implements vscode.Disposable {
   /** Whether this panel is the focused editor (the "Go to screen" command navigates that one). */
   get active(): boolean {
     return !!this.panel?.active;
+  }
+
+  /** VS Code does not expose input focus inside a webview through !inputFocus. Recheck there. */
+  numberedNavigation(view: WsView): void {
+    if (this.panel?.active && (DIGIT_VIEWS as readonly string[]).includes(view))
+      void this.panel.webview.postMessage({type:'numberedNav',view});
   }
 
   /** Called when the panel shows, hides or closes. */

@@ -65,13 +65,40 @@ try {
     await tab.waitForFunction(view=>window.__state?.view===view,DIGIT_VIEWS[i]);
   }
   check('Focused webview numbered shortcuts retain fixed mapping across all ten screens',true);
+  for(const view of DIGIT_VIEWS){
+    await tab.locator('.nav.on').focus();
+    await tab.evaluate(view=>window.postMessage({type:'numberedNav',view},'*'),view);
+    await tab.waitForFunction(view=>window.__state?.view===view,view);
+  }
+  check('Public numbered command requests use the focused client across all ten screens',true);
   await tab.locator('#q').evaluate(el=>{el.classList.remove('q-off');el.focus();});
   const before=await tab.evaluate(()=>window.__messages.filter(m=>m.type==='nav').length);
   await tab.keyboard.type('123');
+  await tab.evaluate(()=>window.postMessage({type:'numberedNav',view:'overview'},'*'));
+  await tab.waitForTimeout(50);
   check('Search input typing never navigates screens',await tab.evaluate(()=>window.__messages.filter(m=>m.type==='nav').length)===before);
   await tab.evaluate(()=>{const edit=document.createElement('div');edit.contentEditable='true';edit.id='fixture-edit';document.body.append(edit);edit.focus();});
   await tab.keyboard.type('456');
+  await tab.evaluate(()=>window.postMessage({type:'numberedNav',view:'live'},'*'));
+  await tab.waitForTimeout(50);
   check('Contenteditable typing never navigates screens',await tab.evaluate(()=>window.__messages.filter(m=>m.type==='nav').length)===before);
+  for(const value of ['', 'plaintext-only']){
+    await tab.evaluate(value=>{const edit=document.createElement('div');edit.setAttribute('contenteditable',value);const child=document.createElement('span');child.tabIndex=0;child.textContent='editable child';edit.append(child);document.body.append(edit);child.focus();},value);
+    await tab.keyboard.type('789');
+    await tab.evaluate(()=>window.postMessage({type:'numberedNav',view:'overview'},'*'));
+    await tab.waitForTimeout(50);
+    check(`Inherited ${value || 'empty attribute'} editable content ignores bare and public numbered shortcuts`,await tab.evaluate(()=>document.activeElement.isContentEditable && window.__messages.filter(m=>m.type==='nav').length)===before);
+  }
+  await tab.locator('.nav.on').focus();
+  await tab.evaluate(()=>{document.dispatchEvent(new CompositionEvent('compositionstart'));window.postMessage({type:'numberedNav',view:'overview'},'*');});
+  await tab.waitForTimeout(50);
+  check('Public numbered requests cannot interrupt composition',await tab.evaluate(()=>window.__messages.filter(m=>m.type==='nav').length)===before);
+  await tab.evaluate(()=>document.dispatchEvent(new CompositionEvent('compositionend')));
+  // Headless Chromium keeps separate pages focused; inject the browser's lost-focus result.
+  await tab.evaluate(()=>{Object.defineProperty(document,'hasFocus',{value:()=>false,configurable:true});window.postMessage({type:'numberedNav',view:'overview'},'*');});
+  await tab.waitForTimeout(50);
+  check('Public numbered requests deny modeled document focus loss',await tab.evaluate(before=>!document.hasFocus() && window.__messages.filter(m=>m.type==='nav').length===before,before));
+  await tab.evaluate(()=>delete document.hasFocus);
   const saved=await tab.evaluate(()=>window.__state);
   const restored=restoreWorkspaceMetadata(saved,allViews());
   state={view:restored.metadata.view,selected:restored.metadata.selected,opts:restored.metadata.opts};

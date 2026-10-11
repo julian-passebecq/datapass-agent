@@ -1,4 +1,4 @@
-# DataPass Agent 0.10.5
+# DataPass Agent 0.10.6
 
 Agent editor tabs now restore their navigation and minimal context through the public VS Code webview serializer. Reviewed source grants remain in memory: after an extension-host restart, scoped tabs explain the missing authority and offer **Review Cockpit Scope** before reopening the project from PM. The selected project context can continue to Lens using its independently reviewed repository mapping. See [integration release notes and qualification limits](docs/AGENTS-WINDOW-INTEGRATION-20261011.md).
 

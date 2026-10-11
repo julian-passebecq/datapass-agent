@@ -83,7 +83,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
       tabs.add(p); p.onVisibility=syncGitEnded; p.restore(panel,state);
     },
   }));
-  for (const [index,view] of DIGIT_VIEWS.entries()) ctx.subscriptions.push(vscode.commands.registerCommand(`agent.numberedScreen${index===9?0:index+1}`,()=>WorkspacePanel.focused()?.open(view)));
+  for (const [index,view] of DIGIT_VIEWS.entries()) ctx.subscriptions.push(vscode.commands.registerCommand(`agent.numberedScreen${index===9?0:index+1}`,()=>WorkspacePanel.focused()?.numberedNavigation(view)));
 
   // Git correlation of ENDED sessions only feeds what a view shows: paused while no Agent view is visible, resumed
   // (with a refresh) as soon as one is. Live sessions keep being correlated.

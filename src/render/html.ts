@@ -199,6 +199,9 @@ const q = document.getElementById('q');
 const initialState = document.getElementById('agent-state');
 if (initialState) { try { vscode.setState(JSON.parse(initialState.textContent)); } catch {} }
 const DIGITS = ${JSON.stringify(DIGIT_VIEWS)};
+let composing = false;
+document.addEventListener('compositionstart', () => { composing = true; });
+document.addEventListener('compositionend', () => { composing = false; });
 // Minified builds rename functions: bind the helper by value, not by its declared name.
 const loadNote = ${loadNote.toString()};
 // Loading markers: first time each id was seen, so the elapsed time survives re-renders.
@@ -232,6 +235,12 @@ function decorate() {
 }
 window.addEventListener('message', e => {
   const m = e.data;
+  if (m && m.type === 'numberedNav' && DIGITS.includes(m.view)) {
+    const a = document.activeElement;
+    if (!document.hasFocus() || composing || gp || a?.isContentEditable || a?.closest('input,select,textarea,[role="textbox"]')) return;
+    vscode.postMessage({type:'nav',view:m.view,key:''});
+    return;
+  }
   if (m && m.type === 'render' && typeof m.html === 'string') {
     const a = document.activeElement;
     const fk = a && a !== q && root.contains(a) && a.dataset ? a.dataset.select : undefined;
@@ -328,7 +337,7 @@ document.addEventListener('keydown', e => {
   if (gp && gp.el.contains(e.target)) return;
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'k' || e.key === 'K')) { gpOpen(); e.preventDefault(); return; }
   if (e.target === q) { if (e.key === 'Escape') { q.value = ''; applyFilter(); q.blur(); } return; }
-  if (!document.hasFocus() || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input,select,textarea,[contenteditable="true"],[role="textbox"]')) return;
+  if (!document.hasFocus() || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.target?.isContentEditable || e.target.closest?.('input,select,textarea,[role="textbox"]')) return;
   if (/^[0-9]$/.test(e.key)) {
     const v = DIGITS[e.key === '0' ? 9 : +e.key - 1];
     const b = v && root.querySelector('[data-nav="' + v + '"].nav');
