@@ -21,6 +21,7 @@ export interface SessionRef { id:string; provider:string; repoId?:string; parent
 export interface ContextRef {
   organizationId:string; privacyDomainId:string; projectId:string; repoId:string;
   hostId:string; worktreeId:string|null; revision:string|null; selectedItemId:string|null; returnToken:string;
+  origin?:{schema:'datapass.pm-origin/1';projectId:string;taskId:string|null;taskRevision:number|null;taskAuthorityHash:string|null};
 }
 export interface ContextMapping { repoId:string;path:string;worktreeId:string|null;worktreePath:string|null;revision:string|null;sessionId:string; }
 export interface NativeObservation {

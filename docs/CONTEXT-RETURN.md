@@ -20,14 +20,20 @@ Negotiate `getContextMappings` to verify the selected local repository independe
     worktreeId: null, // or exact observed SessionRef.worktreeId
     revision: null,   // or an exact observed source revision
     selectedItemId: null, // or an enrolled native SessionRef.id
-    returnToken // opaque caller route token; 1..160 chars [a-zA-Z0-9._:/-]
+    returnToken, // opaque caller route token; 1..160 chars [a-zA-Z0-9._:/-]
+    origin: { // optional inert PM selection metadata
+      schema:'datapass.pm-origin/1', projectId,
+      taskId:null, taskRevision:null, taskAuthorityHash:null
+    }
   }
 }
 ```
 
 Agent validates every context field against the reviewed scope, host and native observations. An unmapped revision/worktree/session or stale epoch yields DENIED with opened=false. A valid native session opens scoped Compact at that selection; full transcript detail opens in the same filtered Agent editor. Back to Compact retains selection. The reply returns `{opened:true, returnToken}` with requestId/generation/scopeHash/epoch.
 
-The context strip offers **Return to PM**. It executes only the fixed, negotiated `datapassPm.returnFromAgent` command, with `{returnToken,requestId,generation,scopeHash,epoch}` captured from the original approved open. It never executes the token as a command. Agent rechecks the original grant epoch and source/session/Git-context identity immediately before returning; drift or revoked/regranted scope refuses both return and token copying. PM independently validates this envelope and restores its saved work selection. A missing command or missing original generation falls back to copying the token. **Copy return token** also remains available explicitly. Installed PM restoration requires separate family qualification.
+Optional `origin` must use the exact context project ID. Its three task fields are either all null, or a valid task ID, a safe nonnegative integer document revision and a 64-character lowercase SHA256 authority hash. Agent treats this as PM selection metadata, not a native-session task association. PM alone validates the authoritative task document before transfer and return. Unknown origin fields, task bodies and drafts are stripped from saved metadata.
+
+The context strip offers **Return to PM**. It executes only the fixed, negotiated `datapassPm.returnFromAgent` command, with `{returnToken,requestId,generation,scopeHash,epoch}` captured from the original approved open. It never executes the token as a command. Agent rechecks the original grant epoch and source/session/Git-context identity immediately before and after returning; drift or revoked/regranted scope refuses both return and token copying. PM independently validates this envelope and restores its saved work selection. Agent reports RETURNED only for `{returned:true,...binding}` with every original binding field matching exactly. Missing acknowledgement yields UNVERIFIED; mismatched acknowledgement yields DENIED; PM rejection propagates. A missing command or missing original generation falls back to copying the token. **Copy return token** also remains available explicitly. Installed PM restoration requires separate family qualification.
 
 **Inspect context in Lens** negotiates `tern.openCockpitContext` and sends `{schema:'datapass.cockpit-lens-context/1',context,binding,devContext}`. `binding` is the original PM return envelope; `devContext` uses the existing public `@galaxy/dev-context` parser and observed repository/worktree/revision. Agent rechecks its original grant epoch and source-context hash after command negotiation. Lens maps its own reviewed catalogue/project/source grant and validates local Git independently; installed command availability alone cannot produce OPENED. Missing Lens support keeps the scoped Agent panel and its direct Return to PM usable.
 

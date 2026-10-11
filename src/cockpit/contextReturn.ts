@@ -9,10 +9,17 @@ export function contextSourceHash(context:ContextRef,sessions:AgentSessionSnapsh
   return digest(sessions.filter(s=>(!context.selectedItemId || s.key===context.selectedItemId) && repoId(s.repository ?? s.cwd ?? '')===context.repoId)
     .map(s=>[s.key,s.artifactPath,repoId(s.repository ?? s.cwd ?? ''),s.worktree ?? null,s.headBefore ?? null,s.headAfter ?? null]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
 }
-export async function returnToPm(context:ContextRef,binding:ContextReturnBinding,valid:()=>boolean,transport:{commands():PromiseLike<string[]>;execute(command:string,payload:ContextReturnBinding):PromiseLike<unknown>;copy(token:string):PromiseLike<unknown>},copyOnly=false):Promise<'RETURNED'|'COPIED'|'DENIED'> {
+export async function returnToPm(context:ContextRef,binding:ContextReturnBinding,valid:()=>boolean,transport:{commands():PromiseLike<string[]>;execute(command:string,payload:ContextReturnBinding):PromiseLike<unknown>;copy(token:string):PromiseLike<unknown>},copyOnly=false):Promise<'RETURNED'|'COPIED'|'DENIED'|'UNVERIFIED'> {
   if(!valid() || binding.returnToken!==context.returnToken || !idOk(binding.returnToken) || !idOk(binding.requestId) || binding.generation!==null && !idOk(binding.generation) || !/^[a-f0-9]{64}$/.test(binding.scopeHash) || !Number.isSafeInteger(binding.epoch) || binding.epoch<0)return 'DENIED';
   const installed=!copyOnly && binding.generation!==null && (await transport.commands()).includes(PM_RETURN_COMMAND);
   if(!valid())return 'DENIED';
-  if(installed){await transport.execute(PM_RETURN_COMMAND,structuredClone(binding));return 'RETURNED';}
+  if(installed){
+    const reply=await transport.execute(PM_RETURN_COMMAND,structuredClone(binding));
+    if(!valid())return 'DENIED';
+    if(!reply || typeof reply!=='object')return 'UNVERIFIED';
+    const ack=reply as ContextReturnBinding & {returned?:boolean};
+    if(ack.returned!==true)return ack.returned===false?'DENIED':'UNVERIFIED';
+    return (Object.keys(binding) as (keyof ContextReturnBinding)[]).every(key=>ack[key]===binding[key])?'RETURNED':'DENIED';
+  }
   await transport.copy(context.returnToken);return 'COPIED';
 }

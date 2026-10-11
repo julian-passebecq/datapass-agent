@@ -192,8 +192,10 @@ export class WorkspacePanel implements vscode.Disposable {
       info: m => void vscode.window.showInformationMessage(m),
       confirm: async (m, yes) => (await vscode.window.showWarningMessage(m, { modal: true }, yes)) === yes,
       saveText: async (name, content) => {
+        const permitted=()=>!this.readSessions || this.readInputs?.().panelContext?.valid===true && this.readInputs?.().panelContext?.exportAllowed===true;
+        if(!permitted()){void vscode.window.showInformationMessage('Agent: this reviewed scope does not permit export, or its source changed. Review an export-enabled scope before saving.');return undefined;}
         const uri = await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(name) });
-        if (!uri) return undefined;
+        if (!uri || !permitted()) return undefined;
         await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
         return uri.fsPath;
       },

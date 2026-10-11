@@ -1,4 +1,5 @@
 import * as fs from 'node:fs/promises';
+import * as localFs from 'node:fs';
 import * as path from 'node:path';
 import { collectSettings, defaultHomes, isForbidden, layersFor, effective } from '../feeds/settings';
 import { collectCatalog, CatalogInput } from '../feeds/catalog';
@@ -16,6 +17,18 @@ export async function safeLocalSource(file: string): Promise<boolean> {
     for (let p = file; p !== path.dirname(p); p = path.dirname(p)) if ((await fs.lstat(p)).isSymbolicLink()) return false;
     return (await fs.stat(file)).isFile();
   } catch { return false; }
+}
+/** Panel reads are synchronous. Recheck linked ancestors without reading source content. */
+export function safeLocalPathSync(file:string,kind:'file'|'directory'='file'):boolean {
+  if(isForbidden(file) || isCredentialPath(file) || !path.isAbsolute(file))return false;
+  try{
+    for(let p=file;p!==path.dirname(p);p=path.dirname(p))if(localFs.lstatSync(p).isSymbolicLink())return false;
+    const stat=localFs.statSync(file);return kind==='file'?stat.isFile():stat.isDirectory();
+  }catch{return false;}
+}
+export function localSourceIdentity(file:string):string|null {
+  if(!safeLocalPathSync(file))return null;
+  try{const stat=localFs.statSync(file);return digest([file,stat.dev,stat.ino,stat.birthtimeMs]);}catch{return null;}
 }
 export async function readConfiguration(grant: LocalGrant, provider: 'codex' | 'claude', sessions: SessionRef[], homes = defaultHomes()): Promise<ConfigRead> {
   return collectConfiguration({ roots: grant.roots, policyHash: grant.scope.policyHash }, provider, sessions, homes);

@@ -16,7 +16,7 @@ fs.mkdirSync(output,{recursive:true});
 const executablePath=process.env.AGENT_HEADLESS_CHROMIUM ?? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const browser=await chromium.launch({executablePath,headless:true,args:['--disable-background-networking','--disable-component-update']});
 const checks=[];const check=(name,ok,detail='')=>{checks.push({name,state:ok?'PASS':'FAIL',detail});console.log(`${ok?'PASS':'FAIL'} ${name} ${detail}`);};
-const contextRef={organizationId:'local',privacyDomainId:'synthetic',projectId:'fixture',repoId:'repo:fixture',hostId:'host:fixture',worktreeId:null,revision:null,selectedItemId:'codex:fixture',returnToken:'pm:fixture'};
+const contextRef={organizationId:'local',privacyDomainId:'synthetic',projectId:'fixture',repoId:'repo:fixture',hostId:'host:fixture',worktreeId:null,revision:null,selectedItemId:'codex:fixture',returnToken:'pm:fixture',origin:{schema:'datapass.pm-origin/1',projectId:'fixture',taskId:'task:fixture',taskRevision:3,taskAuthorityHash:'a'.repeat(64)}};
 const session={key:'codex:fixture',provider:'codex',sessionId:'fixture',status:'UNKNOWN',statusReason:'Synthetic fixture; no process evidence',title:'Synthetic controlled project',commits:[],changedFiles:[],tests:[],isWorker:false,counts:{tools:0,commands:0,fileEdits:0,turns:0},evidence:[],artifactPath:'fixture-only',diagnostics:[],repository:'D:/fixture/controlled-project',cwd:'D:/fixture/controlled-project'};
 let data={sessions:[session],providers:[],events:[],now:Date.parse('2026-10-11T18:00:00Z'),ternAvailable:false,cockpitInputs:{contexts:[],acceptedWork:[],assets:[],panelContext:{valid:true,context:contextRef,projectId:'fixture'}}};
 let state={view:'compact',selected:session.key,opts:{'compact-scope':'session'}};
@@ -39,6 +39,7 @@ await tab.exposeFunction('__fixtureHost',async m=>{
 });
 try {
   await tab.goto('https://agent-fixture.invalid/fixture');
+  check('Scoped PM task selection is distinct from observed native session association',(await tab.locator('.context-bridge').textContent()).includes('Selected PM task: task:fixture') && (await tab.locator('.context-bridge').textContent()).includes('Session assignment is UNKNOWN'));
   for(const width of [420,600,700,1000,1500]){
     await tab.setViewportSize({width,height:900});
     const overflow=[];
@@ -106,6 +107,7 @@ try {
   await tab.reload();
   check('Synthetic host restart preserves selected page and context metadata',await tab.evaluate(()=>window.__state.view)===saved.view && (await tab.evaluate(()=>window.__state.context.projectId))==='fixture');
   check('Synthetic host restart requires reviewed reconnect and hides provider data',(await tab.locator('[role=alert]').textContent()).includes('grant was not restored') && await tab.locator('[data-select]').count()===0);
+  check('Suspended restored panel keeps PM task and project as inert selection hints',(await tab.locator('[role=alert]').textContent()).includes('saved PM task task:fixture') && (await tab.evaluate(()=>window.__state.context.origin.taskAuthorityHash))===contextRef.origin.taskAuthorityHash);
   await tab.screenshot({path:path.join(output,'synthetic-reload-reconnect.png')});
 }finally{
   await browser.close();

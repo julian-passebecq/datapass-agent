@@ -8,6 +8,14 @@ import { cockpitFixture } from './cockpitFixture';
 import * as fs from 'node:fs/promises';
 
 const context={organizationId:'local',privacyDomainId:'fixture',projectId:'fixture',repoId:'repo:fixture',hostId:'host:fixture',worktreeId:null,revision:null,selectedItemId:'codex:fixture',returnToken:'pm:work:fixture'};
+
+test('restored PM task hints retain only identity and authority metadata while requiring fresh scope',()=>{
+  const origin={schema:'datapass.pm-origin/1' as const,projectId:'fixture',taskId:'task:fixture',taskRevision:3,taskAuthorityHash:'a'.repeat(64),taskBody:'private draft',grant:'secret'};
+  const saved=workspaceMetadata({view:'transcript',selected:context.selectedItemId},allViews(),true,{...context,origin});
+  assert.deepEqual(saved.context?.origin,{schema:origin.schema,projectId:origin.projectId,taskId:origin.taskId,taskRevision:origin.taskRevision,taskAuthorityHash:origin.taskAuthorityHash});
+  assert.doesNotMatch(JSON.stringify(saved),/private draft|secret/);assert.match(restoreWorkspaceMetadata(saved,allViews()).reason!,/grant was not restored/);
+  assert.match(restoreWorkspaceMetadata({...saved,context:{...context,origin:{...origin,taskRevision:null}}},allViews()).reason!,/invalid/);
+});
 test('safe workspace state preserves navigation and ContextRef; strips grants, content, arbitrary options and approval bindings',()=>{
   const original={view:'catalog',selected:'codex:fixture',opts:{'catalog.tab':'models','compact-project':'fixture','scope':'fixture',credential:'secret','transcript.open':'conversation','rail.now':'closed'},context,grant:{roots:['private']},binding:{epoch:1},conversations:['private']};
   const saved=workspaceMetadata(original,allViews(),true,context);

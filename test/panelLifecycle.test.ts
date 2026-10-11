@@ -6,12 +6,16 @@ import { createRequire } from 'node:module';
 import * as ts from 'typescript';
 import { workspaceMetadata } from '../src/cockpit/workspaceState';
 import { allViews } from '../src/render/workspace';
+import { cockpitFixture } from './cockpitFixture';
+import { localHost } from '../src/cockpit/facade';
+import { repoId } from '../src/cockpit/policy';
 
-test('serializer adopts existing public panel, restores selected screen, persists metadata and denies stale source actions',()=>{
+test('serializer adopts existing public panel, restores selected screen, persists metadata and denies stale source actions',async()=>{
   const callbacks:{message?:(m:unknown)=>void;dispose?:()=>void}={};
   const received:unknown[]=[];let created=0;
   const panel={visible:true,active:true,title:'Agent',iconPath:undefined as unknown,webview:{options:{},cspSource:'self',html:'',onDidReceiveMessage(fn:(m:unknown)=>void){callbacks.message=fn;},postMessage(m:unknown){received.push(m);return Promise.resolve(true);}},onDidChangeViewState(){},onDidDispose(fn:()=>void){callbacks.dispose=fn;},reveal(){},dispose(){}};
-  const vscode={ThemeIcon:class{},ViewColumn:{Active:1},window:{createWebviewPanel(){created++;return panel;}},workspace:{isTrusted:false,getConfiguration(){return {get(_k:string,f:unknown){return f;}};}}};
+  let saveDialogs=0,beforeSave=()=>{};const writes:unknown[]=[];
+  const vscode={ThemeIcon:class{},ViewColumn:{Active:1},Uri:{file:(fsPath:string)=>({fsPath})},window:{createWebviewPanel(){created++;return panel;},showInformationMessage(){},async showSaveDialog(){saveDialogs++;beforeSave();return {fsPath:'fixture-export.md'};}},workspace:{isTrusted:false,fs:{async writeFile(...args:unknown[]){writes.push(args);}},getConfiguration(){return {get(_k:string,f:unknown){return f;}};}}};
   const source=fs.readFileSync(path.resolve(__dirname,'../../src/ui/workspace.ts'),'utf8');
   const compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
   const localRequire=createRequire(path.resolve(__dirname,'../src/ui/workspace.js'));
@@ -48,4 +52,33 @@ test('serializer adopts existing public panel, restores selected screen, persist
   pumped.length=0;
   const scoped=new module.exports.WorkspacePanel(store,()=>{},()=>false,undefined,()=>[],()=>({contexts:[],acceptedWork:[],assets:[],panelContext:{valid:true,context,projectId:'fixture'}}),context);
   scoped.open('workflows');assert.deepEqual(pumped,[],'provider-wide scanner is not pumped by reviewed scoped navigation');assert.match(panel.webview.html,/no scoped provider-wide scan was performed/);assert.doesNotMatch(panel.webview.html,/Scanning ~\/\.claude/);scoped.dispose();
+  let valid=true,exportAllowed=false;
+  const exporting=new module.exports.WorkspacePanel(store,()=>{},()=>false,undefined,()=>[],()=>({contexts:[],acceptedWork:[],assets:[],panelContext:{valid,exportAllowed,context,projectId:'fixture'}}),context);
+  const ctx=exporting.ctx();assert.equal(await ctx.saveText('fixture.md','redacted fixture'),undefined);assert.equal(saveDialogs,0,'observation-only scope cannot ask for an export destination');
+  exportAllowed=true;assert.equal(await ctx.saveText('fixture.md','redacted fixture'),'fixture-export.md');assert.equal(writes.length,1);
+  beforeSave=()=>{valid=false;};assert.equal(await ctx.saveText('fixture.md','redacted fixture'),undefined);assert.equal(writes.length,1,'source/grant drift during destination dialog prevents the write');exporting.dispose();
+});
+
+test('scoped UI binds exports to reviewed sources and suspends missing, replaced or linked provider paths',async()=>{
+  const f=await cockpitFixture();const handlers=new Map<string,Function>();let exportPermission=false,dialogs=0;const forwarded:unknown[]=[],panels:any[]=[],warnings:string[]=[];
+  class Panel {constructor(...args:any[]){panels.push(this);Object.assign(this,{message:args[1],read:args[4],inputs:args[5]});}open(){}dispose(){}}
+  const vscode={commands:{registerCommand(id:string,fn:Function){handlers.set(id,fn);return {dispose(){}};}},window:{async showQuickPick(items:any[],opts:any){return opts.canPickMany?[items[0]]:items.find(x=>x.exportConsent===exportPermission);},async showInputBox(opts:any){return opts.title==='Organization ID'?'local':'fixture';},showInformationMessage(){},showWarningMessage(message:string){warnings.push(message);},async showOpenDialog(){dialogs++;return [{fsPath:path.join(f.temp,'export')}];}},env:{clipboard:{async writeText(){}}}};
+  const source=fs.readFileSync(path.resolve(__dirname,'../../src/ui/cockpit.ts'),'utf8'),compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+  const localRequire=createRequire(path.resolve(__dirname,'../src/ui/cockpit.js')),module={exports:{} as {registerCockpit:Function}};
+  new Function('require','module','exports',compiled)((id:string)=>id==='vscode'?vscode:id==='./workspace'?{WorkspacePanel:Panel}:localRequire(id),module,module.exports);
+  const store={all:()=>f.snapshots,adapters:[f.adapter],opts:{historyDays:3},onDidChange:()=>({dispose(){}})};
+  const facade=module.exports.registerCockpit({subscriptions:[],globalState:{async update(){}}},store,()=>false,(m:unknown)=>forwarded.push(m),()=>({}));
+  try{
+    await handlers.get('agent.reviewCockpitScope')!();let scope=(await facade.api.getScopes()).data[0];
+    const context={organizationId:'local',privacyDomainId:'fixture',projectId:'fixture',repoId:repoId(f.repo),hostId:localHost().hostId,worktreeId:null,revision:null,selectedItemId:f.snapshots[0].key,returnToken:'pm:fixture'};
+    assert.equal((await facade.api.revealContext({requestId:'panel:fixture',scope,context})).state,'OK');let panel=panels.at(-1);
+    panel.message({type:'cmd',cmd:'exportConversations',key:''});await new Promise(resolve=>setImmediate(resolve));assert.equal(dialogs,0);assert.deepEqual(forwarded,[],'scoped exports never enter the provider-wide command');
+    exportPermission=true;await handlers.get('agent.reviewCockpitScope')!();scope=(await facade.api.getScopes()).data[0];assert.equal((await facade.api.revealContext({requestId:'panel:export',scope,context})).state,'OK');panel=panels.at(-1);
+    panel.message({type:'cmd',cmd:'exportConversations',key:''});
+    for(let i=0;i<40 && !warnings.some(m=>m.startsWith('Export selected fixture sessions locally?'));i++)await new Promise(resolve=>setTimeout(resolve,25));
+    assert.ok(warnings.some(m=>m.startsWith('Export selected fixture sessions locally? 1 new, 0 appended, 0 rewritten, 0 unchanged.')),'actual export plan includes only the reviewed session');assert.equal(dialogs,1);assert.deepEqual(forwarded,[]);assert.equal(fs.existsSync(path.join(f.temp,'export')),false,'cancelled review writes no export');
+    const original=f.snapshots[0].artifactPath,backup=original+'.approved';fs.appendFileSync(original,'\n');assert.equal(panel.read().length,1,'normal provider append retains the reviewed source identity');fs.renameSync(original,backup);assert.equal(panel.read().length,0);assert.equal(panel.inputs().panelContext.valid,false);
+    fs.writeFileSync(original,fs.readFileSync(backup));assert.equal(panel.read().length,0,'same-path replacement requires fresh reviewed reconnect');assert.equal(panel.inputs().panelContext.valid,false);
+    const linked=path.join(f.temp,'linked-provider');fs.symlinkSync(path.dirname(original),linked,'junction');f.snapshots[0].artifactPath=path.join(linked,path.basename(original));assert.equal(panel.read().length,0,'linked source cannot retain the panel authority');
+  }finally{facade.dispose();fs.rmSync(f.temp,{recursive:true,force:true});}
 });

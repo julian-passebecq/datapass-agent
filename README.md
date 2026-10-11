@@ -1,4 +1,6 @@
-# DataPass Agent 0.10.6
+# DataPass Agent 0.10.7
+
+Reviewed PM handoffs now show the original project/task selection separately from the observed native session. Returning requires PM to acknowledge that exact selection. Scoped exports require export consent and a current source throughout destination review; missing, replaced or linked sources suspend the panel until a fresh reviewed handoff. See [focused continuation notes](docs/PM-AGENT-CONTINUATION-20261011.md).
 
 Agent editor tabs now restore their navigation and minimal context through the public VS Code webview serializer. Reviewed source grants remain in memory: after an extension-host restart, scoped tabs explain the missing authority and offer **Review Cockpit Scope** before reopening the project from PM. The selected project context can continue to Lens using its independently reviewed repository mapping. See [integration release notes and qualification limits](docs/AGENTS-WINDOW-INTEGRATION-20261011.md).
 

@@ -14,13 +14,14 @@ import type { ContextRef, ContextMapping, EventPage, NativeObservation } from '.
 import { correlateResourceTime, observeResources, validateResources, SelectedResource } from './resources';
 import { intakeImage, ImageProducerReceipt } from './images';
 import { contextSourceHash, type ContextReturnBinding } from './contextReturn';
+import { safeContext } from './workspaceState';
 
 export interface ContextReceipt { id: string; projectId: string; sourceIds: string[]; backend: string; generationId: string; queriedAt: string; state: string; }
 export interface AcceptedWork { projectId: string; revision: string; counts: { open: number; active: number; done: number; }; }
 export type AssetState = 'FILE_OBSERVED' | 'GENERATED_REPORTED' | 'GENERATED_VERIFIED' | 'SELECTED' | 'PUBLISHED';
 export interface AssetRef { id: string; sha256: string; state: AssetState; producer: string | null; bytes: number; sourceId: string; }
 export interface SessionEvidenceRef { id:string;sessionId:string;taskId:string|null;presetHash:string|null;configHash:string|null;promptHash:string|null;sourceSha:string|null;qaReceiptId:string|null; }
-export interface ScopedInputs { contexts: ContextReceipt[]; acceptedWork: AcceptedWork[]; assets: AssetRef[]; evidenceRefs?:SessionEvidenceRef[]; panelContext?:{valid:boolean;context?:ContextRef;projectId:string;reason?:string}; }
+export interface ScopedInputs { contexts: ContextReceipt[]; acceptedWork: AcceptedWork[]; assets: AssetRef[]; evidenceRefs?:SessionEvidenceRef[]; panelContext?:{valid:boolean;context?:ContextRef;projectId:string;reason?:string;exportAllowed?:boolean}; }
 interface StoreRead { all(): AgentSessionSnapshot[]; onDidChange(fn: () => void): { dispose(): void }; lastStats?: { at: number }; opts: { historyDays: number }; }
 interface HostServices {
   host?: HostIdentity;
@@ -144,7 +145,7 @@ export class CockpitFacade {
   }
   private async revealContext(r:Request & {context:ContextRef}):Promise<Reply<{opened:boolean;returnToken:string|null}>> {
     if(validateRequest(r))r={...structuredClone(r),epoch:r.epoch ?? this.policy.epoch};
-    const g=this.policy.authorize(r),c=r?.context,empty={opened:false,returnToken:null};
+    const g=this.policy.authorize(r),c=safeContext(r?.context),empty={opened:false,returnToken:null};
     if(!g || !c || !g.scope.organizationIds.includes(c.organizationId) || !g.scope.privacyDomainIds.includes(c.privacyDomainId) || !g.scope.projectIds.includes(c.projectId) || !g.scope.repoIds.includes(c.repoId) || c.hostId!==this.host.hostId || !idOk(c.returnToken) || c.selectedItemId!==null && !idOk(c.selectedItemId) || c.worktreeId!==null && !idOk(c.worktreeId) || c.revision!==null && !/^[a-f0-9]{7,40}$/.test(c.revision))return this.reply(r,empty,'DENIED');
     const sessions=this.sessions(g).filter(s=>repoId(s.repository ?? s.cwd ?? '')===c.repoId),selected=c.selectedItemId ? sessions.find(s=>s.key===c.selectedItemId):undefined;
     if(!sessions.length || c.selectedItemId && !selected || c.worktreeId && !sessions.some(s=>s.worktree && repoId(s.worktree)===c.worktreeId) || c.revision && !(selected ? [selected]:sessions).some(s=>s.headAfter===c.revision || s.headBefore===c.revision))return this.reply(r,empty,'DENIED',['Canonical context cannot be mapped to the reviewed native observations.']);

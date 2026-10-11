@@ -1,11 +1,10 @@
 import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { SessionStore } from '../sessions/store';
 import { CockpitFacade, ScopedInputs } from '../cockpit/facade';
 import { digest, idOk, LocalGrant, makeGrant, ScopePolicy, repoId } from '../cockpit/policy';
-import { safeLocalSource } from '../cockpit/configuration';
+import { safeLocalSource, safeLocalPathSync, localSourceIdentity } from '../cockpit/configuration';
 import { IncrementalExporter } from '../export/incremental';
 import { WorkspacePanel } from './workspace';
 import type { WebviewMessage } from '../render/html';
@@ -23,7 +22,8 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
     open: (view, grant, id, context, returnBinding) => {
       const epoch=policy.epoch;
       const valid=()=>!!policy.authorize({requestId:'panel',scope:grant.scope,epoch});
-      const read = () => valid() ? policy.sessions(grant, store.all()).filter(s=>(!context || repoId(s.repository ?? s.cwd ?? '')===context.repoId) && existsSync(s.artifactPath)) : [];
+      const identities=new Map(policy.sessions(grant,store.all()).map(s=>[s.key,localSourceIdentity(s.artifactPath)]));
+      const read = () => valid() ? policy.sessions(grant, store.all()).filter(s=>(!context || repoId(s.repository ?? s.cwd ?? '')===context.repoId) && identities.get(s.key)!==null && localSourceIdentity(s.artifactPath)===identities.get(s.key) && (!s.repository && !s.cwd || safeLocalPathSync(s.repository ?? s.cwd!,'directory')) && (!s.worktree || safeLocalPathSync(s.worktree,'directory'))) : [];
       const sourceHash=context ? contextSourceHash(context,read()):null;
       const validReturn=()=>valid() && !!context && contextSourceHash(context,read())===sourceHash;
       let panel:WorkspacePanel;
@@ -41,10 +41,17 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
           void returnToPm(context,returnBinding,validReturn,{commands:()=>vscode.commands.getCommands(true),execute:(command,payload)=>vscode.commands.executeCommand(command,payload),copy:token=>vscode.env.clipboard.writeText(token)},m.cmd==='copyReturnToken').then(result=>{
             if(result==='COPIED')void vscode.window.showInformationMessage('Agent: return token copied. Restore the reviewed selection in PM.');
             if(result==='DENIED')void vscode.window.showWarningMessage('Agent: source or reviewed scope changed. Reopen the current project before returning.');
+            if(result==='UNVERIFIED')void vscode.window.showWarningMessage('Agent: PM did not acknowledge restoring the original selection. Return is unverified; check PM before continuing.');
           }).catch(()=>{void vscode.window.showWarningMessage('Agent: PM refused the return. Reopen the current project and review its selection.');});
           return;
         }
         if(!valid() || context && !validReturn())return;
+        if(m.type==='cmd' && m.cmd==='exportConversations'){
+          const sourceIds=m.key?[m.key]:context?.selectedItemId?[context.selectedItemId]:read().map(s=>s.key);
+          if(!sourceIds.length || sourceIds.some(id=>!read().some(s=>s.key===id)))return;
+          void exportReviewed(grant,sourceIds,context?validReturn:()=>valid() && sourceIds.every(id=>read().some(s=>s.key===id)));
+          return;
+        }
         if(m.type==='open'){panel.open('transcript',m.key);return;}
         if(m.type==='cmd' && m.cmd==='openWorkspaceNewTab'){panel.open('compact');return;}
         if(m.type==='cmd' && ['readTranscript','openTimeline','timelineAll','openWorkspace','knowledge'].includes(m.cmd)){panel.open(m.cmd==='readTranscript'?'transcript':m.cmd==='knowledge'?'context-activity':m.cmd==='openWorkspace'?'compact':'activity',m.key || undefined);return;}
@@ -52,7 +59,7 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
       };
       const reason=()=>!valid()?'The reviewed source grant changed or was revoked.':!read().length?'The reviewed provider source disappeared or is unavailable. Activity is UNKNOWN.':context && !validReturn()?'The selected provider source disappeared or its repository, worktree, or revision changed.':undefined;
       const guardedRead=()=>reason()?[]:read();
-      panel = new WorkspacePanel(store, scopedMessage, ternAvailable, p => { panels.delete(p); p.dispose(); }, guardedRead, () => ({...(!reason()?facade.scopedInputs(grant):{contexts:[],acceptedWork:[],assets:[]}),panelContext:{valid:!reason(),context,projectId:grant.scope.projectIds.join(', '),reason:reason()}}),context);
+      panel = new WorkspacePanel(store, scopedMessage, ternAvailable, p => { panels.delete(p); p.dispose(); }, guardedRead, () => ({...(!reason()?facade.scopedInputs(grant):{contexts:[],acceptedWork:[],assets:[]}),panelContext:{valid:!reason(),context,projectId:grant.scope.projectIds.join(', '),reason:reason(),exportAllowed:grant.exportConsent}}),context);
       panels.add(panel); panel.open(view === 'settings' || view === 'catalog' ? view : 'compact', view === 'session' ? id : undefined, { 'compact-scope': view === 'session' ? 'session' : 'all', 'compact-view': view === 'project' ? 'factory' : 'live' });
     },
     openSource: async file => { await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true }); },
@@ -61,6 +68,23 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
     const scopes = policy.scopes();
     const pick = await vscode.window.showQuickPick(scopes.map(scope => ({ label: scope.projectIds.join(', '), description: scope.organizationIds.join(', '), scope })), { title: 'Agent: Select reviewed cockpit scope' });
     return pick && policy.authorize({ requestId: 'local-picker', scope: pick.scope });
+  };
+  const exportReviewed=async(g:LocalGrant,sourceIds:string[],valid:()=>boolean):Promise<void>=>{
+    if(!g.exportConsent || !valid())return void vscode.window.showInformationMessage('Review an export-enabled scope first.');
+    const folder=await vscode.window.showOpenDialog({title:'Selected local export destination',canSelectFolders:true,canSelectFiles:false,canSelectMany:false});
+    if(!folder?.[0] || !valid())return;
+    const destinationId='destination:'+randomUUID();facade.setDestination(destinationId,folder[0].fsPath);
+    const request={requestId:'local-export:'+randomUUID(),scope:g.scope,epoch:policy.epoch};
+    const plan=await facade.api.planExport({...request,sourceIds,redactionProfileHash:digest('shared-dialogue/1')});
+    if(!valid())return;
+    if(plan.state!=='OK')return void vscode.window.showWarningMessage(plan.omissions.join(' ') || 'Export plan unavailable.');
+    const p=plan.data;
+    const approved=await vscode.window.showWarningMessage(`Export selected ${g.scope.projectIds.join(', ')} sessions locally? ${p.newCount} new, ${p.appendedCount} appended, ${p.rewrittenCount} rewritten, ${p.unchangedCount} unchanged. Curated full-session resnapshots exclude hidden reasoning and tool payloads.`,{modal:true},'Export selected plan');
+    if(approved!=='Export selected plan' || !valid())return;
+    facade.approve(p.hash,g,destinationId);
+    const receipt=await facade.api.executeApprovedLocalExport({...request,approval:{approvedPlanHash:p.hash,destinationId,scopePolicyHash:g.scope.policyHash}});
+    if(receipt.state==='OK')await vscode.window.showTextDocument(await vscode.workspace.openTextDocument({language:'json',content:JSON.stringify({schema:'datapass.committed-export-handoff/1',scope:g.scope,receipt:receipt.data,destinationId},null,2)}),{preview:true});
+    void vscode.window.showInformationMessage(`Agent export: ${receipt.state}${receipt.state==='OK'?' · '+receipt.data.manifestHash:''}`);
   };
   ctx.subscriptions.push(facade, { dispose: () => { panels.forEach(p => p.dispose()); panels.clear(); } },
     vscode.commands.registerCommand('agent.inspectSelectedProcess',async()=>{
@@ -115,18 +139,7 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
     }),
     vscode.commands.registerCommand('agent.exportIncremental', async () => {
       const g = await chooseScope(); if (!g?.exportConsent) return void vscode.window.showInformationMessage('Review an export-enabled scope first.');
-      const folder = await vscode.window.showOpenDialog({ title: 'Selected local export destination', canSelectFolders: true, canSelectFiles: false, canSelectMany: false }); if (!folder?.[0]) return;
-      const destinationId = 'destination:' + randomUUID(); facade.setDestination(destinationId, folder[0].fsPath);
-      const request = { requestId: 'local-export:' + randomUUID(), scope: g.scope };
-      const plan = await facade.api.planExport({ ...request, sourceIds: g.sessionKeys, redactionProfileHash: digest('shared-dialogue/1') });
-      if (plan.state !== 'OK') return void vscode.window.showWarningMessage(plan.omissions.join(' ') || 'Export plan unavailable.');
-      const p = plan.data;
-      const approved = await vscode.window.showWarningMessage(`Export selected ${g.scope.projectIds.join(', ')} sessions locally? ${p.newCount} new, ${p.appendedCount} appended, ${p.rewrittenCount} rewritten, ${p.unchangedCount} unchanged. Curated full-session resnapshots exclude hidden reasoning and tool payloads.`, { modal: true }, 'Export selected plan');
-      if (approved !== 'Export selected plan') return;
-      facade.approve(p.hash, g, destinationId);
-      const receipt = await facade.api.executeApprovedLocalExport({ ...request, approval: { approvedPlanHash: p.hash, destinationId, scopePolicyHash: g.scope.policyHash } });
-      if(receipt.state==='OK')await vscode.window.showTextDocument(await vscode.workspace.openTextDocument({language:'json',content:JSON.stringify({schema:'datapass.committed-export-handoff/1',scope:g.scope,receipt:receipt.data,destinationId},null,2)}),{preview:true});
-      void vscode.window.showInformationMessage(`Agent export: ${receipt.state}${receipt.state === 'OK' ? ' · ' + receipt.data.manifestHash : ''}`);
+      const epoch=policy.epoch;await exportReviewed(g,g.sessionKeys,()=>!!policy.authorize({requestId:'local-export-check',scope:g.scope,epoch}));
     }),
     vscode.commands.registerCommand('agent.selectAssetRoot', async () => {
       const folder = await vscode.window.showOpenDialog({ title: 'Select approved local image root', canSelectFolders: true, canSelectFiles: false, canSelectMany: false }); if (!folder?.[0]) return;

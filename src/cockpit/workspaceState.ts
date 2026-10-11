@@ -18,7 +18,9 @@ export function safeContext(value: unknown): ContextRef | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return;
   const c = value as ContextRef;
   if (![c.organizationId,c.privacyDomainId,c.projectId,c.repoId,c.hostId,c.returnToken].every(idOk) || c.worktreeId !== null && !idOk(c.worktreeId) || c.selectedItemId !== null && !idOk(c.selectedItemId) || c.revision !== null && (typeof c.revision!=='string' || !/^[a-f0-9]{7,40}$/.test(c.revision))) return;
-  return { organizationId:c.organizationId,privacyDomainId:c.privacyDomainId,projectId:c.projectId,repoId:c.repoId,hostId:c.hostId,worktreeId:c.worktreeId,revision:c.revision,selectedItemId:c.selectedItemId,returnToken:c.returnToken };
+  const o=c.origin;
+  if(o!==undefined && (!o || o.schema!=='datapass.pm-origin/1' || o.projectId!==c.projectId || !(o.taskId===null && o.taskRevision===null && o.taskAuthorityHash===null || idOk(o.taskId) && Number.isSafeInteger(o.taskRevision) && o.taskRevision! >= 0 && typeof o.taskAuthorityHash==='string' && /^[a-f0-9]{64}$/.test(o.taskAuthorityHash))))return;
+  return { organizationId:c.organizationId,privacyDomainId:c.privacyDomainId,projectId:c.projectId,repoId:c.repoId,hostId:c.hostId,worktreeId:c.worktreeId,revision:c.revision,selectedItemId:c.selectedItemId,returnToken:c.returnToken,...(o?{origin:{schema:o.schema,projectId:o.projectId,taskId:o.taskId,taskRevision:o.taskRevision,taskAuthorityHash:o.taskAuthorityHash}}:{}) };
 }
 export function workspaceMetadata(state: WsState, views: string[], scoped = false, context?: ContextRef): WorkspaceMetadata {
   const opts: Record<string,string> = {};
