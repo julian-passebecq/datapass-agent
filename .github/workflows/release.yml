@@ -46,6 +46,7 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - run: npm run build:provider-kit
       - run: npm run package
       - name: Validate optional PM source pin
         if: env.PM_SOURCE_SHA != ''
