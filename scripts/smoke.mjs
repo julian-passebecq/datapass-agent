@@ -352,7 +352,7 @@ try {
   }
   check('Reload: Agent reactivates and Cockpit renders', after);
   await shot(win, '05-after-reload-dark');
-  if(pmFixture)result.pmAgent=await qualifyPmAgent({app,win,fixture:pmFixture,check,shot,runCommand,webviewText,extDir});
+  if(pmFixture)result.pmAgent=await qualifyPmAgent({app,win,fixture:pmFixture,check,shot,runCommand,webviewText,extDir,userData,agentVsix:vsix});
 } catch (e) {
   result.errors.push(String(e?.stack ?? e));
   console.error(e);

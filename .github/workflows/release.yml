@@ -52,29 +52,18 @@ jobs:
         shell: pwsh
         run: |
           if ($env:PM_SOURCE_SHA -cnotmatch '^[a-f0-9]{40}$') { throw 'PM source must be an exact lowercase 40-hex SHA.' }
-      - name: Checkout exact PM candidate
-        if: env.PM_SOURCE_SHA != ''
-        uses: actions/checkout@v4
-        with:
-          repository: julian-passebecq/datapass-pm
-          ref: ${{ env.PM_SOURCE_SHA }}
-          path: .smoke/pm-source
-          persist-credentials: false
-      - name: Build exact PM VSIX for the shared installed host
+      - name: Verify previously qualified exact PM VSIX fixture
         if: env.PM_SOURCE_SHA != ''
         shell: pwsh
-        working-directory: .smoke/pm-source
         run: |
-          $observed = git rev-parse HEAD
-          if ($observed -cne $env:PM_SOURCE_SHA) { throw 'PM checkout differs from the requested exact source.' }
-          npm ci
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm run package
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $packages = @(Get-ChildItem -File datapass-pm-*.vsix)
-          if ($packages.Count -ne 1) { throw 'Expected one PM candidate VSIX.' }
-          "PM_VSIX=$($packages[0].FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          Get-FileHash -LiteralPath $packages[0].FullName -Algorithm SHA256 | ConvertTo-Json | Set-Content pm-vsix-sha256.json
+          $fixture = Join-Path $env:GITHUB_WORKSPACE 'test/fixtures/installed-pm'
+          $receipt = Get-Content (Join-Path $fixture 'receipt.json') -Raw | ConvertFrom-Json
+          if ($receipt.sourceSha -cne $env:PM_SOURCE_SHA) { throw 'Requested PM SHA is not the approved installed fixture.' }
+          if ($receipt.filename -cnotmatch '^datapass-pm-[0-9]+\.[0-9]+\.[0-9]+\.vsix$') { throw 'Invalid fixed PM fixture filename.' }
+          $package = Join-Path $fixture $receipt.filename
+          $observed = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($observed -cne $receipt.sha256) { throw 'PM fixture VSIX hash differs from its exact-source CI receipt.' }
+          "PM_VSIX=$package" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: VSIX hash
         shell: pwsh
         run: Get-FileHash agent-vscode-*.vsix -Algorithm SHA256 | Tee-Object -FilePath vsix-sha256.txt | Format-List
@@ -146,6 +135,6 @@ jobs:
             .smoke/smoke-result.json
             .smoke/pm-agent-result.json
             .smoke/pm-agent-drafts/*.txt
-            .smoke/pm-source/datapass-pm-*.vsix
-            .smoke/pm-source/pm-vsix-sha256.json
+            test/fixtures/installed-pm/datapass-pm-*.vsix
+            test/fixtures/installed-pm/receipt.json
           if-no-files-found: warn

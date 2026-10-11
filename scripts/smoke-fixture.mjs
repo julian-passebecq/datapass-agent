@@ -42,15 +42,16 @@ export function buildFixtureHome(dir, { cwd = root, newestAgoMin = 1, now = Date
   let head = '0'.repeat(40);
   try { head = execFileSync('git', ['-C', cwd, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() || head; } catch { /* not a repo */ }
   const vars = { __CWD__: jpath(cwd), __HEAD__: head, __MISSING__: jpath(path.join(dir, 'deleted-worktree')) };
-  const sources = [['claude', '.claude'], ['codex', '.codex']].map(([src, dst]) => ({ src: path.join(FIXTURES, src), dst: path.join(dir, dst) }));
+  const sources = [['claude', '.claude'], ['codex', '.codex'], ['workflows', '.claude']].map(([src, dst]) => ({ src: path.join(FIXTURES, src), dst: path.join(dir, dst) }));
   let newest = 0;
   for (const { src } of sources) for (const f of files(src)) newest = Math.max(newest, ...stamps(fs.readFileSync(f, 'utf8')));
   if (!newest) throw new Error('fixture has no timestamps');
   const shift = now - newestAgoMin * 60_000 - newest;
   const shiftIso = s => new Date(Date.parse(s) + shift).toISOString().replace(/\.\d{3}Z$/, m => (s.includes('.') ? m : 'Z'));
   const written = [];
+  const replaced = new Set();
   for (const { src, dst } of sources) {
-    fs.rmSync(dst, { recursive: true, force: true });
+    if(!replaced.has(dst)){fs.rmSync(dst,{recursive:true,force:true});replaced.add(dst);}
     for (const f of files(src)) {
       let txt = fs.readFileSync(f, 'utf8');
       for (const [k, v] of Object.entries(vars)) txt = txt.split(k).join(v);
@@ -74,6 +75,12 @@ export function buildFixtureHome(dir, { cwd = root, newestAgoMin = 1, now = Date
       written.push([out, Math.max(0, ...stamps(txt)) || now - newestAgoMin * 60_000]);
     }
   }
+  // The workflow fixture's scanner directory has no lead transcript. Add one
+  // explicitly generated lead so the installed graph can exercise actual links.
+  const workflowLead=path.join(dir,'.claude','projects','D--PROJ-demo','11111111-2222-3333-4444-555555555555.jsonl');
+  const workflowAt=new Date(now-newestAgoMin*60000).toISOString();
+  fs.writeFileSync(workflowLead,JSON.stringify({type:'user',uuid:'generated-workflow-lead',sessionId:'11111111-2222-3333-4444-555555555555',cwd,timestamp:workflowAt,message:{role:'user',content:'Generated workflow lead for installed qualification.'}})+'\n');
+  written.push([workflowLead,now-newestAgoMin*60000]);
   for (const [p, ms] of written) fs.utimesSync(p, new Date(ms), new Date(ms));
   return {
     USERPROFILE: dir,

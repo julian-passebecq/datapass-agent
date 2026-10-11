@@ -3,6 +3,7 @@ dist/
 out/
 out-test/
 *.vsix
+!test/fixtures/installed-pm/*.vsix
 .vscode-test/
 .smoke/
 .env*
