@@ -1,0 +1,78 @@
+{
+  "schema": "datapass.agent-integration-receipt/1",
+  "capturedAt": "2026-10-11T17:48:43.285Z",
+  "sourceSha": "1699e8303156909374d7c5388d83078717ff667c",
+  "baseline": "8c120be6d4046c85cb16e7aa1f70e98de9f4c0bc",
+  "branch": "codex/agents-window-integration-20261011",
+  "canonicalRepository": "https://github.com/julian-passebecq/agent-vscode.git",
+  "package": {
+    "path": "agent-vscode-0.10.5.vsix",
+    "version": "0.10.5",
+    "sha256": "69ff065ba51f73f8221b7be0ef91cc5f6df229578bef1543b9150e266e531810",
+    "bytes": 474955
+  },
+  "checks": {
+    "typecheck": "PASS",
+    "fullTests": {
+      "state": "PASS",
+      "count": 459,
+      "passed": 459,
+      "fail": 0
+    },
+    "headless": {
+      "state": "PASS",
+      "checks": 11
+    },
+    "preservation": {
+      "screens": 47,
+      "existingCommands": 31,
+      "addedCommands": [
+        "agent.numberedScreen0",
+        "agent.numberedScreen1",
+        "agent.numberedScreen2",
+        "agent.numberedScreen3",
+        "agent.numberedScreen4",
+        "agent.numberedScreen5",
+        "agent.numberedScreen6",
+        "agent.numberedScreen7",
+        "agent.numberedScreen8",
+        "agent.numberedScreen9"
+      ],
+      "removedCommands": [],
+      "existingViews": 5,
+      "removedViews": []
+    }
+  },
+  "authority": {
+    "persistedGrants": false,
+    "physicalInput": false,
+    "ownerDesktop": false,
+    "providerHistoryPublication": false,
+    "liveConfigurationApply": false,
+    "push": "NOT_PERFORMED_BY_AGENT_LANE"
+  },
+  "nativeGates": [
+    {
+      "id": "installed-reload-extension-host-restart",
+      "state": "UNTESTED",
+      "reason": "Awaiting owned draft-free native profile and verified nonintrusive capture."
+    },
+    {
+      "id": "installed-PM-Agent-Lens-PM",
+      "state": "UNTESTED",
+      "reason": "Headless/API fixtures do not certify an installed native journey."
+    },
+    {
+      "id": "installed-numbered-keybindings",
+      "state": "UNTESTED",
+      "reason": "Public command manifest plus webview fixture tested; native editor focus remains unqualified."
+    },
+    {
+      "id": "exact-head-remote-CI",
+      "state": "UNTESTED",
+      "reason": "Root owns approved bounded branch publication and CI observation."
+    }
+  ],
+  "tokenUsage": null,
+  "tokenUsageReason": "No authoritative token accounting exposed for this lane."
+}

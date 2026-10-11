@@ -1,0 +1,64 @@
+{
+  "schema": "datapass.agent-headless-qualification/1",
+  "fixture": "SYNTHETIC",
+  "nativeUiState": "UNTESTED",
+  "physicalInput": false,
+  "providerHomeRead": false,
+  "checks": [
+    {
+      "name": "All 47 screens at 420px: bounded page width",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "All 47 screens at 600px: bounded page width",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "All 47 screens at 700px: bounded page width",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "All 47 screens at 1000px: bounded page width",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "All 47 screens at 1500px: bounded page width",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Offscreen active rail control is brought into the narrow viewport",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Focused webview numbered shortcuts retain fixed mapping across all ten screens",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Search input typing never navigates screens",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Contenteditable typing never navigates screens",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Synthetic host restart preserves selected page and context metadata",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Synthetic host restart requires reviewed reconnect and hides provider data",
+      "state": "PASS",
+      "detail": ""
+    }
+  ]
+}

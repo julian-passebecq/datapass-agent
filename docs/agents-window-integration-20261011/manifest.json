@@ -1,0 +1,48 @@
+{
+  "schema": "datapass.agent-qa-manifest/1",
+  "sourceSha": "1699e8303156909374d7c5388d83078717ff667c",
+  "files": [
+    {
+      "path": "headless-receipt.json",
+      "sha256": "94ce57a076de052486839baeb3863896a392123cd13ba1f239310d77e10eb2d3",
+      "bytes": 1581,
+      "privacy": "SANITIZED_PRODUCT_QA"
+    },
+    {
+      "path": "package.txt",
+      "sha256": "2f35508a462b5ad7e46da0ac62a039e500019768be18584046b7227b302996f1",
+      "bytes": 974,
+      "privacy": "SANITIZED_PRODUCT_QA"
+    },
+    {
+      "path": "receipt.json",
+      "sha256": "fae3533a73329c9ab05409bfd603002bbf215357e140f3e973a2c43014c0a345",
+      "bytes": 2346,
+      "privacy": "SANITIZED_PRODUCT_QA"
+    },
+    {
+      "path": "synthetic-narrow-settings.png",
+      "sha256": "a06185caa84e0f309e88df309539941776c867fdd4efafaa6b889c0286a2fb3c",
+      "bytes": 37968,
+      "privacy": "SYNTHETIC_IMAGE"
+    },
+    {
+      "path": "synthetic-reload-reconnect.png",
+      "sha256": "58f7b61630c439b0513a9956a0dd9093b81adf6ad1826534dea3ebd668ccb37f",
+      "bytes": 28099,
+      "privacy": "SYNTHETIC_IMAGE"
+    },
+    {
+      "path": "tests.txt",
+      "sha256": "a9307b4e5f0910cf5e9c375c9c4250c72dbdc428bccc530d07b8c697ed54c2e9",
+      "bytes": 49112,
+      "privacy": "SANITIZED_PRODUCT_QA"
+    },
+    {
+      "path": "typecheck.txt",
+      "sha256": "e49eba4b0364fc2beb8249b1950cd367158d3231926aef185404c8a8f63d36a3",
+      "bytes": 54,
+      "privacy": "SANITIZED_PRODUCT_QA"
+    }
+  ]
+}
