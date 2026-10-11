@@ -188,25 +188,46 @@ async function workspacePass(app, win, ck, theme, views) {
     await panesPass(win, ws, theme, views);
   }
   // Keyboard: digits map to fixed screens (the rail shows the digit); "/" filter hides non-matching sessions.
-  await ws.frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true })));
+  // Real keys require this editor's public control to own focus. Dispatching on document bypasses
+  // the focus boundary (and does not model a user's keyboard target).
+  await ws.frame.locator('.nav.on').click();
+  check(`${theme}: numbered keyboard target owns webview focus`, await ws.frame.evaluate(() => document.hasFocus()));
+  await ws.frame.locator('.nav.on').press('1');
   await win.waitForTimeout(800);
   const third = await ws.frame.evaluate(() => (document.querySelector('.nav[aria-keyshortcuts="3"]')?.childNodes[0]?.textContent ?? '').trim());
-  await ws.frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: '3', bubbles: true })));
+  await ws.frame.locator('.nav.on').press('3');
   let h1 = '';
   for (const t2 = Date.now(); Date.now() - t2 < 15_000; await win.waitForTimeout(250)) {
     h1 = await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent ?? '');
     if (h1 === third) break;
   }
   check(`${theme}: keyboard 3 opens the screen numbered 3 in the rail (${third})`, !!third && h1 === third, h1);
+  // The public VS Code shortcut follows the same fixed mapping, with the Agent editor focused.
+  await ws.frame.locator('.nav.on').click();
+  await win.keyboard.press('Control+Alt+1');
+  await ws.frame.waitForFunction(() => document.querySelector('.mh h1')?.textContent === 'Overview', undefined, { timeout: 15_000 }).catch(() => {});
+  check(`${theme}: public numbered shortcut 1 targets the active Agent editor`, await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent === 'Overview'));
+  await ws.frame.locator('.nav.on').click();
+  await win.keyboard.press('Control+Alt+3');
+  await ws.frame.waitForFunction(() => document.querySelector('.mh h1')?.textContent === 'Live', undefined, { timeout: 15_000 }).catch(() => {});
+  check(`${theme}: public numbered shortcut 3 targets the active Agent editor`, await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent === 'Live'));
   // Rail groups collapse and expand.
   const before = await ws.frame.evaluate(() => document.querySelectorAll('[data-nav].nav').length);
-  await ws.frame.evaluate(() => [...document.querySelectorAll('.rg .railg')].pop()?.click());
+  // The active screen's group deliberately stays expanded, so choose an independent group.
+  const group = await ws.frame.evaluate(() => [...document.querySelectorAll('.rg:not(.closed)')].find(g => !g.querySelector('.nav.on'))?.querySelector('.railg')?.dataset.opt);
+  check(`${theme}: an inactive rail group is available for collapse`, !!group);
+  if (group) await ws.frame.locator(`.railg[data-opt="${group}"]`).click();
   let after = before;
   for (const t3 = Date.now(); Date.now() - t3 < 10_000 && after === before; await win.waitForTimeout(250)) after = await ws.frame.evaluate(() => document.querySelectorAll('[data-nav].nav').length);
-  await ws.frame.evaluate(() => document.querySelector('.rg.closed .railg')?.click());
+  if (group) await ws.frame.locator(`.rg.closed .railg[data-opt="${group}"]`).click();
   await win.waitForTimeout(1500);
   const again = await ws.frame.evaluate(() => document.querySelectorAll('[data-nav].nav').length);
   check(`${theme}: rail group collapses and expands`, after < before && again === before, `${before} → ${after} → ${again}`);
+  await ws.frame.locator('#q').fill('');
+  await ws.frame.locator('#q').press('1');
+  await win.keyboard.press('Control+Alt+1');
+  await win.waitForTimeout(800);
+  check(`${theme}: typing and numbered shortcut in the filter retain the current screen`, await ws.frame.evaluate(() => document.querySelector('.mh h1')?.textContent === 'Live' && document.getElementById('q')?.value === '1'));
   const filt = await ws.frame.evaluate(() => {
     const q = document.getElementById('q');
     const all = document.querySelectorAll('main [data-select]').length;

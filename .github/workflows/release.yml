@@ -98,6 +98,8 @@ jobs:
         if: always()
         with:
           name: ${{ env.ARTIFACT_NAME }}
+          # The allowlisted .smoke outputs contain synthetic fixture screenshots and receipts.
+          include-hidden-files: true
           path: |
             agent-vscode-*.vsix
             vsix-sha256.txt
