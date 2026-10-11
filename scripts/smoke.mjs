@@ -272,13 +272,22 @@ async function workspacePass(app, win, ck, theme, views) {
 }
 
 async function runCommand(win, label) {
-  await win.keyboard.press('Escape');
-  await win.keyboard.press('F1');
-  await win.waitForSelector('.quick-input-widget input', { timeout: 10_000 });
-  await win.keyboard.type(label);
-  await win.waitForTimeout(600);
-  if(label.startsWith('Fixture QA:'))await win.locator('.quick-input-list .monaco-list-row').filter({hasText:label}).first().waitFor({state:'visible',timeout:15000});
-  await win.keyboard.press('Enter');
+  // Never dismiss a legitimate picker or authorization dialog to open the palette.
+  if(await win.locator('.monaco-dialog-box:visible').count())throw Error('Command palette cannot interrupt a pending dialog: '+label);
+  const pending=win.locator('.quick-input-widget:visible');
+  if(await pending.count()){
+    const pendingInput=pending.locator('input:visible').first();
+    if((await pendingInput.inputValue()).startsWith('>'))await pendingInput.press('Escape');
+    await pending.waitFor({state:'hidden',timeout:10000});
+  }
+  await win.keyboard.press('Control+Shift+P');
+  const palette=win.locator('.quick-input-widget:visible');await palette.waitFor({state:'visible',timeout:10000});
+  if(await palette.count()!==1)throw Error('Expected one visible owned command palette: '+label);
+  const input=palette.locator('input:visible').first();await input.fill('>'+label);if(await input.inputValue()!=='>'+label||!await input.evaluate(el=>el===document.activeElement))throw Error('Command palette input did not retain the explicit focused query: '+label);
+  if(label.startsWith('Fixture QA:')){
+    const action={label,query:await input.inputValue(),openedAt:Date.now(),transport:'ACTUAL_VISIBLE_PALETTE_COMMAND_ROW'};result.observerPaletteActions??=[];result.observerPaletteActions.push(action);
+    const row=palette.locator('.quick-input-list .monaco-list-row:visible').filter({hasText:label}).first();await row.waitFor({state:'visible',timeout:15000});action.focusedInput=true;action.visibleMatchingRows=await palette.locator('.quick-input-list .monaco-list-row:visible').filter({hasText:label}).count();action.selectedAriaLabel=await row.getAttribute('aria-label');await row.click();await palette.waitFor({state:'hidden',timeout:10000});action.selectedAt=Date.now();
+  }else{await win.waitForTimeout(600);await input.press('Enter');}
 }
 
 // Analyzer is the default 0.8 pane; legacy views start collapsed.
