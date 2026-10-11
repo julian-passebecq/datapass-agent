@@ -149,5 +149,11 @@
     "reason": "Private cross-repository checkout unavailable to Agent workflow GITHUB_TOKEN.",
     "guiActions": 0
   },
-  "privacy": "Approved product VSIX and public source-selection metadata; no owner history/account/grant"
+  "privacy": "Approved product VSIX and public source-selection metadata; no owner history/account/grant",
+  "dependencies": [
+    {
+      "receipt": "config-dependency.json",
+      "role": "DEPENDENCY_ONLY"
+    }
+  ]
 }

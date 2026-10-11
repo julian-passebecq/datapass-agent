@@ -64,6 +64,10 @@ jobs:
           $observed = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($observed -cne $receipt.sha256) { throw 'PM fixture VSIX hash differs from its exact-source CI receipt.' }
           "PM_VSIX=$package" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $dependency = Get-Content (Join-Path $fixture 'config-dependency.json') -Raw | ConvertFrom-Json
+          if ($dependency.role -cne 'DEPENDENCY_ONLY' -or $dependency.candidate -ne $false -or $dependency.filename -cne 'datapass-native-config-0.7.2.vsix') { throw 'Invalid unchanged PM preparation dependency.' }
+          $dependencyHash = (Get-FileHash -LiteralPath (Join-Path $fixture $dependency.filename) -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($dependencyHash -cne $dependency.sha256) { throw 'Config dependency package changed.' }
       - name: VSIX hash
         shell: pwsh
         run: Get-FileHash agent-vscode-*.vsix -Algorithm SHA256 | Tee-Object -FilePath vsix-sha256.txt | Format-List
@@ -137,4 +141,6 @@ jobs:
             .smoke/pm-agent-drafts/*.txt
             test/fixtures/installed-pm/datapass-pm-*.vsix
             test/fixtures/installed-pm/receipt.json
+            test/fixtures/installed-pm/config-dependency.json
+            test/fixtures/installed-pm/datapass-native-config-0.7.2.vsix
           if-no-files-found: warn

@@ -20,6 +20,41 @@ function snap(p: Partial<AgentSessionSnapshot>): AgentSessionSnapshot {
 const data = (sessions: AgentSessionSnapshot[]): WsData => ({ sessions, providers: [], events: [], now: Date.parse('2026-10-05T12:00:00Z'), ternAvailable: false });
 const kinds = (es: Entry[]) => es.map(e => e.kind);
 
+test('installed reader fixtures count repeated Claude tool UUID and Codex completed command once',()=>{
+  const claude=path.join(FIXTURES,'claude','projects','D--fixture-repo','11111111-1111-4111-8111-111111111111.jsonl');
+  const codex=path.join(FIXTURES,'codex','sessions','2026','10','04','rollout-2026-10-04T10-03-00-22222222-2222-7222-8222-222222222222.jsonl');
+  const c=parseText('claude',fs.readFileSync(claude,'utf8')),x=parseText('codex',fs.readFileSync(codex,'utf8'));
+  assert.equal(c.entries.filter(e=>e.kind==='tool'&&e.name==='Edit').length,1);
+  assert.equal(x.entries.filter(e=>e.kind==='tool'&&e.text==='pytest -q').length,1);
+  assert.equal(c.bad,1,'raw malformed record evidence is retained');assert.equal(x.bad,1);
+  assert.equal(x.entries.find(e=>e.text==='npm test')?.result?.exitCode,1,'distinct failed command remains observed');
+});
+
+test('incremental Claude replay keeps one native call, result attachment and distinct shared-message text',()=>{
+  clearTranscriptCache();const dir=tmpDir('tx-replay'),file=path.join(dir,'claude.jsonl');
+  const tool={type:'assistant',uuid:'native-tool-record',message:{id:'shared-message',content:[{type:'tool_use',id:'call-edit',name:'Edit',input:{file_path:'generated.ts'}}]}};
+  const record=(value:unknown)=>JSON.stringify(value)+'\n';fs.writeFileSync(file,record(tool));
+  const first=readTranscript(file,'claude'),id=first.entries[0].id;
+  fs.appendFileSync(file,record(tool)+record({type:'assistant',uuid:'stream-a',message:{id:'shared-message',content:[{type:'text',text:'First streamed text'}]}})+record({type:'assistant',uuid:'stream-b',message:{id:'shared-message',content:[{type:'text',text:'Second streamed text'}]}})+record({type:'user',message:{content:[{type:'tool_result',tool_use_id:'call-edit',content:'Applied',is_error:false}]}}));
+  const transcript=readTranscript(file,'claude');assert.equal(transcript.entries.filter(e=>e.name==='Edit').length,1);assert.equal(transcript.entries[0].id,id);assert.equal(transcript.entries[0].result?.text,'Applied');assert.deepEqual(transcript.entries.filter(e=>e.kind==='reply').map(e=>e.text),['First streamed text','Second streamed text']);
+  const markdown=toMarkdown(snap({key:'claude:fixture',sessionId:'fixture'}),transcript);assert.equal((markdown.match(/Edit/g)??[]).length,1);assert.match(markdown,/First streamed text/);assert.match(markdown,/Second streamed text/);
+});
+
+test('Codex completed native tool identities are typed; anonymous or distinct calls are preserved',()=>{
+  const item=(type:string,id:string,extra:Record<string,unknown>={})=>({type:'event_msg',payload:{type:'item_completed',item:{type,id,...extra}}});
+  const command=item('CommandExecution','same',{command:['pytest -q'],exit_code:0}),other=item('CommandExecution','different',{command:['pytest -q'],exit_code:1});
+  const rows=[command,command,other,item('FileChange','same',{changes:{'generated.ts':{type:'Add',unified_diff:'+fixture'}}}),item('CommandExecution','',{command:['anonymous']}),item('CommandExecution','',{command:['anonymous']})];
+  const parsed=parseText('codex',rows.map(r=>JSON.stringify(r)).join('\n'));assert.equal(parsed.entries.filter(e=>e.text==='pytest -q').length,2,'distinct native executions remain separate');assert.equal(parsed.entries.find(e=>e.name==='file change')?.text,'Add generated.ts','same ID in another native type remains distinct');assert.equal(parsed.entries.filter(e=>e.text==='anonymous').length,2,'missing identity is never guessed');
+});
+
+test('later Codex completion updates failure and output without duplicating the native call or entry identity',()=>{
+  clearTranscriptCache();const dir=tmpDir('tx-completed-update'),file=path.join(dir,'codex.jsonl');
+  const record=(exit_code:number,output:string,timestamp:string)=>JSON.stringify({timestamp,type:'event_msg',payload:{type:'item_completed',item:{type:'CommandExecution',id:'native-command',command:['npm test'],exit_code,aggregated_output:output}}})+'\n';
+  fs.writeFileSync(file,record(0,'initial output','2026-10-05T10:00:00Z'));const initial=readTranscript(file,'codex').entries[0];
+  fs.appendFileSync(file,record(1,'updated failure','2026-10-05T10:00:02Z'));const latest=readTranscript(file,'codex');assert.equal(latest.entries.length,1);assert.equal(latest.entries[0].id,initial.id);assert.equal(latest.entries[0].at,initial.at);assert.equal(latest.entries[0].result?.text,'updated failure');assert.equal(latest.entries[0].result?.exitCode,1);assert.equal(latest.entries[0].result?.error,true);assert.equal(latest.entries[0].result?.at,Date.parse('2026-10-05T10:00:02Z'));assert.equal(counts(latest.entries).errors,1);
+  const markdown=toMarkdown(snap({key:'codex:fixture',provider:'codex',sessionId:'fixture'}),latest);assert.match(markdown,/updated failure/);assert.doesNotMatch(markdown,/initial output/);assert.equal((markdown.match(/npm test/g)??[]).length,1);
+});
+
 test('Claude transcript → prompts, replies, tools with results, spawn, compaction; meta and tool results are not prompts', () => {
   const { entries, bad } = parseText('claude', fs.readFileSync(CLAUDE, 'utf8'));
   assert.equal(bad, 0);

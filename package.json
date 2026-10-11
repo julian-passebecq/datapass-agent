@@ -2,7 +2,7 @@
   "name": "agent-vscode",
   "displayName": "DataPass Agent",
   "description": "Local observer for Claude Code and Codex sessions: what is running, where, and what changed.",
-  "version": "0.10.7",
+  "version": "0.10.8",
   "publisher": "juliandatapass",
   "private": true,
   "license": "UNLICENSED",

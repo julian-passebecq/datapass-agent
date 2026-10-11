@@ -1,4 +1,6 @@
-# DataPass Agent 0.10.7
+# DataPass Agent 0.10.8
+
+Repeated native Claude tool calls and Codex completed tool items now appear once in the transcript and markdown export. Installed Windows qualification reproduced both duplicate counts; the reader fix keeps distinct calls, anonymous records and streamed assistant text. See [installed qualification scope and receipts](docs/PM-AGENT-INSTALLED-QUALIFICATION.md).
 
 Reviewed PM handoffs now show the original project/task selection separately from the observed native session. Returning requires PM to acknowledge that exact selection. Scoped exports require export consent and a current source throughout destination review; missing, replaced or linked sources suspend the panel until a fresh reviewed handoff. See [focused continuation notes](docs/PM-AGENT-CONTINUATION-20261011.md).
 

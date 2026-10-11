@@ -43,7 +43,7 @@ const settings = theme => fs.writeFileSync(path.join(userData, 'User', 'settings
   'workbench.colorTheme': theme, 'workbench.startupEditor': 'none', 'telemetry.telemetryLevel': 'off', 'update.mode': 'none',
   'extensions.autoUpdate': false, 'security.workspace.trust.enabled': true, 'workbench.tips.enabled': false, 'window.restoreWindows': 'none',
   'chat.disableAIFeatures': true, 'workbench.secondarySideBar.defaultVisibility': 'hidden',
-  ...(pmVsix?{'files.simpleDialog.enable':true}:{}),
+  ...(pmVsix?{'files.simpleDialog.enable':true,'window.dialogStyle':'custom'}:{}),
 }, null, 2));
 settings('Default Dark Modern');
 
@@ -57,7 +57,11 @@ if(pmVsix){
 }
 
 const pmFixture=pmVsix?preparePmAgentFixture(base,pmVsix,pmSha):undefined;
-if(pmFixture)installObserver(extDir,pmFixture);
+if(pmFixture){
+  const installConfig=execFileSync(codeExe,[cliJs,'--extensions-dir',extDir,'--user-data-dir',userData,'--install-extension',pmFixture.configDependency.path,'--force'],{encoding:'utf8',env:{...process.env,ELECTRON_RUN_AS_NODE:'1',VSCODE_DEV:''}});
+  check('Unchanged Config dependency installs for PM preparation only',/successfully installed/i.test(installConfig));
+  installObserver(extDir,pmFixture);
+}
 const workspace = pmFixture?.repository ?? root;
 // Synthetic home (--fixture-home): rebuilt before each launch so its newest record is always a minute old.
 const homeDir = fixtureHome ? fs.mkdtempSync(path.join(os.tmpdir(), 'agent-smoke-home-')) : undefined;
@@ -352,16 +356,21 @@ try {
   }
   check('Reload: Agent reactivates and Cockpit renders', after);
   await shot(win, '05-after-reload-dark');
-  if(pmFixture)result.pmAgent=await qualifyPmAgent({app,win,fixture:pmFixture,check,shot,runCommand,webviewText,extDir,userData,agentVsix:vsix});
+  if(pmFixture){
+    result.pmAgent={shutdownAllowed:false,passed:false,reason:'Installed qualifier has not completed the owned-draft shutdown guard.'};
+    result.pmAgent=await qualifyPmAgent({app,win,fixture:pmFixture,check,shot,runCommand,webviewText,extDir,userData,agentVsix:vsix});
+  }
 } catch (e) {
   result.errors.push(String(e?.stack ?? e));
   console.error(e);
   await shot(win, 'zz-error').catch(() => {});
 } finally {
-  await closeHost(app);
+  if(result.pmAgent?.shutdownAllowed===false){result.errors.push('Owned generated preview save remains unresolved; host shutdown and further launches refused.');}
+  else await closeHost(app);
 }
 
 // Light theme pass
+if(result.pmAgent?.shutdownAllowed!==false){
 settings('Default Light Modern');
 ({ app, win } = await launch());
 try {
@@ -382,6 +391,7 @@ try {
   result.errors.push(String(e?.stack ?? e));
 } finally {
   await closeHost(app);
+}
 }
 
 // Extension host log: no errors from Agent

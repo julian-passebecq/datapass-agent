@@ -170,10 +170,34 @@ export interface ParseState {
   lastAt: number;
   /** Codex message ids already shown. */
   seen: Set<string>;
+  /** Bounded provider/type identities of tool calls already shown. */
+  nativeSeen?: Set<string>;
+  /** Retained completed Codex tools: later observations update the same entry. */
+  nativeEntries?: Map<string,Entry>;
 }
 
 export function newState(provider: Provider): ParseState {
   return { provider, entries: [], byCall: new Map(), seq: 0, dropped: 0, lastAt: 0, seen: new Set() };
+}
+
+function repeatedNativeTool(st:ParseState,type:string,id:string):boolean {
+  if(!id || id.length>512)return false;
+  const seen=st.nativeSeen ??= new Set<string>(),key=st.provider+':'+type+':'+id;
+  if(seen.has(key))return true;
+  seen.add(key);
+  if(seen.size>5000)seen.delete(seen.values().next().value!);
+  return false;
+}
+
+function completedTool(st:ParseState,type:string,id:string,value:Omit<Entry,'id'>):void {
+  const key='item_completed:'+type+':'+id,retained=st.nativeEntries?.get(key);
+  if(id && id.length<=512 && retained){Object.assign(retained,value,{id:retained.id,at:retained.at});return;}
+  if(repeatedNativeTool(st,'item_completed:'+type,id))return;
+  const entry=push(st,value);
+  if(id && id.length<=512){
+    const items=st.nativeEntries ??= new Map<string,Entry>();items.set(key,entry);
+    if(items.size>5000)items.delete(items.keys().next().value!);
+  }
 }
 
 function push(st: ParseState, e: Omit<Entry, 'id'>): Entry {
@@ -251,6 +275,7 @@ export function claudeRecord(st: ParseState, o: Record<string, unknown>): void {
     if (b.type === 'text' && str(b.text).trim()) push(st, { at, kind: 'reply', text: clean(b.text), model });
     else if (b.type === 'thinking' || b.type === 'redacted_thinking') push(st, { at, kind: 'thinking', text: '', chars: str(b.thinking).length || str(b.data).length, model });
     else if (b.type === 'tool_use' || b.type === 'server_tool_use') {
+      if(repeatedNativeTool(st,str(b.type),str(b.id)))continue;
       const name = line(b.name, 80) || 'tool';
       const input = (b.input ?? {}) as Record<string, unknown>;
       if (SPAWN_TOOLS.has(name)) {
@@ -276,17 +301,17 @@ function codexItem(st: ParseState, at: number, item: Record<string, unknown>, p:
     const exit = typeof item.exit_code === 'number' ? item.exit_code : undefined;
     const d = item.duration as { secs?: number; nanos?: number } | undefined;
     const durationMs = d && typeof d.secs === 'number' ? Math.round(d.secs * 1000 + (d.nanos ?? 0) / 1e6) : done - started || undefined;
-    push(st, { at: started, kind: 'tool', name: 'command', sub: true, text: line(cmd), result: result(done, str(item.aggregated_output) || str(item.stdout) || str(item.formatted_output), (exit !== undefined && exit !== 0) || item.status === 'failed', { exitCode: exit, durationMs }) });
+    completedTool(st,t,str(item.id), { at: started, kind: 'tool', name: 'command', sub: true, text: line(cmd), result: result(done, str(item.aggregated_output) || str(item.stdout) || str(item.formatted_output), (exit !== undefined && exit !== 0) || item.status === 'failed', { exitCode: exit, durationMs }) });
   } else if (t === 'McpToolCall') {
     const r = (item.result ?? {}) as Record<string, unknown>;
-    push(st, { at: started, kind: 'tool', name: `mcp ${line(item.server, 40)}.${line(item.tool, 60)}`, sub: true, text: toolInput('mcp', item.arguments), result: result(done, r.content, r.isError === true || item.status === 'failed', { durationMs: done - started || undefined }) });
+    completedTool(st,t,str(item.id), { at: started, kind: 'tool', name: `mcp ${line(item.server, 40)}.${line(item.tool, 60)}`, sub: true, text: toolInput('mcp', item.arguments), result: result(done, r.content, r.isError === true || item.status === 'failed', { durationMs: done - started || undefined }) });
   } else if (t === 'FileChange') {
     const ch = (item.changes ?? {}) as Record<string, { type?: string; unified_diff?: string }>;
     const files = Object.keys(ch);
     const diff = files.map(f => str(ch[f]?.unified_diff)).filter(Boolean).join('\n');
-    push(st, { at, kind: 'tool', name: 'file change', sub: true, text: line(files.map(f => `${ch[f]?.type ?? 'edit'} ${f}`).join(', ')), result: result(done, diff, item.status === 'failed') });
+    completedTool(st,t,str(item.id), { at, kind: 'tool', name: 'file change', sub: true, text: line(files.map(f => `${ch[f]?.type ?? 'edit'} ${f}`).join(', ')), result: result(done, diff, item.status === 'failed') });
   } else if (t === 'ImageView') {
-    push(st, { at, kind: 'tool', name: 'view image', sub: true, text: line(item.path), result: { at, text: '[image not shown]', error: false, chars: 0 } });
+    completedTool(st,t,str(item.id), { at, kind: 'tool', name: 'view image', sub: true, text: line(item.path), result: { at, text: '[image not shown]', error: false, chars: 0 } });
   } else if (t === 'AgentMessage') {
     codexReply(st, at, contentText(item.content).text, str(item.id), str(item.phase));
   }
@@ -396,7 +421,9 @@ export function feed(st: ParseState, o: Record<string, unknown>): void {
 export function trim(st: ParseState, max: number): void {
   const over = st.entries.length - max;
   if (over <= 0) return;
-  for (const e of st.entries.slice(0, over)) if (e.callId && st.byCall.get(e.callId) === e) st.byCall.delete(e.callId);
+  const removed=new Set(st.entries.slice(0,over));
+  for (const e of removed) if (e.callId && st.byCall.get(e.callId) === e) st.byCall.delete(e.callId);
+  for(const [key,entry] of st.nativeEntries ?? [])if(removed.has(entry))st.nativeEntries!.delete(key);
   st.entries.splice(0, over);
   st.dropped += over;
 }
