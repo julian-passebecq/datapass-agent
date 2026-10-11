@@ -1,0 +1,13 @@
+# Optional installed PM and Agent journey
+
+The existing `release-qualification` workflow accepts optional `pm_sha`: an exact lowercase 40-character commit in `julian-passebecq/datapass-pm`. It checks out that commit separately, packages PM and records its VSIX hash. The existing smoke installs both actual VSIXes into one isolated profile on the hosted Windows runner. Local PM GUI execution is refused by the qualification module; no owner desktop, authentication or provider execution is used.
+
+`scripts/smoke-pm-agent.mjs` extends that same Electron extension host. Visible PM controls import generated reviewed definitions, configure the generated Git repository, connect its task authority, create and edit a task, select Kanban, prepare an immutable campaign, read reviewed Agent sessions and Git evidence, search approved sources, and open the selected task in Agent. Agent's actual initial metadata and rendered context strip are checked against persisted task bytes, task revision, observed session and Git SHA. The actual Return button must produce PM's positive return notice and preserve the original task/page/view.
+
+Negative journeys change only generated fixture state: invalid return token through the actual public PM command, changed Git SHA, missing provider source, revoked reviewed scope and extension-host reload. A fresh source review and handoff must reconnect after reload. None of these checks substitutes caller metadata for source authority.
+
+A fixed runner-only observer extension reads public installed Agent exports and PM state. It never replaces product or VS Code APIs, intercepts transport, creates grants or invokes a positive return. Its invalid-token command deliberately invokes the actual PM handler. Observer assertions are recorded separately from GUI actions. Generated untitled previews are copied into allowlisted QA files before navigation, reload and shutdown; no personal document is opened or read.
+
+The inherited smoke's `--disable-workspace-trust` launch flag applies only to this generated runner workspace. It does not qualify production trust approval. Config-owned native preset preparation, real authenticated provider actions and account/security dialogs remain explicit dependency or human authentication gates. The module does not install or alter Config, Lens or Brain.
+
+The optional journey writes `.smoke/pm-agent-result.json`, generated screenshots and retained generated preview files. A failed action writes its available evidence and fails the existing smoke. Results remain PENDING until an exact-head hosted run completes; static syntax and fixture preparation are not installed GUI qualification.

@@ -9,11 +9,18 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { buildFixtureHome } from './smoke-fixture.mjs';
+import { preparePmAgentFixture, qualifyPmAgent, installObserver } from './smoke-pm-agent.mjs';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const vsix = path.join(root, `agent-vscode-${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}.vsix`);
 const args = process.argv.slice(2);
 const fixtureHome = args.includes('--fixture-home');
+const pmVsix=args.find(a=>a.startsWith('--pm-vsix='))?.slice('--pm-vsix='.length);
+const pmSha=args.find(a=>a.startsWith('--pm-sha='))?.slice('--pm-sha='.length);
+if(pmVsix || pmSha){
+  if(!pmVsix || !/^[a-f0-9]{40}$/.test(pmSha ?? '') || !fixtureHome)throw Error('PM qualification requires --fixture-home, --pm-vsix and an exact 40-hex --pm-sha.');
+  if(process.env.GITHUB_ACTIONS!=='true' || process.env.RUNNER_OS!=='Windows')throw Error('The PM and Agent GUI journey is restricted to the isolated hosted Windows runner.');
+}
 const shots = path.resolve(args.find(a => !a.startsWith('--')) ?? path.join(root, '.smoke', 'screenshots'));
 const codeDir = process.env.VSCODE_DIR ?? path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Microsoft VS Code');
 const codeExe = path.join(codeDir, process.platform === 'win32' ? 'Code.exe' : 'code');
@@ -36,6 +43,7 @@ const settings = theme => fs.writeFileSync(path.join(userData, 'User', 'settings
   'workbench.colorTheme': theme, 'workbench.startupEditor': 'none', 'telemetry.telemetryLevel': 'off', 'update.mode': 'none',
   'extensions.autoUpdate': false, 'security.workspace.trust.enabled': true, 'workbench.tips.enabled': false, 'window.restoreWindows': 'none',
   'chat.disableAIFeatures': true, 'workbench.secondarySideBar.defaultVisibility': 'hidden',
+  ...(pmVsix?{'files.simpleDialog.enable':true}:{}),
 }, null, 2));
 settings('Default Dark Modern');
 
@@ -43,11 +51,18 @@ settings('Default Dark Modern');
 const cliJs = fs.readdirSync(codeDir).map(d => path.join(codeDir, d, 'resources', 'app', 'out', 'cli.js')).find(p => fs.existsSync(p)) ?? path.join(codeDir, 'resources', 'app', 'out', 'cli.js');
 const install = execFileSync(codeExe, [cliJs, '--extensions-dir', extDir, '--user-data-dir', userData, '--install-extension', vsix, '--force'], { encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', VSCODE_DEV: '' } });
 check('VSIX installs into isolated profile', /successfully installed/i.test(install), install.trim().split('\n').pop());
+if(pmVsix){
+  const installPm=execFileSync(codeExe,[cliJs,'--extensions-dir',extDir,'--user-data-dir',userData,'--install-extension',path.resolve(pmVsix),'--force'],{encoding:'utf8',env:{...process.env,ELECTRON_RUN_AS_NODE:'1',VSCODE_DEV:''}});
+  check('PM VSIX installs into the same isolated profile',/successfully installed/i.test(installPm));
+}
 
-const workspace = root; // trusted folder; Agent only reads ~/.claude and ~/.codex
+const pmFixture=pmVsix?preparePmAgentFixture(base,pmVsix,pmSha):undefined;
+if(pmFixture)installObserver(extDir,pmFixture);
+const workspace = pmFixture?.repository ?? root;
 // Synthetic home (--fixture-home): rebuilt before each launch so its newest record is always a minute old.
 const homeDir = fixtureHome ? fs.mkdtempSync(path.join(os.tmpdir(), 'agent-smoke-home-')) : undefined;
 const homeEnv = () => (homeDir ? { ...process.env, ...buildFixtureHome(homeDir, { cwd: workspace }) } : undefined);
+if(pmFixture)pmFixture.homeDir=homeDir;
 if (homeDir) console.log(`Fixture home: ${homeDir}`);
 async function launch() {
   const app = await electron.launch({
@@ -337,6 +352,7 @@ try {
   }
   check('Reload: Agent reactivates and Cockpit renders', after);
   await shot(win, '05-after-reload-dark');
+  if(pmFixture)result.pmAgent=await qualifyPmAgent({app,win,fixture:pmFixture,check,shot,runCommand,webviewText,extDir});
 } catch (e) {
   result.errors.push(String(e?.stack ?? e));
   console.error(e);

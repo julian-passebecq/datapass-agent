@@ -18,6 +18,10 @@ on:
         description: VS Code version for the smoke (stable, insiders or x.y.z)
         type: string
         default: stable
+      pm_sha:
+        description: Optional exact 40-hex PM source SHA for the installed PM and Agent journey
+        type: string
+        default: ''
   push:
     tags: ['v*']
 
@@ -31,6 +35,7 @@ jobs:
     env:
       REQUIRE_SMOKE: ${{ github.event_name == 'push' || inputs.require_smoke == true }}
       VSCODE_VERSION: ${{ inputs.vscode_version || 'stable' }}
+      PM_SOURCE_SHA: ${{ inputs.pm_sha || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -42,6 +47,34 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run package
+      - name: Validate optional PM source pin
+        if: env.PM_SOURCE_SHA != ''
+        shell: pwsh
+        run: |
+          if ($env:PM_SOURCE_SHA -cnotmatch '^[a-f0-9]{40}$') { throw 'PM source must be an exact lowercase 40-hex SHA.' }
+      - name: Checkout exact PM candidate
+        if: env.PM_SOURCE_SHA != ''
+        uses: actions/checkout@v4
+        with:
+          repository: julian-passebecq/datapass-pm
+          ref: ${{ env.PM_SOURCE_SHA }}
+          path: .smoke/pm-source
+          persist-credentials: false
+      - name: Build exact PM VSIX for the shared installed host
+        if: env.PM_SOURCE_SHA != ''
+        shell: pwsh
+        working-directory: .smoke/pm-source
+        run: |
+          $observed = git rev-parse HEAD
+          if ($observed -cne $env:PM_SOURCE_SHA) { throw 'PM checkout differs from the requested exact source.' }
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run package
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $packages = @(Get-ChildItem -File datapass-pm-*.vsix)
+          if ($packages.Count -ne 1) { throw 'Expected one PM candidate VSIX.' }
+          "PM_VSIX=$($packages[0].FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Get-FileHash -LiteralPath $packages[0].FullName -Algorithm SHA256 | ConvertTo-Json | Set-Content pm-vsix-sha256.json
       - name: VSIX hash
         shell: pwsh
         run: Get-FileHash agent-vscode-*.vsix -Algorithm SHA256 | Tee-Object -FilePath vsix-sha256.txt | Format-List
@@ -74,7 +107,13 @@ jobs:
       - name: Installed-VSIX smoke (Playwright _electron, dark + light, every screen, synthetic fixture home)
         if: steps.vscode.outputs.available == 'true'
         shell: pwsh
-        run: node scripts/smoke.mjs .smoke/screenshots --fixture-home
+        run: |
+          if ($env:PM_SOURCE_SHA) {
+            node scripts/smoke.mjs .smoke/screenshots --fixture-home "--pm-vsix=$env:PM_VSIX" "--pm-sha=$env:PM_SOURCE_SHA"
+          } else {
+            node scripts/smoke.mjs .smoke/screenshots --fixture-home
+          }
+          exit $LASTEXITCODE
 
       - name: Smoke summary
         if: always() && steps.vscode.outputs.available == 'true'
@@ -105,4 +144,8 @@ jobs:
             vsix-sha256.txt
             .smoke/screenshots/*.png
             .smoke/smoke-result.json
+            .smoke/pm-agent-result.json
+            .smoke/pm-agent-drafts/*.txt
+            .smoke/pm-source/datapass-pm-*.vsix
+            .smoke/pm-source/pm-vsix-sha256.json
           if-no-files-found: warn
