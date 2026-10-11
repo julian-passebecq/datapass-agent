@@ -1,23 +1,23 @@
 {
   "schema": "datapass.agent-qa-manifest/1",
-  "sourceSha": "1699e8303156909374d7c5388d83078717ff667c",
+  "sourceSha": "86d81556d362083c9c1a5aa732c218ce9afbf455",
   "files": [
     {
       "path": "headless-receipt.json",
-      "sha256": "94ce57a076de052486839baeb3863896a392123cd13ba1f239310d77e10eb2d3",
-      "bytes": 1581,
+      "sha256": "476c2bbc1e6046cb9d0c1185f8a6605f1e01e76840e251382bd9397f2234fabb",
+      "bytes": 2303,
       "privacy": "SANITIZED_PRODUCT_QA"
     },
     {
       "path": "package.txt",
-      "sha256": "1fba076c9b39765ab9a910a068743961a3edee55d9b44cb07f7c4d8c28f052c4",
+      "sha256": "89d063eefffc85b319736c909dfd0371b60bc3f1efa29056beb03617f87060a5",
       "bytes": 941,
       "privacy": "SANITIZED_PRODUCT_QA"
     },
     {
       "path": "receipt.json",
-      "sha256": "fae3533a73329c9ab05409bfd603002bbf215357e140f3e973a2c43014c0a345",
-      "bytes": 2346,
+      "sha256": "1cb95f42e8d3612f71f56a41c189022dedc244814ad69ca4d377ce823e2d27a1",
+      "bytes": 3201,
       "privacy": "SANITIZED_PRODUCT_QA"
     },
     {
@@ -34,13 +34,13 @@
     },
     {
       "path": "tests.txt",
-      "sha256": "5ceb386be0599ca1f52357c46acb04c0663e90cea7c0c67f63e2c9e9315a4da5",
-      "bytes": 48554,
+      "sha256": "31edcda0f845c8668b893d998b4e2fe52e5109235e54165b81d5ad0bedff83e0",
+      "bytes": 48176,
       "privacy": "SANITIZED_PRODUCT_QA"
     },
     {
       "path": "typecheck.txt",
-      "sha256": "776225a3f8aa6bdd46a4effe0783c193ec23cffc2a8ef090cc557c2dace364f3",
+      "sha256": "f91b703f957ece358fe8d7a810a8d42e59a2b9e5dc28abfe193499f910912f53",
       "bytes": 49,
       "privacy": "SANITIZED_PRODUCT_QA"
     }

@@ -41,12 +41,37 @@
       "detail": ""
     },
     {
+      "name": "Public numbered command requests use the focused client across all ten screens",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
       "name": "Search input typing never navigates screens",
       "state": "PASS",
       "detail": ""
     },
     {
       "name": "Contenteditable typing never navigates screens",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Inherited empty attribute editable content ignores bare and public numbered shortcuts",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Inherited plaintext-only editable content ignores bare and public numbered shortcuts",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Public numbered requests cannot interrupt composition",
+      "state": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Public numbered requests deny modeled document focus loss",
       "state": "PASS",
       "detail": ""
     },

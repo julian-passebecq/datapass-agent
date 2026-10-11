@@ -1,15 +1,15 @@
 {
   "schema": "datapass.agent-integration-receipt/1",
-  "capturedAt": "2026-10-11T17:48:43.285Z",
-  "sourceSha": "1699e8303156909374d7c5388d83078717ff667c",
+  "capturedAt": "2026-10-11T18:20:43.094Z",
+  "sourceSha": "86d81556d362083c9c1a5aa732c218ce9afbf455",
   "baseline": "8c120be6d4046c85cb16e7aa1f70e98de9f4c0bc",
   "branch": "codex/agents-window-integration-20261011",
   "canonicalRepository": "https://github.com/julian-passebecq/agent-vscode.git",
   "package": {
-    "path": "agent-vscode-0.10.5.vsix",
-    "version": "0.10.5",
-    "sha256": "69ff065ba51f73f8221b7be0ef91cc5f6df229578bef1543b9150e266e531810",
-    "bytes": 474955
+    "path": "agent-vscode-0.10.6.vsix",
+    "version": "0.10.6",
+    "sha256": "4663c2afe78414962fbb11e8af5d2b9dbceec364bc2b227154eff50646d0fde9",
+    "bytes": 475120
   },
   "checks": {
     "typecheck": "PASS",
@@ -21,7 +21,8 @@
     },
     "headless": {
       "state": "PASS",
-      "checks": 11
+      "checks": 16,
+      "focusLoss": "MODELED document.hasFocus=false; headless Chromium does not model native window focus"
     },
     "preservation": {
       "screens": 47,
@@ -74,5 +75,22 @@
     }
   ],
   "tokenUsage": null,
-  "tokenUsageReason": "No authoritative token accounting exposed for this lane."
+  "tokenUsageReason": "No authoritative token accounting exposed for this lane.",
+  "priorRemoteAttempts": [
+    {
+      "sourceSha": "caacb41f77282d166a81d531d1ccee7d6a67eed2",
+      "url": "https://github.com/julian-passebecq/agent-vscode/actions/runs/38161358152",
+      "state": "FAIL",
+      "reason": "Smoke dispatched synthetic keys without focused controls; active rail group could not collapse."
+    },
+    {
+      "sourceSha": "c3272bf383a1b4363448ebd2117ac9a2b7ce7dc9",
+      "url": "https://github.com/julian-passebecq/agent-vscode/actions/runs/38162315384",
+      "state": "FAIL",
+      "checks": 133,
+      "failed": 2,
+      "screenshots": 112,
+      "reason": "Installed public numbered command navigated while webview filter owned input focus. Version0.10.6 adds independent client focus validation."
+    }
+  ]
 }
