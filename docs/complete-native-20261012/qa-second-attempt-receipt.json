@@ -1,0 +1,85 @@
+{
+  "schema": "datapass.agent-native-qa/1",
+  "state": "FAILED",
+  "startedAt": "2026-10-12T17:05:47.581Z",
+  "completedAt": "2026-10-12T17:06:32.940Z",
+  "runtime": {
+    "version": "v22.23.3",
+    "sha256": "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e"
+  },
+  "productVersion": "0.11.0",
+  "gates": [
+    {
+      "name": "check",
+      "command": [
+        "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "check"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-10-12T17:05:47.582Z",
+      "completedAt": "2026-10-12T17:05:52.893Z",
+      "log": "check.log",
+      "logSha256": "17ee454f3d0319518d9193df37d472b8b20d82cc32bb8f0b88680ad19b8ae0b7"
+    },
+    {
+      "name": "compile-tests",
+      "command": [
+        "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "compile-tests"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-10-12T17:05:52.894Z",
+      "completedAt": "2026-10-12T17:06:00.171Z",
+      "log": "compile-tests.log",
+      "logSha256": "8b24dd911f3697e40b476e92017f789b01165a4a626382b3c0398c8403e784be"
+    },
+    {
+      "name": "targeted",
+      "command": [
+        "--test",
+        "out-test/test/nativeTransport.test.js",
+        "out-test/test/render.test.js",
+        "out-test/test/providerKit.test.js"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-10-12T17:06:00.171Z",
+      "completedAt": "2026-10-12T17:06:04.642Z",
+      "log": "targeted.log",
+      "logSha256": "b036347a181cb6fb530e83298f8b84906687839f80c4f4637488f8f347bbe0c1"
+    },
+    {
+      "name": "locale-en-CH",
+      "command": [
+        "--require",
+        "./docs/complete-native-20261012/force-en-CH.cjs",
+        "--test",
+        "out-test/test/render.test.js"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-10-12T17:06:04.642Z",
+      "completedAt": "2026-10-12T17:06:05.034Z",
+      "log": "locale-en-CH.log",
+      "logSha256": "b188390b9f8488c6e98b67fc600f4616720e7b183140e8b5502659c44478baa5"
+    },
+    {
+      "name": "test",
+      "command": [
+        "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "test"
+      ],
+      "exitCode": 1,
+      "startedAt": "2026-10-12T17:06:05.034Z",
+      "completedAt": "2026-10-12T17:06:32.940Z",
+      "log": "test.log",
+      "logSha256": "b85c068a8a4a2c7ae0d9d9159797895361b7dad9fa16b847b22088ca551c61c2"
+    }
+  ],
+  "isolation": "Dedicated synthetic home and fixture processes; not an OS security sandbox",
+  "nativeProviderTasks": 0,
+  "ownerDesktopInput": false,
+  "installedGuiJourney": "BLOCKED_NOT_EXECUTED",
+  "liveAccounts": "UNQUALIFIED"
+}

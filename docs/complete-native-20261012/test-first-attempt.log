@@ -1,0 +1,2996 @@
+
+> agent-vscode@0.11.0 test
+> npm run compile-tests && node --test "out-test/test/*.test.js"
+
+
+> agent-vscode@0.11.0 compile-tests
+> tsc -p tsconfig.test.json
+
+TAP version 13
+# Subtest: claude: async_launched Agent result does not end the worker; task-notification does
+ok 1 - claude: async_launched Agent result does not end the worker; task-notification does
+  ---
+  duration_ms: 53.978
+  type: 'test'
+  ...
+# Subtest: claude: queued task-notification ends a background worker once; sync results still end at once
+ok 2 - claude: queued task-notification ends a background worker once; sync results still end at once
+  ---
+  duration_ms: 23.0761
+  type: 'test'
+  ...
+# Subtest: claude: a worker whose own transcript ends on a final reply is no longer an open turn (INFERRED, not ENDED)
+ok 3 - claude: a worker whose own transcript ends on a final reply is no longer an open turn (INFERRED, not ENDED)
+  ---
+  duration_ms: 39.9268
+  type: 'test'
+  ...
+# Subtest: claude: usage totals are DERIVED; cache creation (5m / 1h) and new input are kept apart; repeated id counted once
+ok 4 - claude: usage totals are DERIVED; cache creation (5m / 1h) and new input are kept apart; repeated id counted once
+  ---
+  duration_ms: 23.4827
+  type: 'test'
+  ...
+# Subtest: claude: test runs are INFERRED (command regex), outcome from is_error; interrupted / backgrounded → UNKNOWN
+ok 5 - claude: test runs are INFERRED (command regex), outcome from is_error; interrupted / backgrounded → UNKNOWN
+  ---
+  duration_ms: 22.3859
+  type: 'test'
+  ...
+# Subtest: claude: permission mode changes, mode records, pr-link and compact_boundary are kept as bounded OBSERVED facts
+ok 6 - claude: permission mode changes, mode records, pr-link and compact_boundary are kept as bounded OBSERVED facts
+  ---
+  duration_ms: 30.4053
+  type: 'test'
+  ...
+# Subtest: codex: cache writes and reasoning tokens kept; call rhythm INFERRED
+ok 7 - codex: cache writes and reasoning tokens kept; call rhythm INFERRED
+  ---
+  duration_ms: 23.7651
+  type: 'test'
+  ...
+# Subtest: codex: approval policy, permission profile and collaboration (plan) mode are distinct facts
+ok 8 - codex: approval policy, permission profile and collaboration (plan) mode are distinct facts
+  ---
+  duration_ms: 21.6715
+  type: 'test'
+  ...
+# Subtest: codex: one subagent spawn recorded by three record kinds gives one WORKER_STARTED and one spawn
+ok 9 - codex: one subagent spawn recorded by three record kinds gives one WORKER_STARTED and one spawn
+  ---
+  duration_ms: 44.4811
+  type: 'test'
+  ...
+# Subtest: codex: test events are OBSERVED only with a recorded exit code; compacted window kept
+ok 10 - codex: test events are OBSERVED only with a recorded exit code; compacted window kept
+  ---
+  duration_ms: 104.8014
+  type: 'test'
+  ...
+# Subtest: archive: idempotent upsert within a day, unchanged sessions not rewritten on later days
+ok 11 - archive: idempotent upsert within a day, unchanged sessions not rewritten on later days
+  ---
+  duration_ms: 161.9754
+  type: 'test'
+  ...
+# Subtest: archive: a session the provider deleted survives and shows in History as ARCHIVED
+ok 12 - archive: a session the provider deleted survives and shows in History as ARCHIVED
+  ---
+  duration_ms: 109.5739
+  type: 'test'
+  ...
+# (node:55788) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: archive: no prompt or reply text from real provider fixtures; titles redacted; workflows and backlog snapshots
+ok 13 - archive: no prompt or reply text from real provider fixtures; titles redacted; workflows and backlog snapshots
+  ---
+  duration_ms: 266.6542
+  type: 'test'
+  ...
+# Subtest: archive: backlog items removed from a plan stay visible as ARCHIVED
+ok 14 - archive: backlog items removed from a plan stay visible as ARCHIVED
+  ---
+  duration_ms: 53.1666
+  type: 'test'
+  ...
+# Subtest: archive: raw copy gzips transcripts, skips auth / secret names and files outside the provider root, honours the cap
+ok 15 - archive: raw copy gzips transcripts, skips auth / secret names and files outside the provider root, honours the cap
+  ---
+  duration_ms: 68.7565
+  type: 'test'
+  ...
+# Subtest: archive: lock blocks a second run; settings.json with comments parses
+ok 16 - archive: lock blocks a second run; settings.json with comments parses
+  ---
+  duration_ms: 31.2218
+  type: 'test'
+  ...
+# Subtest: raw copies and the raw manifest are written owner-only (0600) on POSIX
+ok 17 - raw copies and the raw manifest are written owner-only (0600) on POSIX
+  ---
+  duration_ms: 29.0235
+  type: 'test'
+  ...
+# Subtest: ownerOnly tightens an existing file on POSIX and is a no-op on Windows
+ok 18 - ownerOnly tightens an existing file on POSIX and is a no-op on Windows
+  ---
+  duration_ms: 2.708
+  type: 'test'
+  ...
+# Subtest: parentTranscriptOf maps <session>/subagents/agent-*.jsonl to <session>.jsonl
+ok 19 - parentTranscriptOf maps <session>/subagents/agent-*.jsonl to <session>.jsonl
+  ---
+  duration_ms: 0.5303
+  type: 'test'
+  ...
+# Subtest: scan cap keeps the parent of every kept subagent, parent first
+ok 20 - scan cap keeps the parent of every kept subagent, parent first
+  ---
+  duration_ms: 3.048
+  type: 'test'
+  ...
+# Subtest: ClaudeAdapter.listArtifacts applies the parent-preserving cap on disk
+ok 21 - ClaudeAdapter.listArtifacts applies the parent-preserving cap on disk
+  ---
+  duration_ms: 12.3658
+  type: 'test'
+  ...
+# Subtest: transitions: lifecycle, commits, tests with outcome changes, events
+ok 22 - transitions: lifecycle, commits, tests with outcome changes, events
+  ---
+  duration_ms: 11.7638
+  type: 'test'
+  ...
+# Subtest: transitions: status now, inferred end, workers, redaction
+ok 23 - transitions: status now, inferred end, workers, redaction
+  ---
+  duration_ms: 11.5381
+  type: 'test'
+  ...
+# Subtest: jsonl export: one object per line, oldest first
+ok 24 - jsonl export: one object per line, oldest first
+  ---
+  duration_ms: 1.9687
+  type: 'test'
+  ...
+# Subtest: histogram buckets and auto granularity
+ok 25 - histogram buckets and auto granularity
+  ---
+  duration_ms: 0.9886
+  type: 'test'
+  ...
+# Subtest: audit screen renders every view escaped, export uses the shown filter
+ok 26 - audit screen renders every view escaped, export uses the shown filter
+  ---
+  duration_ms: 20.1099
+  type: 'test'
+  ...
+# Subtest: backlog: ids, states and markers
+ok 27 - backlog: ids, states and markers
+  ---
+  duration_ms: 7.2427
+  type: 'test'
+  ...
+# Subtest: backlog: parsePlan reads checklists, state tables, bold leads; skips fences and stateless tables
+ok 28 - backlog: parsePlan reads checklists, state tables, bold leads; skips fences and stateless tables
+  ---
+  duration_ms: 22.2293
+  type: 'test'
+  ...
+# Subtest: backlog: scan finds plan, TODO and archive files with a size cap
+ok 29 - backlog: scan finds plan, TODO and archive files with a size cap
+  ---
+  duration_ms: 67.3675
+  type: 'test'
+  ...
+# Subtest: backlog: sessions are linked by branch or id text, same repository only
+ok 30 - backlog: sessions are linked by branch or id text, same repository only
+  ---
+  duration_ms: 18.7695
+  type: 'test'
+  ...
+# Subtest: backlog: weekly archive buckets done items
+ok 31 - backlog: weekly archive buckets done items
+  ---
+  duration_ms: 15.7357
+  type: 'test'
+  ...
+# Subtest: backlog: screen renders escaped board, table, files and weeks
+ok 32 - backlog: screen renders escaped board, table, files and weeks
+  ---
+  duration_ms: 65.2285
+  type: 'test'
+  ...
+# Subtest: benchmarks: minimal YAML list parser keeps scalars, strips quotes and comments
+ok 33 - benchmarks: minimal YAML list parser keeps scalars, strips quotes and comments
+  ---
+  duration_ms: 2.6303
+  type: 'test'
+  ...
+# Subtest: benchmarks: Aider polyglot parser maps fields, derives cost per task, leaves out total_cost 0
+ok 34 - benchmarks: Aider polyglot parser maps fields, derives cost per task, leaves out total_cost 0
+  ---
+  duration_ms: 1.2884
+  type: 'test'
+  ...
+# Subtest: benchmarks: vendor inference is keyword based
+ok 35 - benchmarks: vendor inference is keyword based
+  ---
+  duration_ms: 0.2598
+  type: 'test'
+  ...
+# Subtest: benchmarks: Pareto frontier keeps the cheapest model for each score level
+ok 36 - benchmarks: Pareto frontier keeps the cheapest model for each score level
+  ---
+  duration_ms: 1.6212
+  type: 'test'
+  ...
+# Subtest: benchmarks: log ticks come from the data range and frame it
+ok 37 - benchmarks: log ticks come from the data range and frame it
+  ---
+  duration_ms: 28.4251
+  type: 'test'
+  ...
+# Subtest: benchmarks: local model matching is loose but not empty
+ok 38 - benchmarks: local model matching is loose but not empty
+  ---
+  duration_ms: 0.9493
+  type: 'test'
+  ...
+# Subtest: benchmarks: merge replaces refreshed sources, keeps the others, drops vanished manual files
+ok 39 - benchmarks: merge replaces refreshed sources, keeps the others, drops vanished manual files
+  ---
+  duration_ms: 2.3487
+  type: 'test'
+  ...
+# Subtest: benchmarks: weekly snapshot write is atomic, idempotent and never touches other weeks
+ok 40 - benchmarks: weekly snapshot write is atomic, idempotent and never touches other weeks
+  ---
+  duration_ms: 97.5625
+  type: 'test'
+  ...
+# Subtest: benchmarks: snapshot validation drops bad rows and rows of unknown sources
+ok 41 - benchmarks: snapshot validation drops bad rows and rows of unknown sources
+  ---
+  duration_ms: 0.8582
+  type: 'test'
+  ...
+# Subtest: benchmarks: manual files (array or {source, rows}) become one source each
+ok 42 - benchmarks: manual files (array or {source, rows}) become one source each
+  ---
+  duration_ms: 20.5368
+  type: 'test'
+  ...
+# Subtest: benchmarks: folder setting falls back to ~/.agent/benchmarks
+ok 43 - benchmarks: folder setting falls back to ~/.agent/benchmarks
+  ---
+  duration_ms: 0.7675
+  type: 'test'
+  ...
+# Subtest: benchmarks: local workload rows are DERIVED from dispatch analytics, cost only with a user price
+ok 44 - benchmarks: local workload rows are DERIVED from dispatch analytics, cost only with a user price
+  ---
+  duration_ms: 3.4495
+  type: 'test'
+  ...
+# Subtest: benchmarks screen: empty state explains how to fill the database
+ok 45 - benchmarks screen: empty state explains how to fill the database
+  ---
+  duration_ms: 1.5163
+  type: 'test'
+  ...
+# Subtest: benchmarks screen: scatter with log cost axis, frontier, labels, escaped tooltips, selectable rows
+ok 46 - benchmarks screen: scatter with log cost axis, frontier, labels, escaped tooltips, selectable rows
+  ---
+  duration_ms: 15.0394
+  type: 'test'
+  ...
+# Subtest: benchmarks screen: trend tab draws weekly lines
+ok 47 - benchmarks screen: trend tab draws weekly lines
+  ---
+  duration_ms: 4.3182
+  type: 'test'
+  ...
+# Subtest: benchmarks screen: registered in the Usage group and rendered through the workspace
+ok 48 - benchmarks screen: registered in the Usage group and rendered through the workspace
+  ---
+  duration_ms: 7.4252
+  type: 'test'
+  ...
+# Subtest: catalog: skills, agents, commands with sources
+ok 49 - catalog: skills, agents, commands with sources
+  ---
+  duration_ms: 411.856
+  type: 'test'
+  ...
+# Subtest: catalog: plugins, hooks, MCP and settings are redacted
+ok 50 - catalog: plugins, hooks, MCP and settings are redacted
+  ---
+  duration_ms: 304.104
+  type: 'test'
+  ...
+# Subtest: catalog: instructions, memory names and Codex inventory
+ok 51 - catalog: instructions, memory names and Codex inventory
+  ---
+  duration_ms: 289.9132
+  type: 'test'
+  ...
+# Subtest: catalog: helpers
+ok 52 - catalog: helpers
+  ---
+  duration_ms: 0.473
+  type: 'test'
+  ...
+# Subtest: catalog: a large tree never blocks the event loop for long
+ok 53 - catalog: a large tree never blocks the event loop for long
+  ---
+  duration_ms: 5719.0366
+  type: 'test'
+  ...
+# Subtest: catalog: --help parsing (commander and clap)
+ok 54 - catalog: --help parsing (commander and clap)
+  ---
+  duration_ms: 2.5511
+  type: 'test'
+  ...
+# Subtest: catalog: CLI runner respects trust, cache and missing exe
+ok 55 - catalog: CLI runner respects trust, cache and missing exe
+  ---
+  duration_ms: 1.0367
+  type: 'test'
+  ...
+# Subtest: catalog: screen renders every tab, escaped, and validates actions
+ok 56 - catalog: screen renders every tab, escaped, and validates actions
+  ---
+  duration_ms: 261.632
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: changes: numstat and status parsers (-z records, binary, renames, conflicts)
+ok 57 - changes: numstat and status parsers (-z records, binary, renames, conflicts)
+  ---
+  duration_ms: 3.1585
+  type: 'test'
+  ...
+# Subtest: changes: collect from a real repo (commit window, staged, unstaged, untracked); untrusted runs nothing
+ok 58 - changes: collect from a real repo (commit window, staged, unstaged, untracked); untrusted runs nothing
+  ---
+  duration_ms: 6815.2363
+  type: 'test'
+  ...
+# Subtest: changes: windows inside another window of the same worktree count once; overlap is flagged
+ok 59 - changes: windows inside another window of the same worktree count once; overlap is flagged
+  ---
+  duration_ms: 3.1026
+  type: 'test'
+  ...
+# Subtest: changes: edit calls from facts map to repo paths; heat buckets by hour
+ok 60 - changes: edit calls from facts map to repo paths; heat buckets by hour
+  ---
+  duration_ms: 2.4273
+  type: 'test'
+  ...
+# Subtest: changes: screen renders every tab escaped, from cached feed data
+ok 61 - changes: screen renders every tab escaped, from cached feed data
+  ---
+  duration_ms: 71.8206
+  type: 'test'
+  ...
+# Subtest: changes: actions accept only paths inside a session worktree, never auth files
+ok 62 - changes: actions accept only paths inside a session worktree, never auth files
+  ---
+  duration_ms: 1.6136
+  type: 'test'
+  ...
+# Subtest: facade denies caller-created grants/counts, isolates sessions, and returns detached snapshots
+ok 63 - facade denies caller-created grants/counts, isolates sessions, and returns detached snapshots
+  ---
+  duration_ms: 200.1065
+  type: 'test'
+  ...
+# Subtest: late config answer after grant revocation is denied, and subscriber failure/overflow is isolated
+ok 64 - late config answer after grant revocation is denied, and subscriber failure/overflow is isolated
+  ---
+  duration_ms: 192.604
+  type: 'test'
+  ...
+# Subtest: configuration is sanitized/inert, carries provenance, and ignores linked secret files
+ok 65 - configuration is sanitized/inert, carries provenance, and ignores linked secret files
+  ---
+  duration_ms: 191.9098
+  type: 'test'
+  ...
+# Subtest: compact keeps independent roots, escapes labels, isolates project/session selection, and partial windows remain useful
+ok 66 - compact keeps independent roots, escapes labels, isolates project/session selection, and partial windows remain useful
+  ---
+  duration_ms: 65.8296
+  type: 'test'
+  ...
+# Subtest: export approval cannot be manufactured in caller JSON; registered context is explicit and scoped
+ok 67 - export approval cannot be manufactured in caller JSON; registered context is explicit and scoped
+  ---
+  duration_ms: 210.0378
+  type: 'test'
+  ...
+# (node:62676) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: codexState: whitelisted columns only, locks, models
+ok 68 - codexState: whitelisted columns only, locks, models
+  ---
+  duration_ms: 739.4486
+  type: 'test'
+  ...
+# Subtest: codexState: without node:sqlite every db source is missing, no throw
+ok 69 - codexState: without node:sqlite every db source is missing, no throw
+  ---
+  duration_ms: 2.3198
+  type: 'test'
+  ...
+# Subtest: codexState: select never includes forbidden columns; origin URL keeps host/owner/repo
+ok 70 - codexState: select never includes forbidden columns; origin URL keeps host/owner/repo
+  ---
+  duration_ms: 0.3912
+  type: 'test'
+  ...
+# Subtest: context mappings expose only reviewed local metadata, preserve reply bindings and omit disappeared sources
+ok 71 - context mappings expose only reviewed local metadata, preserve reply bindings and omit disappeared sources
+  ---
+  duration_ms: 469.8148
+  type: 'test'
+  ...
+# Subtest: asynchronous mapping discards source drift and grant revocation
+ok 72 - asynchronous mapping discards source drift and grant revocation
+  ---
+  duration_ms: 377.3593
+  type: 'test'
+  ...
+# Subtest: owner return executes only fixed PM command; absence copies token; drift denies both effects
+ok 73 - owner return executes only fixed PM command; absence copies token; drift denies both effects
+  ---
+  duration_ms: 117.6909
+  type: 'test'
+  ...
+# Subtest: PM task origin is inert selection metadata, separately validated from observed native session identity
+ok 74 - PM task origin is inert selection metadata, separately validated from observed native session identity
+  ---
+  duration_ms: 89.9016
+  type: 'test'
+  ...
+# Subtest: facade passes exact return binding and denies revocation during host opening
+ok 75 - facade passes exact return binding and denies revocation during host opening
+  ---
+  duration_ms: 257.4534
+  type: 'test'
+  ...
+# Subtest: return scope hash matches the actual reply for a valid reordered caller scope
+ok 76 - return scope hash matches the actual reply for a valid reordered caller scope
+  ---
+  duration_ms: 98.1512
+  type: 'test'
+  ...
+# Subtest: context open refuses source identity drift during an asynchronous host open
+ok 77 - context open refuses source identity drift during an asynchronous host open
+  ---
+  duration_ms: 113.5723
+  type: 'test'
+  ...
+# Subtest: jsonl: incremental reads only new complete lines
+ok 78 - jsonl: incremental reads only new complete lines
+  ---
+  duration_ms: 29.3179
+  type: 'test'
+  ...
+# Subtest: jsonl: truncated or replaced file restarts from 0
+ok 79 - jsonl: truncated or replaced file restarts from 0
+  ---
+  duration_ms: 29.6463
+  type: 'test'
+  ...
+# Subtest: jsonl: multibyte UTF-8 split across chunk boundary survives
+ok 80 - jsonl: multibyte UTF-8 split across chunk boundary survives
+  ---
+  duration_ms: 51.4854
+  type: 'test'
+  ...
+# Subtest: redact: tokens, auth headers, env assignments, URL credentials
+ok 81 - redact: tokens, auth headers, env assignments, URL credentials
+  ---
+  duration_ms: 14.7456
+  type: 'test'
+  ...
+# Subtest: safeEnv: only allow-listed variables, never a full snapshot
+ok 82 - safeEnv: only allow-listed variables, never a full snapshot
+  ---
+  duration_ms: 0.381
+  type: 'test'
+  ...
+# Subtest: classify: verification commands by what runs, not by output text
+ok 83 - classify: verification commands by what runs, not by output text
+  ---
+  duration_ms: 6.5978
+  type: 'test'
+  ...
+# Subtest: classify: program at command position only; builds, lints, type checks are not tests
+ok 84 - classify: program at command position only; builds, lints, type checks are not tests
+  ---
+  duration_ms: 0.6354
+  type: 'test'
+  ...
+# Subtest: classify: test verdict trusts a chain / pipe only through a recorded exit code
+ok 85 - classify: test verdict trusts a chain / pipe only through a recorded exit code
+  ---
+  duration_ms: 0.8413
+  type: 'test'
+  ...
+# Subtest: status derivation is conservative
+ok 86 - status derivation is conservative
+  ---
+  duration_ms: 1.4779
+  type: 'test'
+  ...
+# Subtest: paths: traversal and injected artifact paths are rejected
+ok 87 - paths: traversal and injected artifact paths are rejected
+  ---
+  duration_ms: 10.176
+  type: 'test'
+  ...
+# Subtest: Overview: every KPI carries "<KIND>: <basis>"
+ok 88 - Overview: every KPI carries "<KIND>: <basis>"
+  ---
+  duration_ms: 35.5465
+  type: 'test'
+  ...
+# Subtest: Board: every column count carries an evidence title
+ok 89 - Board: every column count carries an evidence title
+  ---
+  duration_ms: 2.0364
+  type: 'test'
+  ...
+# Subtest: durTip: live, observed end, inferred end
+ok 90 - durTip: live, observed end, inferred end
+  ---
+  duration_ms: 0.8375
+  type: 'test'
+  ...
+# Subtest: Result card: duration with no recorded end is a lower bound (≥)
+ok 91 - Result card: duration with no recorded end is a lower bound (≥)
+  ---
+  duration_ms: 1.299
+  type: 'test'
+  ...
+# Subtest: ctxcost parser: claude tool_result sizes per tool, never the content
+ok 92 - ctxcost parser: claude tool_result sizes per tool, never the content
+  ---
+  duration_ms: 84.9192
+  type: 'test'
+  ...
+# Subtest: ctxcost parser: codex function_call_output / custom_tool_call_output sizes per tool
+ok 93 - ctxcost parser: codex function_call_output / custom_tool_call_output sizes per tool
+  ---
+  duration_ms: 105.2771
+  type: 'test'
+  ...
+# Subtest: ctxcost parser: content size helpers and bounded samples
+ok 94 - ctxcost parser: content size helpers and bounded samples
+  ---
+  duration_ms: 7.875
+  type: 'test'
+  ...
+# Subtest: ctxcost: aggregation per tool, percentiles, shares, period slicing, unknown sessions
+ok 95 - ctxcost: aggregation per tool, percentiles, shares, period slicing, unknown sessions
+  ---
+  duration_ms: 4.9295
+  type: 'test'
+  ...
+# Subtest: ctxcost: helpers (labels, percentile, log axis, ratios, tips)
+ok 96 - ctxcost: helpers (labels, percentile, log axis, ratios, tips)
+  ---
+  duration_ms: 1.3235
+  type: 'test'
+  ...
+# Subtest: ctxcost: screen renders bars, window line, table, tips; escaped; registered
+ok 97 - ctxcost: screen renders bars, window line, table, tips; escaped; registered
+  ---
+  duration_ms: 44.7412
+  type: 'test'
+  ...
+# Subtest: development observations omit transcript text, prompts, command bodies and archive paths
+ok 98 - development observations omit transcript text, prompts, command bodies and archive paths
+  ---
+  duration_ms: 6.9451
+  type: 'test'
+  ...
+# Subtest: dispatch: one row per worker plus workflow agents not loaded, newest first
+ok 99 - dispatch: one row per worker plus workflow agents not loaded, newest first
+  ---
+  duration_ms: 5.939
+  type: 'test'
+  ...
+# Subtest: dispatch: spawn join prefers same type, each spawn used once
+ok 100 - dispatch: spawn join prefers same type, each spawn used once
+  ---
+  duration_ms: 1.0011
+  type: 'test'
+  ...
+# Subtest: dispatch: outcome verified / unverified / failed / unknown
+ok 101 - dispatch: outcome verified / unverified / failed / unknown
+  ---
+  duration_ms: 0.7598
+  type: 'test'
+  ...
+# Subtest: dispatch: period filter keeps live ones
+ok 102 - dispatch: period filter keeps live ones
+  ---
+  duration_ms: 0.6103
+  type: 'test'
+  ...
+# Subtest: dispatch: prices only from the user setting
+ok 103 - dispatch: prices only from the user setting
+  ---
+  duration_ms: 0.7253
+  type: 'test'
+  ...
+# Subtest: dispatch: group stats by model, model+effort, type
+ok 104 - dispatch: group stats by model, model+effort, type
+  ---
+  duration_ms: 15.5417
+  type: 'test'
+  ...
+# Subtest: dispatch: helpers
+ok 105 - dispatch: helpers
+  ---
+  duration_ms: 0.648
+  type: 'test'
+  ...
+# Subtest: dispatch: screen renders both tabs, escapes, honest n < 5, no $ without setting
+ok 106 - dispatch: screen renders both tabs, escapes, honest n < 5, no $ without setting
+  ---
+  duration_ms: 35.9056
+  type: 'test'
+  ...
+# Subtest: README documents every screen of the rail in a screens table
+ok 107 - README documents every screen of the rail in a screens table
+  ---
+  duration_ms: 239.305
+  type: 'test'
+  ...
+# Subtest: package.json points to the canonical agent-vscode repository
+ok 108 - package.json points to the canonical agent-vscode repository
+  ---
+  duration_ms: 1.4197
+  type: 'test'
+  ...
+# Subtest: claude: tests carry their check kind; chained / piped with only the error flag get UNKNOWN
+ok 109 - claude: tests carry their check kind; chained / piped with only the error flag get UNKNOWN
+  ---
+  duration_ms: 39.8039
+  type: 'test'
+  ...
+# Subtest: insights: attention, stages and verification use testVerdict
+ok 110 - insights: attention, stages and verification use testVerdict
+  ---
+  duration_ms: 39.7047
+  type: 'test'
+  ...
+# Subtest: signals: a piped test with only the error flag is not an unsolved failing test
+ok 111 - signals: a piped test with only the error flag is not an unsolved failing test
+  ---
+  duration_ms: 1.8728
+  type: 'test'
+  ...
+# Subtest: audit: status evidence kind comes from statusEvidenceOf, never stronger than the provider recorded
+ok 112 - audit: status evidence kind comes from statusEvidenceOf, never stronger than the provider recorded
+  ---
+  duration_ms: 1.8088
+  type: 'test'
+  ...
+# Subtest: findExe never picks a tool planted in the current directory
+ok 113 - findExe never picks a tool planted in the current directory
+  ---
+  duration_ms: 32.9473
+  type: 'test'
+  ...
+# Subtest: findExe on Windows skips .cmd / .bat (execFile cannot run them without a shell)
+ok 114 - findExe on Windows skips .cmd / .bat (execFile cannot run them without a shell)
+  ---
+  duration_ms: 9.1169
+  type: 'test'
+  ...
+# Subtest: findExe rejects names that are paths or carry separators
+ok 115 - findExe rejects names that are paths or carry separators
+  ---
+  duration_ms: 0.4504
+  type: 'test'
+  ...
+# Subtest: resolveExe returns an absolute path for git and caches it
+ok 116 - resolveExe returns an absolute path for git and caches it
+  ---
+  duration_ms: 48.5951
+  type: 'test'
+  ...
+# Subtest: findExe resolves an npm .cmd shim to the native exe of a known package (Windows)
+ok 117 - findExe resolves an npm .cmd shim to the native exe of a known package (Windows)
+  ---
+  duration_ms: 14.4534
+  type: 'test'
+  ...
+# Subtest: explore: tokens split per recorded call, remainder at last activity; totals preserved
+ok 118 - explore: tokens split per recorded call, remainder at last activity; totals preserved
+  ---
+  duration_ms: 3.1656
+  type: 'test'
+  ...
+# Subtest: explore: pivot by repo, period filter and leads-only
+ok 119 - explore: pivot by repo, period filter and leads-only
+  ---
+  duration_ms: 17.9569
+  type: 'test'
+  ...
+# Subtest: explore: dimensions provider / worker / model / tool and cost only where recorded
+ok 120 - explore: dimensions provider / worker / model / tool and cost only where recorded
+  ---
+  duration_ms: 2.3302
+  type: 'test'
+  ...
+# Subtest: explore: tests pass / fail and commits are timed; hour dimension uses piece time
+ok 121 - explore: tests pass / fail and commits are timed; hour dimension uses piece time
+  ---
+  duration_ms: 2.5061
+  type: 'test'
+  ...
+# Subtest: explore: cross, series and topN
+ok 122 - explore: cross, series and topN
+  ---
+  duration_ms: 2.2567
+  type: 'test'
+  ...
+# Subtest: explore: CSV quotes labels and stays numbers-only
+ok 123 - explore: CSV quotes labels and stays numbers-only
+  ---
+  duration_ms: 1.3731
+  type: 'test'
+  ...
+# Subtest: explore: squarify fills the box
+ok 124 - explore: squarify fills the box
+  ---
+  duration_ms: 0.8003
+  type: 'test'
+  ...
+# Subtest: explore: every chart renders escaped, with drill-down rows selectable
+ok 125 - explore: every chart renders escaped, with drill-down rows selectable
+  ---
+  duration_ms: 48.4117
+  type: 'test'
+  ...
+# Subtest: explore: CSV action validates its argument
+ok 126 - explore: CSV action validates its argument
+  ---
+  duration_ms: 1.5701
+  type: 'test'
+  ...
+# Subtest: exports the whole selected file with provenance, tools and malformed counts; source unchanged
+ok 127 - exports the whole selected file with provenance, tools and malformed counts; source unchanged
+  ---
+  duration_ms: 184.2465
+  type: 'test'
+  ...
+# Subtest: scrubs complete Mongo URI, keys, query credentials and binary data; keeps native session identity and counts
+ok 128 - scrubs complete Mongo URI, keys, query credentials and binary data; keeps native session identity and counts
+  ---
+  duration_ms: 0.7015
+  type: 'test'
+  ...
+# Subtest: CSV supports multiline, escaped quotes and rejects malformed or duplicate headers
+ok 129 - CSV supports multiline, escaped quotes and rejects malformed or duplicate headers
+  ---
+  duration_ms: 1.6253
+  type: 'test'
+  ...
+# Subtest: project selection respects path boundaries
+ok 130 - project selection respects path boundaries
+  ---
+  duration_ms: 0.6037
+  type: 'test'
+  ...
+# Subtest: credential input files are rejected without reading them
+ok 131 - credential input files are rejected without reading them
+  ---
+  duration_ms: 0.9191
+  type: 'test'
+  ...
+# Subtest: full-event fallback searches tool records and returns bounded redacted citations
+ok 132 - full-event fallback searches tool records and returns bounded redacted citations
+  ---
+  duration_ms: 337.3494
+  type: 'test'
+  ...
+# Subtest: ChatGPT import retains alternate branches and parent linkage; CSV and Mongo retain source rows
+ok 133 - ChatGPT import retains alternate branches and parent linkage; CSV and Mongo retain source rows
+  ---
+  duration_ms: 29.8366
+  type: 'test'
+  ...
+# Subtest: facts: claude tools, current tool, prompts, files, per-model tokens, spawns, modes, waits
+ok 134 - facts: claude tools, current tool, prompts, files, per-model tokens, spawns, modes, waits
+  ---
+  duration_ms: 65.6064
+  type: 'test'
+  ...
+# Subtest: facts: codex calls, current tool, modes, token deltas, spawns, web / mcp / compaction dedupe, waits
+ok 135 - facts: codex calls, current tool, modes, token deltas, spawns, web / mcp / compaction dedupe, waits
+  ---
+  duration_ms: 59.4374
+  type: 'test'
+  ...
+# Subtest: facts: turn completion clears the current tool; incremental append updates facts
+ok 136 - facts: turn completion clears the current tool; incremental append updates facts
+  ---
+  duration_ms: 143.3512
+  type: 'test'
+  ...
+# Subtest: facts: sessions without tool data keep facts small and never invent values
+ok 137 - facts: sessions without tool data keep facts small and never invent values
+  ---
+  duration_ms: 0.5945
+  type: 'test'
+  ...
+# Subtest: facts: bounded call history and file list
+ok 138 - facts: bounded call history and file list
+  ---
+  duration_ms: 4.9562
+  type: 'test'
+  ...
+# Subtest: forecast: quartiles and label prefix
+ok 139 - forecast: quartiles and label prefix
+  ---
+  duration_ms: 2.7448
+  type: 'test'
+  ...
+# Subtest: forecast: estimate walks the key chain, conditions on elapsed time and flags overrun
+ok 140 - forecast: estimate walks the key chain, conditions on elapsed time and flags overrun
+  ---
+  duration_ms: 1.3637
+  type: 'test'
+  ...
+# Subtest: forecast: running agent, phase composition and pending phase projection
+ok 141 - forecast: running agent, phase composition and pending phase projection
+  ---
+  duration_ms: 4.8986
+  type: 'test'
+  ...
+# Subtest: forecast: sessions tree, worker keys, workflow transcripts not double-counted
+ok 142 - forecast: sessions tree, worker keys, workflow transcripts not double-counted
+  ---
+  duration_ms: 3.3646
+  type: 'test'
+  ...
+# Subtest: forecast: accuracy back-test only uses items finished before the 50 % point
+ok 143 - forecast: accuracy back-test only uses items finished before the 50 % point
+  ---
+  duration_ms: 1.1461
+  type: 'test'
+  ...
+# Subtest: forecast: screen renders escaped Gantt, table, accuracy and vertical views
+ok 144 - forecast: screen renders escaped Gantt, table, accuracy and vertical views
+  ---
+  duration_ms: 45.8852
+  type: 'test'
+  ...
+# Subtest: forecast: capItems keeps running items with their parents first
+ok 145 - forecast: capItems keeps running items with their parents first
+  ---
+  duration_ms: 0.6828
+  type: 'test'
+  ...
+# Subtest: Codex reader observes ordinary request/result and requested child metadata without inventing observed model
+ok 146 - Codex reader observes ordinary request/result and requested child metadata without inventing observed model
+  ---
+  duration_ms: 114.5531
+  type: 'test'
+  ...
+# Subtest: scoped event pages deduplicate, isolate other sessions, recover gaps and reject stale epochs
+ok 147 - scoped event pages deduplicate, isolate other sessions, recover gaps and reject stale epochs
+  ---
+  duration_ms: 137.4319
+  type: 'test'
+  ...
+# Subtest: ContextRef preserves exact scope/return target; ordinary drafts cannot answer security prompts
+ok 148 - ContextRef preserves exact scope/return target; ordinary drafts cannot answer security prompts
+  ---
+  duration_ms: 115.562
+  type: 'test'
+  ...
+# Subtest: registered session evidence follows current scoped observations through disappearance, repo drift and revocation
+ok 149 - registered session evidence follows current scoped observations through disappearance, repo drift and revocation
+  ---
+  duration_ms: 114.4083
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: observation: schema, ISO times, events of this session only, oldest first, without labels
+ok 150 - observation: schema, ISO times, events of this session only, oldest first, without labels
+  ---
+  duration_ms: 10.0924
+  type: 'test'
+  ...
+# Subtest: observation: no prompt, title, command, commit subject, todo, file name or absolute path is exported
+ok 151 - observation: no prompt, title, command, commit subject, todo, file name or absolute path is exported
+  ---
+  duration_ms: 2.1401
+  type: 'test'
+  ...
+# Subtest: observation: absent values are UNKNOWN, never OBSERVED; recorded evidence wins; live status is INFERRED
+ok 152 - observation: absent values are UNKNOWN, never OBSERVED; recorded evidence wins; live status is INFERRED
+  ---
+  duration_ms: 1.1796
+  type: 'test'
+  ...
+# Subtest: observation: maxEvents keeps the newest events
+ok 153 - observation: maxEvents keeps the newest events
+  ---
+  duration_ms: 0.8516
+  type: 'test'
+  ...
+# (node:25300) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: observation: real fixture sessions project to valid, path-free documents
+ok 154 - observation: real fixture sessions project to valid, path-free documents
+  ---
+  duration_ms: 6213.4807
+  type: 'test'
+  ...
+# Subtest: config snapshot: layers, effective values, names and counts only; no env, hook command, values or paths
+ok 155 - config snapshot: layers, effective values, names and counts only; no env, hook command, values or paths
+  ---
+  duration_ms: 48.9151
+  type: 'test'
+  ...
+# Subtest: config snapshot: content hash ignores capturedAt and key order, changes with content; missing feed is UNKNOWN
+ok 156 - config snapshot: content hash ignores capturedAt and key order, changes with content; missing feed is UNKNOWN
+  ---
+  duration_ms: 121.7967
+  type: 'test'
+  ...
+# Subtest: health: context uses the recorded window when present, else the reference marker
+ok 157 - health: context uses the recorded window when present, else the reference marker
+  ---
+  duration_ms: 3.3476
+  type: 'test'
+  ...
+# Subtest: health: series downsamples by max and keeps the peak
+ok 158 - health: series downsamples by max and keeps the peak
+  ---
+  duration_ms: 2.167
+  type: 'test'
+  ...
+# Subtest: health: rows by repo and session, period clipping, leads-only commits per session
+ok 159 - health: rows by repo and session, period clipping, leads-only commits per session
+  ---
+  duration_ms: 2.0027
+  type: 'test'
+  ...
+# Subtest: health: total aggregates once over the period
+ok 160 - health: total aggregates once over the period
+  ---
+  duration_ms: 0.4599
+  type: 'test'
+  ...
+# Subtest: health: trend buckets per hour
+ok 161 - health: trend buckets per hour
+  ---
+  duration_ms: 3.5725
+  type: 'test'
+  ...
+# Subtest: health: settings parse with safe defaults
+ok 162 - health: settings parse with safe defaults
+  ---
+  duration_ms: 1.3162
+  type: 'test'
+  ...
+# Subtest: health: sparkline handles gaps and empty input
+ok 163 - health: sparkline handles gaps and empty input
+  ---
+  duration_ms: 1.3089
+  type: 'test'
+  ...
+# Subtest: health: screen renders escaped, with every toggle combination
+ok 164 - health: screen renders escaped, with every toggle combination
+  ---
+  duration_ms: 66.8839
+  type: 'test'
+  ...
+# Subtest: history: ISO week ids round-trip, year edges and shifts
+ok 165 - history: ISO week ids round-trip, year edges and shifts
+  ---
+  duration_ms: 2.3627
+  type: 'test'
+  ...
+# Subtest: history: a session spanning two weeks splits tokens per call and counts in both weeks
+ok 166 - history: a session spanning two weeks splits tokens per call and counts in both weeks
+  ---
+  duration_ms: 3.3197
+  type: 'test'
+  ...
+# Subtest: history: merge keeps rows of earlier runs and git commits over a git-less run
+ok 167 - history: merge keeps rows of earlier runs and git commits over a git-less run
+  ---
+  duration_ms: 2.0602
+  type: 'test'
+  ...
+# Subtest: history: validation drops bad rows and recomputes rollups
+ok 168 - history: validation drops bad rows and recomputes rollups
+  ---
+  duration_ms: 0.8934
+  type: 'test'
+  ...
+# Subtest: history: archive write → read round-trip, markdown report, no prompt text, merge on second run
+ok 169 - history: archive write → read round-trip, markdown report, no prompt text, merge on second run
+  ---
+  duration_ms: 282.6054
+  type: 'test'
+  ...
+# Subtest: history: weekly markdown escapes table cells and compares with the previous week
+ok 170 - history: weekly markdown escapes table cells and compares with the previous week
+  ---
+  duration_ms: 1.8234
+  type: 'test'
+  ...
+# Subtest: history screen: every view renders escaped from the archive plus loaded sessions
+ok 171 - history screen: every view renders escaped from the archive plus loaded sessions
+  ---
+  duration_ms: 145.1291
+  type: 'test'
+  ...
+# Subtest: history screen: empty archive explains how to fill it; actions validate their argument
+ok 172 - history screen: empty archive explains how to fill it; actions validate their argument
+  ---
+  duration_ms: 4.5869
+  type: 'test'
+  ...
+# Subtest: todos: claude TodoWrite keeps the latest list, capped at 30 × 120 chars, redacted
+ok 173 - todos: claude TodoWrite keeps the latest list, capped at 30 × 120 chars, redacted
+  ---
+  duration_ms: 69.6204
+  type: 'test'
+  ...
+# Subtest: todos: claude TaskCreate / TaskUpdate build a list by creation order, duplicates ignored, deleted removed
+ok 174 - todos: claude TaskCreate / TaskUpdate build a list by creation order, duplicates ignored, deleted removed
+  ---
+  duration_ms: 36.0965
+  type: 'test'
+  ...
+# Subtest: todos: codex update_plan from function_call and from exec scripts
+ok 175 - todos: codex update_plan from function_call and from exec scripts
+  ---
+  duration_ms: 39.2547
+  type: 'test'
+  ...
+# Subtest: hud: lessons count bullets, CLAUDE.md only in a Lessons section, code fences skipped
+ok 176 - hud: lessons count bullets, CLAUDE.md only in a Lessons section, code fences skipped
+  ---
+  duration_ms: 0.742
+  type: 'test'
+  ...
+# Subtest: hud: lessons feed reads the first candidate file, async, capped
+ok 177 - hud: lessons feed reads the first candidate file, async, capped
+  ---
+  duration_ms: 57.9548
+  type: 'test'
+  ...
+# Subtest: hud: workers, todo progress, tests, sessions, log tail
+ok 178 - hud: workers, todo progress, tests, sessions, log tail
+  ---
+  duration_ms: 2.4037
+  type: 'test'
+  ...
+# Subtest: hud: needs-input workers, absences DERIVED, inferred end, untrusted piped outcome
+ok 179 - hud: needs-input workers, absences DERIVED, inferred end, untrusted piped outcome
+  ---
+  duration_ms: 4.6418
+  type: 'test'
+  ...
+# Subtest: hud: CI from the pipelines report, branch first, else newest of the repo
+ok 180 - hud: CI from the pipelines report, branch first, else newest of the repo
+  ---
+  duration_ms: 0.6394
+  type: 'test'
+  ...
+# Subtest: hud: screen renders cards with evidence, escapes text, pins a session
+ok 181 - hud: screen renders cards with evidence, escapes text, pins a session
+  ---
+  duration_ms: 25.8008
+  type: 'test'
+  ...
+# Subtest: incremental stable-prefix export: new, unchanged, append, same-mtime rewrite, generation and idempotence
+ok 182 - incremental stable-prefix export: new, unchanged, append, same-mtime rewrite, generation and idempotence
+  ---
+  duration_ms: 3515.1405
+  type: 'test'
+  ...
+# Subtest: cancel, malformed/rewrite after preview, identity mismatch, cross-scope and unsafe destination never commit a cursor
+ok 183 - cancel, malformed/rewrite after preview, identity mismatch, cross-scope and unsafe destination never commit a cursor
+  ---
+  duration_ms: 1572.8863
+  type: 'test'
+  ...
+# Subtest: usage: Claude counts each message id once (latest record wins) and keeps the recorded cost
+ok 184 - usage: Claude counts each message id once (latest record wins) and keeps the recorded cost
+  ---
+  duration_ms: 68.0614
+  type: 'test'
+  ...
+# (node:82404) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: usage: Codex token_count is cumulative and exposes the context window
+ok 185 - usage: Codex token_count is cumulative and exposes the context window
+  ---
+  duration_ms: 53.324
+  type: 'test'
+  ...
+# Subtest: attention: input, failing test, full context, stale turn, long idle, ended-with-edits; never for clean ends
+ok 186 - attention: input, failing test, full context, stale turn, long idle, ended-with-edits; never for clean ends
+  ---
+  duration_ms: 12.6495
+  type: 'test'
+  ...
+# Subtest: stages, outcome and flow are factual
+ok 187 - stages, outcome and flow are factual
+  ---
+  duration_ms: 63.4661
+  type: 'test'
+  ...
+# Subtest: flow drill-down: picking a node lists only matching sessions
+ok 188 - flow drill-down: picking a node lists only matching sessions
+  ---
+  duration_ms: 13.9937
+  type: 'test'
+  ...
+# Subtest: hourly heatmap ignores turn/tool chatter; identity colors are stable
+ok 189 - hourly heatmap ignores turn/tool chatter; identity colors are stable
+  ---
+  duration_ms: 2.7163
+  type: 'test'
+  ...
+# Subtest: workspace: every view renders, escapes provider text, team root follows workers
+ok 190 - workspace: every view renders, escapes provider text, team root follows workers
+  ---
+  duration_ms: 1069.7575
+  type: 'test'
+  ...
+# Subtest: sources view: collectors, storage and git off state
+ok 191 - sources view: collectors, storage and git off state
+  ---
+  duration_ms: 1.6829
+  type: 'test'
+  ...
+# Subtest: messages: nav and select are validated against allow-lists
+ok 192 - messages: nav and select are validated against allow-lists
+  ---
+  duration_ms: 0.8346
+  type: 'test'
+  ...
+# Subtest: DirCache: unchanged folder is served from cache, an added entry re-lists it
+ok 193 - DirCache: unchanged folder is served from cache, an added entry re-lists it
+  ---
+  duration_ms: 12.1463
+  type: 'test'
+  ...
+# Subtest: DirCache: a recently changed folder is always re-listed; unused listings are pruned
+ok 194 - DirCache: a recently changed folder is always re-listed; unused listings are pruned
+  ---
+  duration_ms: 18.2768
+  type: 'test'
+  ...
+# Subtest: Claude discovery: unchanged project folders are not re-listed, file growth is still seen
+ok 195 - Claude discovery: unchanged project folders are not re-listed, file growth is still seen
+  ---
+  duration_ms: 38.6571
+  type: 'test'
+  ...
+# Subtest: Codex discovery: day folders cached; session_index.jsonl read from its last offset
+ok 196 - Codex discovery: day folders cached; session_index.jsonl read from its last offset
+  ---
+  duration_ms: 56.4559
+  type: 'test'
+  ...
+# Subtest: jsonl: a file over 4 MB is read once, then only from the last offset in bounded chunks
+ok 197 - jsonl: a file over 4 MB is read once, then only from the last offset in bounded chunks
+  ---
+  duration_ms: 827.2786
+  type: 'test'
+  ...
+# Subtest: Claude ingest of a > 4 MB transcript: appends are parsed from the cursor, heap stays bounded
+ok 198 - Claude ingest of a > 4 MB transcript: appends are parsed from the cursor, heap stays bounded
+  ---
+  duration_ms: 2963.5919
+  type: 'test'
+  ...
+# Subtest: transcript reader: a window over 1 MB is read in chunks with the same result
+ok 199 - transcript reader: a window over 1 MB is read in chunks with the same result
+  ---
+  duration_ms: 608.9008
+  type: 'test'
+  ...
+# Subtest: endObserved: only a provider-recorded end counts
+ok 200 - endObserved: only a provider-recorded end counts
+  ---
+  duration_ms: 2.422
+  type: 'test'
+  ...
+# Subtest: Week: every KPI has an evidence title; open-ended durations shown with ≥
+ok 201 - Week: every KPI has an evidence title; open-ended durations shown with ≥
+  ---
+  duration_ms: 40.421
+  type: 'test'
+  ...
+# Subtest: Explore: KPI titles, active time marked ≥ when a session has no recorded end
+ok 202 - Explore: KPI titles, active time marked ≥ when a session has no recorded end
+  ---
+  duration_ms: 4.7869
+  type: 'test'
+  ...
+# Subtest: Health: every KPI has an evidence title
+ok 203 - Health: every KPI has an evidence title
+  ---
+  duration_ms: 5.9472
+  type: 'test'
+  ...
+# Subtest: Audit: alive-check transitions carry an "(inferred)" suffix
+ok 204 - Audit: alive-check transitions carry an "(inferred)" suffix
+  ---
+  duration_ms: 5.6107
+  type: 'test'
+  ...
+# Subtest: joinTokens refuses anything that would need shell quoting
+ok 205 - joinTokens refuses anything that would need shell quoting
+  ---
+  duration_ms: 3.1666
+  type: 'test'
+  ...
+# Subtest: folderKey is stable, case and slash insensitive on Windows-like paths
+ok 206 - folderKey is stable, case and slash insensitive on Windows-like paths
+  ---
+  duration_ms: 0.8722
+  type: 'test'
+  ...
+# Subtest: folderChoices merges sessions and workspace folders, drops junk
+ok 207 - folderChoices merges sessions and workspace folders, drops junk
+  ---
+  duration_ms: 1.2635
+  type: 'test'
+  ...
+# Subtest: modelChoices: defaults first, then models seen, invalid names skipped
+ok 208 - modelChoices: defaults first, then models seen, invalid names skipped
+  ---
+  duration_ms: 1.9678
+  type: 'test'
+  ...
+# Subtest: buildStart: Claude flags, never bypassPermissions
+ok 209 - buildStart: Claude flags, never bypassPermissions
+  ---
+  duration_ms: 1.4394
+  type: 'test'
+  ...
+# Subtest: buildStart: Codex profile, model, effort and sandbox mapping
+ok 210 - buildStart: Codex profile, model, effort and sandbox mapping
+  ---
+  duration_ms: 1.1771
+  type: 'test'
+  ...
+# Subtest: buildResume validates the id and folder
+ok 211 - buildResume validates the id and folder
+  ---
+  duration_ms: 0.566
+  type: 'test'
+  ...
+# Subtest: pick encoding round-trips and maps lowercase modes
+ok 212 - pick encoding round-trips and maps lowercase modes
+  ---
+  duration_ms: 0.9755
+  type: 'test'
+  ...
+# Subtest: owned terminal registry only closes its own ids
+ok 213 - owned terminal registry only closes its own ids
+  ---
+  duration_ms: 0.9135
+  type: 'test'
+  ...
+# Subtest: screen renders escaped, actions confirm before opening a terminal
+ok 214 - screen renders escaped, actions confirm before opening a terminal
+  ---
+  duration_ms: 49.0641
+  type: 'test'
+  ...
+# Subtest: workState classifies events
+ok 215 - workState classifies events
+  ---
+  duration_ms: 2.1402
+  type: 'test'
+  ...
+# Subtest: statusPath: started → running ⇄ idle → ended with evidence
+ok 216 - statusPath: started → running ⇄ idle → ended with evidence
+  ---
+  duration_ms: 4.6132
+  type: 'test'
+  ...
+# Subtest: workPath and loop stats
+ok 217 - workPath and loop stats
+  ---
+  duration_ms: 0.7751
+  type: 'test'
+  ...
+# Subtest: machine aggregates edges, counts and medians
+ok 218 - machine aggregates edges, counts and medians
+  ---
+  duration_ms: 24.5879
+  type: 'test'
+  ...
+# Subtest: screen renders both machines, lists sessions, escapes
+ok 219 - screen renders both machines, lists sessions, escapes
+  ---
+  duration_ms: 48.9699
+  type: 'test'
+  ...
+# Subtest: limits: blocks floor to the hour, split at 5 h from start and at gaps ≥ 5 h
+ok 220 - limits: blocks floor to the hour, split at 5 h from start and at gaps ≥ 5 h
+  ---
+  duration_ms: 86.5324
+  type: 'test'
+  ...
+# Subtest: limits: current block burn (last 15 min), projection, past p90 / max
+ok 221 - limits: current block burn (last 15 min), projection, past p90 / max
+  ---
+  duration_ms: 25.3123
+  type: 'test'
+  ...
+# Subtest: limits: codex rate_limits parsing (resets_at seconds, resets_in_seconds, window kinds)
+ok 222 - limits: codex rate_limits parsing (resets_at seconds, resets_in_seconds, window kinds)
+  ---
+  duration_ms: 0.6992
+  type: 'test'
+  ...
+# Subtest: limits: codex rollout fixture → facts.rateLimits, gauges, trend, badge
+ok 223 - limits: codex rollout fixture → facts.rateLimits, gauges, trend, badge
+  ---
+  duration_ms: 111.3607
+  type: 'test'
+  ...
+# Subtest: live: rate over the window and per-minute spark from recorded calls
+ok 224 - live: rate over the window and per-minute spark from recorded calls
+  ---
+  duration_ms: 3.3292
+  type: 'test'
+  ...
+# Subtest: live: rows nest workers under their lead, keep live only by default, add recent on request
+ok 225 - live: rows nest workers under their lead, keep live only by default, add recent on request
+  ---
+  duration_ms: 2.4642
+  type: 'test'
+  ...
+# Subtest: live: totals and lanes
+ok 226 - live: totals and lanes
+  ---
+  duration_ms: 1.3214
+  type: 'test'
+  ...
+# Subtest: live: screen renders every layout escaped, with selection hooks
+ok 227 - live: screen renders every layout escaped, with selection hooks
+  ---
+  duration_ms: 28.6579
+  type: 'test'
+  ...
+# Subtest: loading: a feed records its start time while running
+ok 228 - loading: a feed records its start time while running
+  ---
+  duration_ms: 2.0613
+  type: 'test'
+  ...
+# Subtest: loading: a plain pump never restarts a running feed; a forced one only after its timeout
+ok 229 - loading: a plain pump never restarts a running feed; a forced one only after its timeout
+  ---
+  duration_ms: 13.1403
+  type: 'test'
+  ...
+# Subtest: loading: a failing feed records the error and keeps the last value; a throwing load is caught
+ok 230 - loading: a failing feed records the error and keeps the last value; a throwing load is caught
+  ---
+  duration_ms: 8.7421
+  type: 'test'
+  ...
+# Subtest: loading: the 7 screens show kit.loading() while their feeds load, with a Retry action
+ok 231 - loading: the 7 screens show kit.loading() while their feeds load, with a Retry action
+  ---
+  duration_ms: 13.4802
+  type: 'test'
+  ...
+# Subtest: loading: the 7 screens show kit.loadError() with Retry when their feeds fail
+ok 232 - loading: the 7 screens show kit.loadError() with Retry when their feeds fail
+  ---
+  duration_ms: 5.2987
+  type: 'test'
+  ...
+# Subtest: native preflight is inert and exact binary/startup/capability mismatches block
+ok 233 - native preflight is inert and exact binary/startup/capability mismatches block
+  ---
+  duration_ms: 2699.4571
+  type: 'test'
+  ...
+# Subtest: native commands have no caller shell/argv/env or credential inheritance
+ok 234 - native commands have no caller shell/argv/env or credential inheritance
+  ---
+  duration_ms: 269.9186
+  type: 'test'
+  ...
+# Subtest: owned app-server handshake, exact task, sanitized streams, completed ledger and duplicate refusal
+ok 235 - owned app-server handshake, exact task, sanitized streams, completed ledger and duplicate refusal
+  ---
+  duration_ms: 2052.4051
+  type: 'test'
+  ...
+# Subtest: native failure/security refusal cannot become success or approval
+ok 236 - native failure/security refusal cannot become success or approval
+  ---
+  duration_ms: 1009.5735
+  type: 'test'
+  ...
+# Subtest: uncertain durable intent blocks blind retries and reload does not claim stopped
+ok 237 - uncertain durable intent blocks blind retries and reload does not claim stopped
+  ---
+  duration_ms: 464.4526
+  type: 'test'
+  ...
+# Subtest: owned completed session can resume; changed target/permission/Config binding cannot
+ok 238 - owned completed session can resume; changed target/permission/Config binding cannot
+  ---
+  duration_ms: 687.6632
+  type: 'test'
+  ...
+# Subtest: codex-cli requires native completion AND zero exit; requested identity never inferred
+ok 239 - codex-cli requires native completion AND zero exit; requested identity never inferred
+  ---
+  duration_ms: 593.6836
+  type: 'test'
+  ...
+# Subtest: claude-cli requires native completion AND zero exit; requested identity never inferred
+ok 240 - claude-cli requires native completion AND zero exit; requested identity never inferred
+  ---
+  duration_ms: 622.1118
+  type: 'test'
+  ...
+# Subtest: host facade requires independent exact approval, scope/epoch guards and own Config role association
+not ok 241 - host facade requires independent exact approval, scope/epoch guards and own Config role association
+  ---
+  duration_ms: 505.3271
+  type: 'test'
+  location: 'D:\\PROJ\\.cockpit-integration\\COMPLETE-NATIVE-20261012\\worktrees\\AGENT\\out-test\\test\\nativeTransport.test.js:236:22'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'UNKNOWN'
+    - 'STOPPED'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'STOPPED'
+  actual: 'UNKNOWN'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\PROJ\.cockpit-integration\COMPLETE-NATIVE-20261012\worktrees\AGENT\out-test\test\nativeTransport.test.js:251:16)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: observation export preserves missing outcomes, serializes and redacts event secrets
+ok 242 - observation export preserves missing outcomes, serializes and redacts event secrets
+  ---
+  duration_ms: 10.898
+  type: 'test'
+  ...
+# Subtest: Agent never invents missing repository, worktree, commit or changed file
+ok 243 - Agent never invents missing repository, worktree, commit or changed file
+  ---
+  duration_ms: 2.5584
+  type: 'test'
+  ...
+# Subtest: observation export retains verification UNKNOWN and field provenance
+ok 244 - observation export retains verification UNKNOWN and field provenance
+  ---
+  duration_ms: 1.4525
+  type: 'test'
+  ...
+# Subtest: plain provider/session command object resolves without inventing session identity
+ok 245 - plain provider/session command object resolves without inventing session identity
+  ---
+  duration_ms: 0.3029
+  type: 'test'
+  ...
+# Subtest: replay: the moving playhead wrappers are clipped by their track, not by the page
+ok 246 - replay: the moving playhead wrappers are clipped by their track, not by the page
+  ---
+  duration_ms: 2.2911
+  type: 'test'
+  ...
+# Subtest: health: the context rows scroll inside their list and shrink at narrow widths
+ok 247 - health: the context rows scroll inside their list and shrink at narrow widths
+  ---
+  duration_ms: 0.5444
+  type: 'test'
+  ...
+# Subtest: runs: the hour heatmap scrolls inside its box and the x axis labels are clipped
+ok 248 - runs: the hour heatmap scrolls inside its box and the x axis labels are clipped
+  ---
+  duration_ms: 0.5002
+  type: 'test'
+  ...
+# Subtest: overlap: two overlapping sessions in one worktree share their window commits (INFERRED)
+ok 249 - overlap: two overlapping sessions in one worktree share their window commits (INFERRED)
+  ---
+  duration_ms: 3.8283
+  type: 'test'
+  ...
+# Subtest: overlap: a session that ran git commit itself stays OBSERVED (not marked)
+ok 250 - overlap: a session that ran git commit itself stays OBSERVED (not marked)
+  ---
+  duration_ms: 0.5223
+  type: 'test'
+  ...
+# Subtest: overlap: different worktrees, disjoint windows and own workers are not shared; live runs until now
+ok 251 - overlap: different worktrees, disjoint windows and own workers are not shared; live runs until now
+  ---
+  duration_ms: 0.7429
+  type: 'test'
+  ...
+# Subtest: overlap: Changes and Review screens show the badge with the other sessions in the tooltip
+ok 252 - overlap: Changes and Review screens show the badge with the other sessions in the tooltip
+  ---
+  duration_ms: 46.5175
+  type: 'test'
+  ...
+# Subtest: overview: Needs attention is collapsible, count stays visible, state comes from WsState opts
+ok 253 - overview: Needs attention is collapsible, count stays visible, state comes from WsState opts
+  ---
+  duration_ms: 58.8092
+  type: 'test'
+  ...
+# Subtest: overview: attention and live agents grouped by provider with counts, each group collapsible
+ok 254 - overview: attention and live agents grouped by provider with counts, each group collapsible
+  ---
+  duration_ms: 6.3066
+  type: 'test'
+  ...
+# Subtest: overview: lead card lists running workers (max 5, then +n more to Topology), idle/ended only counted
+ok 255 - overview: lead card lists running workers (max 5, then +n more to Topology), idle/ended only counted
+  ---
+  duration_ms: 4.0599
+  type: 'test'
+  ...
+# Subtest: overview: worker rows do not force horizontal overflow (shrinkable flex cells)
+ok 256 - overview: worker rows do not force horizontal overflow (shrinkable flex cells)
+  ---
+  duration_ms: 0.2681
+  type: 'test'
+  ...
+# Subtest: serializer adopts existing public panel, restores selected screen, persists metadata and denies stale source actions
+ok 257 - serializer adopts existing public panel, restores selected screen, persists metadata and denies stale source actions
+  ---
+  duration_ms: 297.7826
+  type: 'test'
+  ...
+# Subtest: scoped UI binds exports to reviewed sources and suspends missing, replaced or linked provider paths
+ok 258 - scoped UI binds exports to reviewed sources and suspends missing, replaced or linked provider paths
+  ---
+  duration_ms: 1196.5922
+  type: 'test'
+  ...
+# Subtest: panes: layout and cell choice are validated, never recursive
+ok 259 - panes: layout and cell choice are validated, never recursive
+  ---
+  duration_ms: 2.8428
+  type: 'test'
+  ...
+# Subtest: panes: 2x2 renders four headers with their screens and no nested panes
+ok 260 - panes: 2x2 renders four headers with their screens and no nested panes
+  ---
+  duration_ms: 58.1327
+  type: 'test'
+  ...
+# Subtest: panes: select posts through the existing opt validation
+ok 261 - panes: select posts through the existing opt validation
+  ---
+  duration_ms: 1.303
+  type: 'test'
+  ...
+# (node:77560) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: perf: 100-session history load and large-file incremental refresh
+ok 262 - perf: 100-session history load and large-file incremental refresh
+  ---
+  duration_ms: 4069.3949
+  type: 'test'
+  ...
+# Subtest: picker lists every registered screen id exactly once (webview source and command list)
+ok 263 - picker lists every registered screen id exactly once (webview source and command list)
+  ---
+  duration_ms: 11.0865
+  type: 'test'
+  ...
+# Subtest: picker entries carry label, group and hint, in rail group order
+ok 264 - picker entries carry label, group and hint, in rail group order
+  ---
+  duration_ms: 1.0162
+  type: 'test'
+  ...
+# Subtest: picker source is hidden, after the rail, and never a [data-nav] element
+ok 265 - picker source is hidden, after the rail, and never a [data-nav] element
+  ---
+  duration_ms: 1.9862
+  type: 'test'
+  ...
+# Subtest: webview script wires "g" and Ctrl+K to the picker and stays valid JavaScript
+ok 266 - webview script wires "g" and Ctrl+K to the picker and stays valid JavaScript
+  ---
+  duration_ms: 1.9424
+  type: 'test'
+  ...
+# Subtest: package.json contributes "Agent: Go to screen…" with a keybinding in the workspace webview
+ok 267 - package.json contributes "Agent: Go to screen…" with a keybinding in the workspace webview
+  ---
+  duration_ms: 1.6829
+  type: 'test'
+  ...
+# Subtest: pipelines: remotes parse https / scp / ssh, drop credentials, detect provider
+ok 268 - pipelines: remotes parse https / scp / ssh, drop credentials, detect provider
+  ---
+  duration_ms: 7.7904
+  type: 'test'
+  ...
+# Subtest: pipelines: status mapping, MR refs and safe urls
+ok 269 - pipelines: status mapping, MR refs and safe urls
+  ---
+  duration_ms: 0.9156
+  type: 'test'
+  ...
+# Subtest: pipelines: load runs read-only API GETs, parses runs and jobs, records errors
+ok 270 - pipelines: load runs read-only API GETs, parses runs and jobs, records errors
+  ---
+  duration_ms: 819.3506
+  type: 'test'
+  ...
+# Subtest: pipelines: job run picking puts active, newest and latest failures first
+ok 271 - pipelines: job run picking puts active, newest and latest failures first
+  ---
+  duration_ms: 18.8466
+  type: 'test'
+  ...
+# Subtest: pipelines: what blocks uses the latest run per ref and infers runner contention
+ok 272 - pipelines: what blocks uses the latest run per ref and infers runner contention
+  ---
+  duration_ms: 7.7651
+  type: 'test'
+  ...
+# Subtest: pipelines: runner use buckets busy time per runner
+ok 273 - pipelines: runner use buckets busy time per runner
+  ---
+  duration_ms: 5.8477
+  type: 'test'
+  ...
+# Subtest: pipelines: sessions link by commit (observed) or branch (inferred), never by main
+ok 274 - pipelines: sessions link by commit (observed) or branch (inferred), never by main
+  ---
+  duration_ms: 5.9393
+  type: 'test'
+  ...
+# Subtest: pipelines: feed stays off by default and in untrusted workspaces
+ok 275 - pipelines: feed stays off by default and in untrusted workspaces
+  ---
+  duration_ms: 0.5719
+  type: 'test'
+  ...
+# Subtest: pipelines: screen renders every tab escaped, with session chips and evidence
+ok 276 - pipelines: screen renders every tab escaped, with session chips and evidence
+  ---
+  duration_ms: 95.7592
+  type: 'test'
+  ...
+# Subtest: pipelines: open action only follows links the feed listed
+ok 277 - pipelines: open action only follows links the feed listed
+  ---
+  duration_ms: 4.8738
+  type: 'test'
+  ...
+# Subtest: selected PID metadata remains separate, bounds reads, detects identity reuse and drops revoked results
+ok 278 - selected PID metadata remains separate, bounds reads, detects identity reuse and drops revoked results
+  ---
+  duration_ms: 207.2482
+  type: 'test'
+  ...
+# Subtest: resource timestamps correlate only with enrolled recorded windows, remain bounded and never imply cause
+ok 279 - resource timestamps correlate only with enrolled recorded windows, remain bounded and never imply cause
+  ---
+  duration_ms: 527.3313
+  type: 'test'
+  ...
+# Subtest: parseRules drops malformed entries
+ok 280 - parseRules drops malformed entries
+  ---
+  duration_ms: 3.4755
+  type: 'test'
+  ...
+# Subtest: rule matching: prefix, glob, bare name, case and slash insensitive
+ok 281 - rule matching: prefix, glob, bare name, case and slash insensitive
+  ---
+  duration_ms: 1.096
+  type: 'test'
+  ...
+# Subtest: inference: parent folder or drive is the company, folder or prefix is the project
+ok 282 - inference: parent folder or drive is the company, folder or prefix is the project
+  ---
+  duration_ms: 0.7805
+  type: 'test'
+  ...
+# Subtest: repoPath strips linked worktree suffix from cwd when git is unknown
+ok 283 - repoPath strips linked worktree suffix from cwd when git is unknown
+  ---
+  duration_ms: 0.458
+  type: 'test'
+  ...
+# Subtest: most specific rule wins, rule fills only what it names
+ok 284 - most specific rule wins, rule fills only what it names
+  ---
+  duration_ms: 0.9605
+  type: 'test'
+  ...
+# Subtest: buildProjects rolls up counts, filters by period, reports unused rules
+ok 285 - buildProjects rolls up counts, filters by period, reports unused rules
+  ---
+  duration_ms: 4.7367
+  type: 'test'
+  ...
+# Subtest: squarify fills the box and keeps order
+ok 286 - squarify fills the box and keeps order
+  ---
+  duration_ms: 1.1161
+  type: 'test'
+  ...
+# Subtest: projects screen renders every layout, escapes names, scopes by repo key
+ok 287 - projects screen renders every layout, escapes names, scopes by repo key
+  ---
+  duration_ms: 40.9582
+  type: 'test'
+  ...
+# Subtest: projects actions only touch paths of known sessions
+ok 288 - projects actions only touch paths of known sessions
+  ---
+  duration_ms: 1.1076
+  type: 'test'
+  ...
+# Subtest: modeFacts: Codex approval policy + collaboration mode, legacy alias, Claude permission mode
+ok 289 - modeFacts: Codex approval policy + collaboration mode, legacy alias, Claude permission mode
+  ---
+  duration_ms: 4.2793
+  type: 'test'
+  ...
+# Subtest: live: mode column shows approval / collaboration / permission with an evidence chip
+ok 290 - live: mode column shows approval / collaboration / permission with an evidence chip
+  ---
+  duration_ms: 5.7027
+  type: 'test'
+  ...
+# Subtest: hud: Codex approval + collaboration (plan ON) and Claude permission mode with evidence
+ok 291 - hud: Codex approval + collaboration (plan ON) and Claude permission mode with evidence
+  ---
+  duration_ms: 4.7142
+  type: 'test'
+  ...
+# Subtest: hud: lessons and CI feeds use kit.loading() then kit.loadError()
+ok 292 - hud: lessons and CI feeds use kit.loading() then kit.loadError()
+  ---
+  duration_ms: 2.423
+  type: 'test'
+  ...
+# Subtest: transcript header: provider mode facts with an evidence chip
+ok 293 - transcript header: provider mode facts with an evidence chip
+  ---
+  duration_ms: 63.3933
+  type: 'test'
+  ...
+# Subtest: tokenFacts: compactions, cache read / write, reasoning with evidence kinds; UNKNOWN when not recorded
+ok 294 - tokenFacts: compactions, cache read / write, reasoning with evidence kinds; UNKNOWN when not recorded
+  ---
+  duration_ms: 0.9713
+  type: 'test'
+  ...
+# Subtest: ctxcost and health: provider token facts strip with evidence chips
+ok 295 - ctxcost and health: provider token facts strip with evidence chips
+  ---
+  duration_ms: 10.8825
+  type: 'test'
+  ...
+# Subtest: bulk Codex includes old and archived workers; keeps full large/unknown native records and hashes
+ok 296 - bulk Codex includes old and archived workers; keeps full large/unknown native records and hashes
+  ---
+  duration_ms: 879.2682
+  type: 'test'
+  ...
+# Subtest: bulk Claude has distinct worker identity, parent linkage and hashed companion metadata
+ok 297 - bulk Claude has distinct worker identity, parent linkage and hashed companion metadata
+  ---
+  duration_ms: 801.7614
+  type: 'test'
+  ...
+# Subtest: bulk fails closed on malformed records and does not overwrite a bundle
+ok 298 - bulk fails closed on malformed records and does not overwrite a bundle
+  ---
+  duration_ms: 378.2717
+  type: 'test'
+  ...
+# Subtest: output is refused anywhere under either provider root, including linked output ancestors
+ok 299 - output is refused anywhere under either provider root, including linked output ancestors
+  ---
+  duration_ms: 182.1254
+  type: 'test'
+  ...
+# Subtest: discovery does not follow linked project directories
+ok 300 - discovery does not follow linked project directories
+  ---
+  duration_ms: 360.9992
+  type: 'test'
+  ...
+# Subtest: credential JSONL is refused and linked worker directories are ignored
+ok 301 - credential JSONL is refused and linked worker directories are ignored
+  ---
+  duration_ms: 258.7228
+  type: 'test'
+  ...
+# Subtest: CLI is noninteractive, requires provider selection and publishes direct cockpit.json
+ok 302 - CLI is noninteractive, requires provider selection and publishes direct cockpit.json
+  ---
+  duration_ms: 654.9174
+  type: 'test'
+  ...
+# Subtest: hash evidence distinguishes append-only external activity from changed captured bytes
+ok 303 - hash evidence distinguishes append-only external activity from changed captured bytes
+  ---
+  duration_ms: 48.074
+  type: 'test'
+  ...
+# Subtest: shared sanitizer excludes environment snapshots, protects secret-shaped keys and preserves parent IDs
+ok 304 - shared sanitizer excludes environment snapshots, protects secret-shaped keys and preserves parent IDs
+  ---
+  duration_ms: 1.4299
+  type: 'test'
+  ...
+# Subtest: existing Codex adapter discovers underscore-separated fork rollouts in bulk
+ok 305 - existing Codex adapter discovers underscore-separated fork rollouts in bulk
+  ---
+  duration_ms: 68.2477
+  type: 'test'
+  ...
+# Subtest: bulk includes workflow transcripts, parent identities and journals without changing default UI discovery
+ok 306 - bulk includes workflow transcripts, parent identities and journals without changing default UI discovery
+  ---
+  duration_ms: 101.8064
+  type: 'test'
+  ...
+# Subtest: standalone kit uses the Agent collector, stable safe hashes and no history/secret payloads
+ok 307 - standalone kit uses the Agent collector, stable safe hashes and no history/secret payloads
+  ---
+  duration_ms: 784.8772
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# (node:85568) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: claude adapter: session, location, model/effort, tests, files, worker tree, evidence
+ok 308 - claude adapter: session, location, model/effort, tests, files, worker tree, evidence
+  ---
+  duration_ms: 4508.7871
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: claude adapter: live registry → RUNNING; secrets never copied
+ok 309 - claude adapter: live registry → RUNNING; secrets never copied
+  ---
+  duration_ms: 2938.6832
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: codex adapter: meta, turn state, exit-code tests, file changes, subagent parent, archive
+ok 310 - codex adapter: meta, turn state, exit-code tests, file changes, subagent parent, archive
+  ---
+  duration_ms: 3875.5973
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: collectors: each source reports ready / partial / missing explicitly
+ok 311 - collectors: each source reports ready / partial / missing explicitly
+  ---
+  duration_ms: 2709.8298
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: codex: open turn without recent activity is UNKNOWN, never RUNNING or FAILED
+ok 312 - codex: open turn without recent activity is UNKNOWN, never RUNNING or FAILED
+  ---
+  duration_ms: 2087.1691
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: git: linked worktree and detached HEAD are reported
+ok 313 - git: linked worktree and detached HEAD are reported
+  ---
+  duration_ms: 2346.3769
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: security: provider artifacts are never mutated by ingestion
+ok 314 - security: provider artifacts are never mutated by ingestion
+  ---
+  duration_ms: 1398.3477
+  type: 'test'
+  ...
+# Subtest: security: artifact reached through a junction/symlink outside the provider root is rejected
+ok 315 - security: artifact reached through a junction/symlink outside the provider root is rejected
+  ---
+  duration_ms: 1113.0512
+  type: 'test'
+  ...
+# Subtest: incremental refresh reads only appended bytes
+ok 316 - incremental refresh reads only appended bytes
+  ---
+  duration_ms: 1168.115
+  type: 'test'
+  ...
+# Subtest: RAIL_ORDER lists every registered screen (no screen falls back to rank 999)
+ok 317 - RAIL_ORDER lists every registered screen (no screen falls back to rank 999)
+  ---
+  duration_ms: 2.5626
+  type: 'test'
+  ...
+# Subtest: rail keeps every screen: each registered screen appears exactly once
+ok 318 - rail keeps every screen: each registered screen appears exactly once
+  ---
+  duration_ms: 8.5408
+  type: 'test'
+  ...
+# Subtest: unknown ids in RAIL_ORDER (a planned "benchmarks") are ignored, never rendered
+ok 319 - unknown ids in RAIL_ORDER (a planned "benchmarks") are ignored, never rendered
+  ---
+  duration_ms: 1.4561
+  type: 'test'
+  ...
+# Subtest: new screens sit where the reading order puts them inside their group
+ok 320 - new screens sit where the reading order puts them inside their group
+  ---
+  duration_ms: 1.4714
+  type: 'test'
+  ...
+# Subtest: every rail group header carries its question as a tooltip
+ok 321 - every rail group header carries its question as a tooltip
+  ---
+  duration_ms: 7.276
+  type: 'test'
+  ...
+# Subtest: launcher: labelled as the only screen that starts sessions; untrusted workspace never starts or resumes
+ok 322 - launcher: labelled as the only screen that starts sessions; untrusted workspace never starts or resumes
+  ---
+  duration_ms: 13.9759
+  type: 'test'
+  ...
+# Subtest: redact: every audit sample and named token format is removed
+ok 323 - redact: every audit sample and named token format is removed
+  ---
+  duration_ms: 7.8531
+  type: 'test'
+  ...
+# Subtest: redact: structure and harmless text survive
+ok 324 - redact: structure and harmless text survive
+  ---
+  duration_ms: 0.8381
+  type: 'test'
+  ...
+# Subtest: redact: linear on 1 MB adversarial inputs
+ok 325 - redact: linear on 1 MB adversarial inputs
+  ---
+  duration_ms: 972.6802
+  type: 'test'
+  ...
+# Subtest: redactDeep: secret-named keys and every nested string
+ok 326 - redactDeep: secret-named keys and every nested string
+  ---
+  duration_ms: 3.3409
+  type: 'test'
+  ...
+# Subtest: isCredentialPath: auth and credential files are refused
+ok 327 - isCredentialPath: auth and credential files are refused
+  ---
+  duration_ms: 2.1097
+  type: 'test'
+  ...
+# Subtest: transcript screen and markdown export never show a secret from tool inputs, results or text
+ok 328 - transcript screen and markdown export never show a secret from tool inputs, results or text
+  ---
+  duration_ms: 69.0249
+  type: 'test'
+  ...
+# Subtest: audit JSONL export never carries a secret from titles or labels
+ok 329 - audit JSONL export never carries a secret from titles or labels
+  ---
+  duration_ms: 3.472
+  type: 'test'
+  ...
+# Subtest: webview page has strict CSP with nonce and no remote/eval sources
+ok 330 - webview page has strict CSP with nonce and no remote/eval sources
+  ---
+  duration_ms: 2.6778
+  type: 'test'
+  ...
+# Subtest: webview messages are validated
+ok 331 - webview messages are validated
+  ---
+  duration_ms: 1.7299
+  type: 'test'
+  ...
+# Subtest: rendered provider text is escaped (no HTML/script injection from titles or commands)
+ok 332 - rendered provider text is escaped (no HTML/script injection from titles or commands)
+  ---
+  duration_ms: 37.3879
+  type: 'test'
+  ...
+# Subtest: ended without commit is not FAILED
+ok 333 - ended without commit is not FAILED
+  ---
+  duration_ms: 0.6065
+  type: 'test'
+  ...
+# Subtest: cockpit: counts, provider not detected state, recent list
+ok 334 - cockpit: counts, provider not detected state, recent list
+  ---
+  duration_ms: 0.6892
+  type: 'test'
+  ...
+# Subtest: graph: worker edges only where the provider exposed a parent
+ok 335 - graph: worker edges only where the provider exposed a parent
+  ---
+  duration_ms: 1.0031
+  type: 'test'
+  ...
+# Subtest: activity: weekly rollup, no productivity score
+ok 336 - activity: weekly rollup, no productivity score
+  ---
+  duration_ms: 1.7173
+  type: 'test'
+  ...
+# Subtest: timeline renders chronologically with day headers
+ok 337 - timeline renders chronologically with day headers
+  ---
+  duration_ms: 0.6916
+  type: 'test'
+  ...
+# Subtest: inspector: State (permission mode, current tool), Usage, Related, honest end and test verdicts
+ok 338 - inspector: State (permission mode, current tool), Usage, Related, honest end and test verdicts
+  ---
+  duration_ms: 8.9038
+  type: 'test'
+  ...
+# Subtest: inspector usage preserves exact provider values in en-CH
+ok 339 - inspector usage preserves exact provider values in en-CH
+  ---
+  duration_ms: 2.4886
+  type: 'test'
+  ...
+# Subtest: inspector usage preserves exact provider values in en-US
+ok 340 - inspector usage preserves exact provider values in en-US
+  ---
+  duration_ms: 1.4499
+  type: 'test'
+  ...
+# Subtest: plan keeps the session and its workers, filters, windows and maps actors, categories and spawns
+ok 341 - plan keeps the session and its workers, filters, windows and maps actors, categories and spawns
+  ---
+  duration_ms: 3.6696
+  type: 'test'
+  ...
+# Subtest: timing rules are monotonic and capped; helpers format and search
+ok 342 - timing rules are monotonic and capped; helpers format and search
+  ---
+  duration_ms: 0.7168
+  type: 'test'
+  ...
+# Subtest: transport: play advances with wall time and speed, pause freezes, seek and speed re-anchor
+ok 343 - transport: play advances with wall time and speed, pause freezes, seek and speed re-anchor
+  ---
+  duration_ms: 0.6951
+  type: 'test'
+  ...
+# Subtest: screen renders escaped, lights in step mode and continues playback across renders
+ok 344 - screen renders escaped, lights in step mode and continues playback across renders
+  ---
+  duration_ms: 55.4629
+  type: 'test'
+  ...
+# Subtest: empty states and actions validate their arguments
+ok 345 - empty states and actions validate their arguments
+  ---
+  duration_ms: 2.1809
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: parseWorktrees reads porcelain blocks
+ok 346 - parseWorktrees reads porcelain blocks
+  ---
+  duration_ms: 2.0855
+  type: 'test'
+  ...
+# Subtest: parseBranches reads ahead / behind / gone / local
+ok 347 - parseBranches reads ahead / behind / gone / local
+  ---
+  duration_ms: 4.9414
+  type: 'test'
+  ...
+# Subtest: parseStatus counts staged, unstaged, untracked, conflicts (with -z renames)
+ok 348 - parseStatus counts staged, unstaged, untracked, conflicts (with -z renames)
+  ---
+  duration_ms: 0.4943
+  type: 'test'
+  ...
+# Subtest: parseCommits strips HEAD, tags and stash refs
+ok 349 - parseCommits strips HEAD, tags and stash refs
+  ---
+  duration_ms: 0.6486
+  type: 'test'
+  ...
+# Subtest: worktreeOf picks the longest containing worktree
+ok 350 - worktreeOf picks the longest containing worktree
+  ---
+  duration_ms: 2.5328
+  type: 'test'
+  ...
+# Subtest: hardened runner refuses write commands
+ok 351 - hardened runner refuses write commands
+  ---
+  duration_ms: 0.3861
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: loadRepos reads a real repo with a linked worktree, dirty state and upstream
+ok 352 - loadRepos reads a real repo with a linked worktree, dirty state and upstream
+  ---
+  duration_ms: 6419.1287
+  type: 'test'
+  ...
+# Subtest: loadRepos groups a checkout and its worktree when session paths use 8.3 short names
+ok 353 - loadRepos groups a checkout and its worktree when session paths use 8.3 short names
+  ---
+  duration_ms: 4487.4517
+  type: 'test'
+  ...
+# Subtest: repos screen escapes branch names and handles empty / untrusted states
+ok 354 - repos screen escapes branch names and handles empty / untrusted states
+  ---
+  duration_ms: 2.0711
+  type: 'test'
+  ...
+# Subtest: selected resource metadata distinguishes absent, blocked, disabled and stale without claiming causes
+ok 355 - selected resource metadata distinguishes absent, blocked, disabled and stale without claiming causes
+  ---
+  duration_ms: 612.585
+  type: 'test'
+  ...
+# Subtest: image intake matches selected file bytes/hash and scoped source receipt; producer/publication stay separate
+ok 356 - image intake matches selected file bytes/hash and scoped source receipt; producer/publication stay separate
+  ---
+  duration_ms: 332.4516
+  type: 'test'
+  ...
+# Subtest: committed export receipts recover after restart and revocation never advances a cursor
+ok 357 - committed export receipts recover after restart and revocation never advances a cursor
+  ---
+  duration_ms: 683.3349
+  type: 'test'
+  ...
+# Subtest: review: remote URLs and remotes
+ok 358 - review: remote URLs and remotes
+  ---
+  duration_ms: 9.5888
+  type: 'test'
+  ...
+# Subtest: review: gh pr list parsing (state, checks, review, mergeable, unsafe links)
+ok 359 - review: gh pr list parsing (state, checks, review, mergeable, unsafe links)
+  ---
+  duration_ms: 177.1611
+  type: 'test'
+  ...
+# Subtest: review: glab mr list + view parsing
+ok 360 - review: glab mr list + view parsing
+  ---
+  duration_ms: 695.6616
+  type: 'test'
+  ...
+# Subtest: review: loadRepo runs only fixed read-only commands
+ok 361 - review: loadRepo runs only fixed read-only commands
+  ---
+  duration_ms: 19.4284
+  type: 'test'
+  ...
+# Subtest: review: recorded commands → push / PR create / merge marks
+ok 362 - review: recorded commands → push / PR create / merge marks
+  ---
+  duration_ms: 5.1533
+  type: 'test'
+  ...
+# Subtest: review: lanes from sessions, commands and PR state
+ok 363 - review: lanes from sessions, commands and PR state
+  ---
+  duration_ms: 21.835
+  type: 'test'
+  ...
+# Subtest: review: screen renders lanes, layouts and escapes; actions validate
+ok 364 - review: screen renders lanes, layouts and escapes; actions validate
+  ---
+  duration_ms: 14.3814
+  type: 'test'
+  ...
+# Subtest: review: feed stays off by default and in untrusted workspaces
+ok 365 - review: feed stays off by default and in untrusted workspaces
+  ---
+  duration_ms: 0.4534
+  type: 'test'
+  ...
+# Subtest: roles: rules compile, invalid entries are skipped
+ok 366 - roles: rules compile, invalid entries are skipped
+  ---
+  duration_ms: 2.1137
+  type: 'test'
+  ...
+# Subtest: roles: recorded type beats title pattern; fallback lead / worker
+ok 367 - roles: recorded type beats title pattern; fallback lead / worker
+  ---
+  duration_ms: 2.5328
+  type: 'test'
+  ...
+# Subtest: roles: stats, period, median, outcome mix
+ok 368 - roles: stats, period, median, outcome mix
+  ---
+  duration_ms: 21.9103
+  type: 'test'
+  ...
+# Subtest: roles: hand-off edges, layers, file overlap, groups
+ok 369 - roles: hand-off edges, layers, file overlap, groups
+  ---
+  duration_ms: 1.8541
+  type: 'test'
+  ...
+# Subtest: roles: screen renders every tab, escapes, carries data-select
+ok 370 - roles: screen renders every tab, escapes, carries data-select
+  ---
+  duration_ms: 36.7832
+  type: 'test'
+  ...
+# Subtest: buildRuns: one run per session in range, workers optional, outcome and spans
+ok 371 - buildRuns: one run per session in range, workers optional, outcome and spans
+  ---
+  duration_ms: 4.5982
+  type: 'test'
+  ...
+# Subtest: runRows groups per row with per-day counts and outcome mix
+ok 372 - runRows groups per row with per-day counts and outcome mix
+  ---
+  duration_ms: 1.1957
+  type: 'test'
+  ...
+# Subtest: concurrency: peak, mean and open per bucket; target summary
+ok 373 - concurrency: peak, mean and open per bucket; target summary
+  ---
+  duration_ms: 2.228
+  type: 'test'
+  ...
+# Subtest: bucketStarts aligns quarters, hours and days; tickLanes folds extra lanes
+ok 374 - bucketStarts aligns quarters, hours and days; tickLanes folds extra lanes
+  ---
+  duration_ms: 0.4857
+  type: 'test'
+  ...
+# Subtest: parseTarget accepts positive numbers only
+ok 375 - parseTarget accepts positive numbers only
+  ---
+  duration_ms: 0.3061
+  type: 'test'
+  ...
+# Subtest: runs screen renders every layout and chart, escaped, with target
+ok 376 - runs screen renders every layout and chart, escaped, with target
+  ---
+  duration_ms: 136.4561
+  type: 'test'
+  ...
+# Subtest: scope: milestones come from the heading trail
+ok 377 - scope: milestones come from the heading trail
+  ---
+  duration_ms: 12.2631
+  type: 'test'
+  ...
+# Subtest: scope: buildMaps groups the fixture per project and milestone with counts and changes
+ok 378 - scope: buildMaps groups the fixture per project and milestone with counts and changes
+  ---
+  duration_ms: 64.1508
+  type: 'test'
+  ...
+# Subtest: scope: baseline is the previous weekly snapshot
+ok 379 - scope: baseline is the previous weekly snapshot
+  ---
+  duration_ms: 26.269
+  type: 'test'
+  ...
+# Subtest: scope: screen renders escaped overview, grid and tree; open targets are checked
+ok 380 - scope: screen renders escaped overview, grid and tree; open targets are checked
+  ---
+  duration_ms: 51.5416
+  type: 'test'
+  ...
+# Subtest: raw archive warning shows once, only when the setting is on
+ok 381 - raw archive warning shows once, only when the setting is on
+  ---
+  duration_ms: 1.6103
+  type: 'test'
+  ...
+# Subtest: archive lock: atomic create, stale takeover by mtime, token-checked release
+ok 382 - archive lock: atomic create, stale takeover by mtime, token-checked release
+  ---
+  duration_ms: 48.1277
+  type: 'test'
+  ...
+# Subtest: versions probe runs only allow-listed executables
+ok 383 - versions probe runs only allow-listed executables
+  ---
+  duration_ms: 0.6932
+  type: 'test'
+  ...
+# Subtest: codex sqlite copies: own folder removed on dispose, stale leftovers swept on start
+ok 384 - codex sqlite copies: own folder removed on dispose, stale leftovers swept on start
+  ---
+  duration_ms: 34.5265
+  type: 'test'
+  ...
+# Subtest: settings: layers, precedence and merged rules
+ok 385 - settings: layers, precedence and merged rules
+  ---
+  duration_ms: 410.4412
+  type: 'test'
+  ...
+# Subtest: settings: hooks are redacted and secrets never leave the collector
+ok 386 - settings: hooks are redacted and secrets never leave the collector
+  ---
+  duration_ms: 68.996
+  type: 'test'
+  ...
+# Subtest: settings: subagents, skills, commands and memory files
+ok 387 - settings: subagents, skills, commands and memory files
+  ---
+  duration_ms: 36.4265
+  type: 'test'
+  ...
+# Subtest: settings: Codex config.toml subset parser
+ok 388 - settings: Codex config.toml subset parser
+  ---
+  duration_ms: 35.2128
+  type: 'test'
+  ...
+# Subtest: settings: front matter and roots
+ok 389 - settings: front matter and roots
+  ---
+  duration_ms: 0.7414
+  type: 'test'
+  ...
+# Subtest: settings screen renders every tab escaped
+ok 390 - settings screen renders every tab escaped
+  ---
+  duration_ms: 90.5113
+  type: 'test'
+  ...
+# Subtest: settings actions only open files the feed listed
+ok 391 - settings actions only open files the feed listed
+  ---
+  duration_ms: 41.0206
+  type: 'test'
+  ...
+# Subtest: settings: observed sessions show approval policy / collaboration mode / permission mode with an evidence chip
+ok 392 - settings: observed sessions show approval policy / collaboration mode / permission mode with an evidence chip
+  ---
+  duration_ms: 40.3593
+  type: 'test'
+  ...
+# Subtest: helpers: command normalisation and exit parsing
+ok 393 - helpers: command normalisation and exit parsing
+  ---
+  duration_ms: 2.6629
+  type: 'test'
+  ...
+# Subtest: clean session raises no signal
+ok 394 - clean session raises no signal
+  ---
+  duration_ms: 4.3363
+  type: 'test'
+  ...
+# Subtest: unsolved: last test failing, or edits without commit; never for live sessions or workers
+ok 395 - unsolved: last test failing, or edits without commit; never for live sessions or workers
+  ---
+  duration_ms: 4.1583
+  type: 'test'
+  ...
+# Subtest: blocked: exit 127 grouped per command, and provider API errors
+ok 396 - blocked: exit 127 grouped per command, and provider API errors
+  ---
+  duration_ms: 0.9084
+  type: 'test'
+  ...
+# Subtest: permissions: exit 126, approval abort, waiting on approval
+ok 397 - permissions: exit 126, approval abort, waiting on approval
+  ---
+  duration_ms: 0.6848
+  type: 'test'
+  ...
+# Subtest: swallowed: failure never re-run before the end; re-run clears it
+ok 398 - swallowed: failure never re-run before the end; re-run clears it
+  ---
+  duration_ms: 0.8329
+  type: 'test'
+  ...
+# Subtest: looping: same command N times without a file change; a file change resets
+ok 399 - looping: same command N times without a file change; a file change resets
+  ---
+  duration_ms: 2.8298
+  type: 'test'
+  ...
+# Subtest: allSignals routes events to their session
+ok 400 - allSignals routes events to their session
+  ---
+  duration_ms: 0.6024
+  type: 'test'
+  ...
+# Subtest: signals screen renders every view escaped, with data-select rows
+ok 401 - signals screen renders every view escaped, with data-select rows
+  ---
+  duration_ms: 23.693
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'n.txt', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'w.txt', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: gitSignal: stable without change, moves on commit and checkout, no spawn; linked worktree resolved
+ok 402 - gitSignal: stable without change, moves on commit and checkout, no spawn; linked worktree resolved
+  ---
+  duration_ms: 4361.7635
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: diffStat: a from..to result is cached (immutable commits) and handed out as a copy
+ok 403 - diffStat: a from..to result is cached (immutable commits) and handed out as a copy
+  ---
+  duration_ms: 2973.0951
+  type: 'test'
+  ...
+# (node:20060) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'later.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: store: no git re-correlation when only the clock moves; a commit or the max age re-correlates
+ok 404 - store: no git re-correlation when only the clock moves; a commit or the max age re-correlates
+  ---
+  duration_ms: 4283.2678
+  type: 'test'
+  ...
+# Subtest: store: idle refresh keeps snapshots and version; a new line rebuilds that session only
+ok 405 - store: idle refresh keeps snapshots and version; a new line rebuilds that session only
+  ---
+  duration_ms: 90.0794
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: store: ingest yields to the event loop and reports its longest synchronous stretch
+ok 406 - store: ingest yields to the event loop and reports its longest synchronous stretch
+  ---
+  duration_ms: 1933.064
+  type: 'test'
+  ...
+# Subtest: store: cold git phase is progressive (notifies per batch, progress counted)
+ok 407 - store: cold git phase is progressive (notifies per batch, progress counted)
+  ---
+  duration_ms: 2609.0744
+  type: 'test'
+  ...
+# Subtest: viewNeedsRender: idle store notification builds no page; version, feed or age does
+ok 408 - viewNeedsRender: idle store notification builds no page; version, feed or age does
+  ---
+  duration_ms: 0.4156
+  type: 'test'
+  ...
+# Subtest: tokens: pieces split calls and the untimed remainder, totals preserved
+ok 409 - tokens: pieces split calls and the untimed remainder, totals preserved
+  ---
+  duration_ms: 2.9524
+  type: 'test'
+  ...
+# Subtest: tokens: rhythm per minute stacks by provider, rates and untimed apart
+ok 410 - tokens: rhythm per minute stacks by provider, rates and untimed apart
+  ---
+  duration_ms: 5.269
+  type: 'test'
+  ...
+# Subtest: tokens: 24 h by hour, kind split, leads only, session rows and peaks
+ok 411 - tokens: 24 h by hour, kind split, leads only, session rows and peaks
+  ---
+  duration_ms: 3.246
+  type: 'test'
+  ...
+# Subtest: tokens: buckets are capped to the latest ones, folding stacks into other
+ok 412 - tokens: buckets are capped to the latest ones, folding stacks into other
+  ---
+  duration_ms: 1.3736
+  type: 'test'
+  ...
+# Subtest: tokens: context lines mark drops and keep the recorded window
+ok 413 - tokens: context lines mark drops and keep the recorded window
+  ---
+  duration_ms: 1.091
+  type: 'test'
+  ...
+# Subtest: tokens: CSV uses keys and numbers only
+ok 414 - tokens: CSV uses keys and numbers only
+  ---
+  duration_ms: 1.2418
+  type: 'test'
+  ...
+# Subtest: tokens: every chart renders escaped, rows selectable
+ok 415 - tokens: every chart renders escaped, rows selectable
+  ---
+  duration_ms: 245.6009
+  type: 'test'
+  ...
+# Subtest: tokens: CSV action validates its argument
+ok 416 - tokens: CSV action validates its argument
+  ---
+  duration_ms: 1.1182
+  type: 'test'
+  ...
+# Subtest: topology: tree rollups sum the subtree and count depth
+ok 417 - topology: tree rollups sum the subtree and count depth
+  ---
+  duration_ms: 4.2871
+  type: 'test'
+  ...
+# Subtest: topology: spawn descriptions pair by type and time, each used once
+ok 418 - topology: spawn descriptions pair by type and time, each used once
+  ---
+  duration_ms: 0.4646
+  type: 'test'
+  ...
+# Subtest: topology: leads, orphans, grouping and cycles
+ok 419 - topology: leads, orphans, grouping and cycles
+  ---
+  duration_ms: 2.4212
+  type: 'test'
+  ...
+# Subtest: topology screen: every layout renders escaped, selectable rows
+ok 420 - topology screen: every layout renders escaped, selectable rows
+  ---
+  duration_ms: 8.8069
+  type: 'test'
+  ...
+# Subtest: topology screen: depth 1 collapses workers; a node toggle tagged with the depth re-opens it
+ok 421 - topology screen: depth 1 collapses workers; a node toggle tagged with the depth re-opens it
+  ---
+  duration_ms: 7.782
+  type: 'test'
+  ...
+# Subtest: topology screen: all leads includes orphan groups; empty state without workers
+ok 422 - topology screen: all leads includes orphan groups; empty state without workers
+  ---
+  duration_ms: 0.9664
+  type: 'test'
+  ...
+# Subtest: topology screen: registered in the workspace rail and rendered through it
+ok 423 - topology screen: registered in the workspace rail and rendered through it
+  ---
+  duration_ms: 18.9767
+  type: 'test'
+  ...
+# Subtest: installed reader fixtures count repeated Claude tool UUID and Codex completed command once
+ok 424 - installed reader fixtures count repeated Claude tool UUID and Codex completed command once
+  ---
+  duration_ms: 12.9565
+  type: 'test'
+  ...
+# Subtest: incremental Claude replay keeps one native call, result attachment and distinct shared-message text
+ok 425 - incremental Claude replay keeps one native call, result attachment and distinct shared-message text
+  ---
+  duration_ms: 66.735
+  type: 'test'
+  ...
+# Subtest: Codex completed native tool identities are typed; anonymous or distinct calls are preserved
+ok 426 - Codex completed native tool identities are typed; anonymous or distinct calls are preserved
+  ---
+  duration_ms: 1.1395
+  type: 'test'
+  ...
+# Subtest: later Codex completion updates failure and output without duplicating the native call or entry identity
+ok 427 - later Codex completion updates failure and output without duplicating the native call or entry identity
+  ---
+  duration_ms: 31.7675
+  type: 'test'
+  ...
+# Subtest: Claude transcript → prompts, replies, tools with results, spawn, compaction; meta and tool results are not prompts
+ok 428 - Claude transcript → prompts, replies, tools with results, spawn, compaction; meta and tool results are not prompts
+  ---
+  duration_ms: 2.5491
+  type: 'test'
+  ...
+# Subtest: Codex rollout → prompts (no injected context), tool calls with outputs, spawn, web search, one reply per message
+ok 429 - Codex rollout → prompts (no injected context), tool calls with outputs, spawn, web search, one reply per message
+  ---
+  duration_ms: 4.7511
+  type: 'test'
+  ...
+# Subtest: Codex assistant text recorded twice (response_item + AgentMessage) shows once; thinking keeps its length only
+ok 430 - Codex assistant text recorded twice (response_item + AgentMessage) shows once; thinking keeps its length only
+  ---
+  duration_ms: 0.6364
+  type: 'test'
+  ...
+# Subtest: clean() redacts keys, drops base64 and data urls; images never kept
+ok 431 - clean() redacts keys, drops base64 and data urls; images never kept
+  ---
+  duration_ms: 0.6966
+  type: 'test'
+  ...
+# Subtest: toolInput gives a short human summary
+ok 432 - toolInput gives a short human summary
+  ---
+  duration_ms: 0.8207
+  type: 'test'
+  ...
+# Subtest: readTranscript is incremental, keeps ids stable, waits for complete lines, and tail-reads big files
+ok 433 - readTranscript is incremental, keeps ids stable, waits for complete lines, and tail-reads big files
+  ---
+  duration_ms: 300.9991
+  type: 'test'
+  ...
+# Subtest: page window follows the latest, jumps to a time, and links older / newer
+ok 434 - page window follows the latest, jumps to a time, and links older / newer
+  ---
+  duration_ms: 1.1162
+  type: 'test'
+  ...
+# Subtest: filters: tools mode, errors, thinking toggle, tool name
+ok 435 - filters: tools mode, errors, thinking toggle, tool name
+  ---
+  duration_ms: 0.8717
+  type: 'test'
+  ...
+# Subtest: spawn → worker links: description match is OBSERVED, start-time match INFERRED
+ok 436 - spawn → worker links: description match is OBSERVED, start-time match INFERRED
+  ---
+  duration_ms: 0.6102
+  type: 'test'
+  ...
+# Subtest: screen renders a real fixture in chat / log / tools, escaped and redacted; chooser without selection
+ok 437 - screen renders a real fixture in chat / log / tools, escaped and redacted; chooser without selection
+  ---
+  duration_ms: 16.5854
+  type: 'test'
+  ...
+# Subtest: ux: loading marker carries id, timeout, UNKNOWN evidence and a hidden Retry; error state has Retry
+ok 438 - ux: loading marker carries id, timeout, UNKNOWN evidence and a hidden Retry; error state has Retry
+  ---
+  duration_ms: 2.1104
+  type: 'test'
+  ...
+# Subtest: ux: loadNote shows elapsed seconds, then a timeout note
+ok 439 - ux: loadNote shows elapsed seconds, then a timeout note
+  ---
+  duration_ms: 2.6073
+  type: 'test'
+  ...
+# Subtest: ux: feed-backed screens show a loading marker, then an error state, each with Retry
+ok 440 - ux: feed-backed screens show a loading marker, then an error state, each with Retry
+  ---
+  duration_ms: 11.2676
+  type: 'test'
+  ...
+# Subtest: ux: rail shows fixed digit shortcuts; header hint has a title; filter is not fixed over the header
+ok 441 - ux: rail shows fixed digit shortcuts; header hint has a title; filter is not fixed over the header
+  ---
+  duration_ms: 44.9473
+  type: 'test'
+  ...
+# Subtest: ux: client script has keyboard focus, tabindex, digit map, loading clock and valid JS
+ok 442 - ux: client script has keyboard focus, tabindex, digit map, loading clock and valid JS
+  ---
+  duration_ms: 3.9864
+  type: 'test'
+  ...
+# Subtest: ux: style has visible focus, reduced motion, narrow-width rules and no white-on-colour badges
+ok 443 - ux: style has visible focus, reduced motion, narrow-width rules and no white-on-colour badges
+  ---
+  duration_ms: 0.742
+  type: 'test'
+  ...
+# Subtest: ux: board empty column, card title tooltip, footer cap and Sankey labels without overlap
+ok 444 - ux: board empty column, card title tooltip, footer cap and Sankey labels without overlap
+  ---
+  duration_ms: 15.8789
+  type: 'test'
+  ...
+# Subtest: weekStart is local Monday midnight; offsets move by whole weeks
+ok 445 - weekStart is local Monday midnight; offsets move by whole weeks
+  ---
+  duration_ms: 1.86
+  type: 'test'
+  ...
+# Subtest: spans split at idle gaps; two points only are INFERRED; live extends to now
+ok 446 - spans split at idle gaps; two points only are INFERRED; live extends to now
+  ---
+  duration_ms: 1.5467
+  type: 'test'
+  ...
+# Subtest: weekBlocks cut at midnight, place overlapping sessions in lanes, and attach commits and PR commands
+ok 447 - weekBlocks cut at midnight, place overlapping sessions in lanes, and attach commits and PR commands
+  ---
+  duration_ms: 3.5852
+  type: 'test'
+  ...
+# Subtest: workers are hidden unless asked; sessions outside the range are skipped
+ok 448 - workers are hidden unless asked; sessions outside the range are skipped
+  ---
+  duration_ms: 0.5336
+  type: 'test'
+  ...
+# Subtest: week screen renders both orientations and every range, escapes titles, marks live blocks
+ok 449 - week screen renders both orientations and every range, escapes titles, marks live blocks
+  ---
+  duration_ms: 90.4289
+  type: 'test'
+  ...
+# Subtest: colorOf maps each dimension to a label
+ok 450 - colorOf maps each dimension to a label
+  ---
+  duration_ms: 0.511
+  type: 'test'
+  ...
+# Subtest: wfLinks: runs join their lead by directory; counts, phase, strip, effort evidence
+ok 451 - wfLinks: runs join their lead by directory; counts, phase, strip, effort evidence
+  ---
+  duration_ms: 79.8846
+  type: 'test'
+  ...
+# Subtest: topology: workflow run is a group node under its lead, agents as children
+ok 452 - topology: workflow run is a group node under its lead, agents as children
+  ---
+  duration_ms: 58.9611
+  type: 'test'
+  ...
+# Subtest: topology screen: workflow nodes in every layout, escaped, with model · effort and legend
+ok 453 - topology screen: workflow nodes in every layout, escaped, with model · effort and legend
+  ---
+  duration_ms: 30.4792
+  type: 'test'
+  ...
+# Subtest: team, overview, live, hud and workflows screens show the run under the lead
+ok 454 - team, overview, live, hud and workflows screens show the run under the lead
+  ---
+  duration_ms: 108.1259
+  type: 'test'
+  ...
+# warning: in the working copy of 'src/f0.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f1.ts', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'src/f2.ts', LF will be replaced by CRLF the next time Git touches it
+# Subtest: inferred end: card and result card never show the last record as an observed end
+ok 455 - inferred end: card and result card never show the last record as an observed end
+  ---
+  duration_ms: 32.8672
+  type: 'test'
+  ...
+# Subtest: commit counts carry the window caveat unless the session ran git commit itself
+ok 456 - commit counts carry the window caveat unless the session ran git commit itself
+  ---
+  duration_ms: 0.7403
+  type: 'test'
+  ...
+# Subtest: status strip shows git n/N only while a git pass runs
+ok 457 - status strip shows git n/N only while a git pass runs
+  ---
+  duration_ms: 0.9175
+  type: 'test'
+  ...
+# Subtest: inspector jump bar: Replay and HUD navigate to registered screens
+ok 458 - inspector jump bar: Replay and HUD navigate to registered screens
+  ---
+  duration_ms: 1.4552
+  type: 'test'
+  ...
+# Subtest: Esc posts a validated clear-selection message
+ok 459 - Esc posts a validated clear-selection message
+  ---
+  duration_ms: 0.6576
+  type: 'test'
+  ...
+# (node:53416) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: store: git correlation of ENDED sessions pauses with gitEnded=false and resumes after
+ok 460 - store: git correlation of ENDED sessions pauses with gitEnded=false and resumes after
+  ---
+  duration_ms: 3021.6285
+  type: 'test'
+  ...
+# Subtest: scanner reads runs, agents, phases, tokens and tools from fixtures
+ok 461 - scanner reads runs, agents, phases, tokens and tools from fixtures
+  ---
+  duration_ms: 103.3833
+  type: 'test'
+  ...
+# Subtest: agent without result turns stale after 10 min of silence
+ok 462 - agent without result turns stale after 10 min of silence
+  ---
+  duration_ms: 20.2596
+  type: 'test'
+  ...
+# Subtest: runs older than 7 days are not listed
+ok 463 - runs older than 7 days are not listed
+  ---
+  duration_ms: 4.8455
+  type: 'test'
+  ...
+# Subtest: journal parsing and result summaries
+ok 464 - journal parsing and result summaries
+  ---
+  duration_ms: 1.3034
+  type: 'test'
+  ...
+# Subtest: script meta is parsed without evaluation
+ok 465 - script meta is parsed without evaluation
+  ---
+  duration_ms: 0.8978
+  type: 'test'
+  ...
+# Subtest: final run state keeps only small fields
+ok 466 - final run state keeps only small fields
+  ---
+  duration_ms: 0.8695
+  type: 'test'
+  ...
+# Subtest: huge transcript lines still close tool calls
+ok 467 - huge transcript lines still close tool calls
+  ---
+  duration_ms: 1.4604
+  type: 'test'
+  ...
+# Subtest: screen renders runs, agents, timeline and Codex workers, escaped
+ok 468 - screen renders runs, agents, timeline and Codex workers, escaped
+  ---
+  duration_ms: 65.9882
+  type: 'test'
+  ...
+# Subtest: async reader: first read covers only the tail, then reads appended bytes only
+ok 469 - async reader: first read covers only the tail, then reads appended bytes only
+  ---
+  duration_ms: 86.85
+  type: 'test'
+  ...
+# Subtest: scanIfDue reuses the snapshot for 30 s when no run is live, 3 s when one is
+ok 470 - scanIfDue reuses the snapshot for 30 s when no run is live, 3 s when one is
+  ---
+  duration_ms: 55.4033
+  type: 'test'
+  ...
+# Subtest: restored PM task hints retain only identity and authority metadata while requiring fresh scope
+ok 471 - restored PM task hints retain only identity and authority metadata while requiring fresh scope
+  ---
+  duration_ms: 4.2225
+  type: 'test'
+  ...
+# Subtest: safe workspace state preserves navigation and ContextRef; strips grants, content, arbitrary options and approval bindings
+ok 472 - safe workspace state preserves navigation and ContextRef; strips grants, content, arbitrary options and approval bindings
+  ---
+  duration_ms: 3.2168
+  type: 'test'
+  ...
+# Subtest: invalid, old and forged restoration metadata fail closed without a fallback to local sources
+ok 473 - invalid, old and forged restoration metadata fail closed without a fallback to local sources
+  ---
+  duration_ms: 0.7556
+  type: 'test'
+  ...
+# Subtest: Agent to Lens forwards scoped context and original PM return binding only under current reviewed authority
+ok 474 - Agent to Lens forwards scoped context and original PM return binding only under current reviewed authority
+  ---
+  duration_ms: 86.0448
+  type: 'test'
+  ...
+# Subtest: workspace screens escape hostile session fields
+ok 475 - workspace screens escape hostile session fields
+  ---
+  duration_ms: 396.6064
+  type: 'test'
+  ...
+# Subtest: session cards, graph and inspector escape hostile fields
+ok 476 - session cards, graph and inspector escape hostile fields
+  ---
+  duration_ms: 12.9092
+  type: 'test'
+  ...
+# Subtest: assertSafe catches the payloads it is meant to catch
+ok 477 - assertSafe catches the payloads it is meant to catch
+  ---
+  duration_ms: 2.0013
+  type: 'test'
+  ...
+1..477
+# tests 477
+# suites 0
+# pass 476
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 27104.0678

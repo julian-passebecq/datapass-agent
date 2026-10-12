@@ -160,7 +160,7 @@ export function renderGraph(sessions: AgentSessionSnapshot[]): string {
 
 const kindChip = (kind: EvidenceKind, basis: string) => ` <span class="chip" title="${esc(basis)}">${esc(kind)}</span>`;
 
-function usageBlock(s: AgentSessionSnapshot, now: number, dd: (label: string, value: unknown, field?: string) => string): string {
+function usageBlock(s: AgentSessionSnapshot, now: number, dd: (label: string, value: unknown, field?: string) => string, locale?: string): string {
   const u = s.usage;
   const f = s.facts;
   const per = f?.modelTokens ? Object.entries(f.modelTokens).sort((a, b) => b[1] - a[1]) : [];
@@ -168,10 +168,10 @@ function usageBlock(s: AgentSessionSnapshot, now: number, dd: (label: string, va
   const wall = s.startedAt !== undefined ? (isLive(s) ? now : (s.lastActivityAt ?? now)) - s.startedAt : undefined;
   let h = '<dl>';
   h += u
-    ? dd('Tokens (provider-recorded)', `${u.totalTokens.toLocaleString()} total · ${u.outputTokens.toLocaleString()} output · ${u.cachedInputTokens.toLocaleString()} cached input`, 'usage')
+    ? dd('Tokens (provider-recorded)', `${u.totalTokens.toLocaleString(locale)} total · ${u.outputTokens.toLocaleString(locale)} output · ${u.cachedInputTokens.toLocaleString(locale)} cached input`, 'usage')
     : `<dt>Tokens</dt><dd><span class="muted">not recorded</span>${kindChip('UNKNOWN', 'the provider recorded no token usage for this session')}</dd>`;
-  if (per.length > 1) h += `<dt>Tokens per model</dt><dd>${per.map(([m, n]) => `${esc(m)} ${n.toLocaleString()}`).join(' · ')}${kindChip('OBSERVED', 'tokens per model as the provider recorded them')}</dd>`;
-  if (u?.contextTokens) h += `<dt>Context (latest call)</dt><dd>${esc(`${u.contextTokens.toLocaleString()} tokens${u.contextWindow ? ` of ${u.contextWindow.toLocaleString()} (${ctxPct} %)` : ''}`)}${u.contextWindow ? kindChip('OBSERVED', 'prompt size of the latest call / window recorded by the provider') : kindChip('OBSERVED', 'prompt size of the latest call; the provider records no window size, so no % here (Health uses a reference window)')}</dd>`;
+  if (per.length > 1) h += `<dt>Tokens per model</dt><dd>${per.map(([m, n]) => `${esc(m)} ${n.toLocaleString(locale)}`).join(' · ')}${kindChip('OBSERVED', 'tokens per model as the provider recorded them')}</dd>`;
+  if (u?.contextTokens) h += `<dt>Context (latest call)</dt><dd>${esc(`${u.contextTokens.toLocaleString(locale)} tokens${u.contextWindow ? ` of ${u.contextWindow.toLocaleString(locale)} (${ctxPct} %)` : ''}`)}${u.contextWindow ? kindChip('OBSERVED', 'prompt size of the latest call / window recorded by the provider') : kindChip('OBSERVED', 'prompt size of the latest call; the provider records no window size, so no % here (Health uses a reference window)')}</dd>`;
   else h += `<dt>Context (latest call)</dt><dd><span class="muted">not recorded</span>${kindChip('UNKNOWN', 'no prompt size recorded')}</dd>`;
   if (u?.costUSD !== undefined) h += dd('Cost (recorded by provider)', `$${u.costUSD.toFixed(4)}`, 'costUSD');
   h += `<dt>Wall time</dt><dd>${wall === undefined ? '<span class="muted">not exposed</span>' : `${esc(duration(wall))}${isLive(s) ? ' so far' : ''}`}${kindChip('DERIVED', 'first record → last activity (live: → now)')}</dd>`;
@@ -226,7 +226,7 @@ function relatedBlock(s: AgentSessionSnapshot, children: AgentSessionSnapshot[],
   return `<dl>${rows.join('')}</dl>`;
 }
 
-export function renderInspector(s: AgentSessionSnapshot, children: AgentSessionSnapshot[], parent: AgentSessionSnapshot | undefined, events: TimelineEvent[], ternAvailable: boolean, now = Date.now()): string {
+export function renderInspector(s: AgentSessionSnapshot, children: AgentSessionSnapshot[], parent: AgentSessionSnapshot | undefined, events: TimelineEvent[], ternAvailable: boolean, now = Date.now(), locale?: string): string {
   const ev = (field: string) => {
     const e = s.evidence.filter(x => x.field === field).pop();
     return e ? ` <span class="chip" title="${esc(e.source)}">${esc(e.kind)}</span>` : '';
@@ -259,7 +259,7 @@ export function renderInspector(s: AgentSessionSnapshot, children: AgentSessionS
         return `<tr><td>${hhmm(t.at)}</td><td><code>${esc(t.command)}</code></td><td class="${v.outcome === 'PASS' ? 'pass' : v.outcome === 'FAIL' ? 'fail' : 'muted'}" title="${esc(`${v.kind}: ${v.basis}`)}">${esc(shown)}${t.exitCode !== undefined ? ` (exit ${t.exitCode})` : ''}</td><td class="muted">${esc(v.basis)}</td></tr>`;
       }).join('')}</table>`
     : `<div class="muted">No test command observed${kindChip('DERIVED', 'none in the loaded records (transcript may be capped); builds, lints and type checks are not tests')}.</div>`;
-  h += `<h2>Usage</h2>${usageBlock(s, now, dd)}`;
+  h += `<h2>Usage</h2>${usageBlock(s, now, dd, locale)}`;
   h += `<h2>Workers</h2>`;
   if (parent) h += `<div>Parent: <a class="link" data-open="${esc(parent.key)}">${esc(parent.title ?? parent.sessionId)}</a>${ev('parentSessionId')}</div>`;
   if (children.length) h += children.map(c => `<div class="row" data-open="${esc(c.key)}"><span class="dot ${c.status}"></span><span class="main">${esc(c.workerLabel ?? c.title ?? c.sessionId)}</span><span class="right">${esc(statusText(c))}</span></div>`).join('');

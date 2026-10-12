@@ -1,0 +1,15 @@
+{
+  "schema": "datapass.agent-native-package-verification/1",
+  "manifestVersion": "0.11.0",
+  "entrypointMatchesBuiltSource": true,
+  "entries": {
+    "extension/package.json": {
+      "bytes": 26590,
+      "sha256": "62ef56cf55d6122a9b8226b1a7b4487309f76b9cf55f3a233360242094d323b0"
+    },
+    "extension/dist/extension.js": {
+      "bytes": 1303030,
+      "sha256": "ced569dba71106d49233b31d816c8e7726dcd54d22ee7d66e707a0de228295e7"
+    }
+  }
+}

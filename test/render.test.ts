@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { AgentSessionSnapshot } from '../src/model';
-import { page, validateMessage, csp } from '../src/render/html';
+import { page, validateMessage, csp, esc } from '../src/render/html';
 import { renderActivity, renderCockpit, renderGraph, renderInspector, renderTimeline, statusText } from '../src/render/views';
 import { weekly, summarize } from '../src/activity/activity';
 
@@ -115,7 +115,7 @@ test('inspector: State (permission mode, current tool), Usage, Related, honest e
   assert.ok(!/>Ended</.test(h), 'no plain Ended for an inferred end');
   assert.ok(h.includes('acceptEdits'), 'permission mode in State');
   assert.ok(h.includes('Current tool'));
-  assert.ok(h.includes('120,000 total') && h.includes('Active time') && h.includes('Wall time') && h.includes('claude-haiku-5'), 'usage');
+  assert.ok(h.includes(`${esc((120_000).toLocaleString())} total`) && h.includes('Active time') && h.includes('Wall time') && h.includes('claude-haiku-5'), 'usage');
   assert.ok(!h.includes('Cost (recorded'), 'no cost unless recorded');
   assert.ok(h.includes('UNKNOWN (recorded PASS)'), 'piped test with only a tool flag is not a pass');
   assert.ok(h.includes('not proof the session made it'), 'window commit caveat');
@@ -127,4 +127,14 @@ test('inspector: State (permission mode, current tool), Usage, Related, honest e
   assert.equal(statusText(w), 'No longer active (inferred)');
   const top = { ...w, key: 'claude:top', isWorker: false, parentSessionId: undefined };
   assert.ok(renderCockpit([top], [], NOW).includes('inactive since'), 'cockpit row: inferred end is not "ended HH:MM"');
+});
+
+for (const locale of ['en-CH', 'en-US']) test(`inspector usage preserves exact provider values in ${locale}`, () => {
+  const s = snap({ usage: { totalTokens: 120_000, outputTokens: 3000, cachedInputTokens: 90_000, contextTokens: 50_000, contextWindow: 200_000 }, facts: { modelTokens: { 'model-a': 100_000, 'model-b': 20_000 } } });
+  const html = renderInspector(s, [], undefined, [], false, NOW, locale);
+  const n = (value: number) => new Intl.NumberFormat(locale).format(value);
+  assert.ok(html.includes(esc(`${n(120_000)} total · ${n(3000)} output · ${n(90_000)} cached input`)));
+  assert.ok(html.includes(esc(`${n(50_000)} tokens of ${n(200_000)} (25 %)`)));
+  assert.ok(html.includes(`model-a ${n(100_000)}`) && html.includes(`model-b ${n(20_000)}`));
+  assert.ok(!html.includes(`${new Intl.NumberFormat(locale === 'en-CH' ? 'en-US' : 'en-CH').format(120_000)} total`));
 });

@@ -1,20 +1,20 @@
 {
   "schema": "datapass.installed-pm-fixture/1",
   "repo": "julian-passebecq/datapass-pm",
-  "sourceSha": "ef5d1132079e9be128d67bcb3246125b6f28e645",
-  "version": "0.4.14",
-  "filename": "datapass-pm-0.4.14.vsix",
-  "sha256": "ea62cbb4dfd4a5fa8bb74c6acc3597c9d62d88676dd2ec599eecf01c65bacee9",
-  "bytes": 1035511,
+  "sourceSha": "ee12b652e425a6badadf3442293839830239ebc1",
+  "version": "0.4.15",
+  "filename": "datapass-pm-0.4.15.vsix",
+  "sha256": "5ece625352fb72853ee80bd3735af9ef4f67a53876925334c2fe8254f3ac7122",
+  "bytes": 1036036,
   "provenance": {
     "kind": "EXACT_SOURCE_WINDOWS_CI_ARTIFACT",
-    "runId": "38173651068",
-    "jobId": "114571338134",
-    "artifactId": "11715415865",
+    "pipelineId": "2939104831",
+    "jobId": "17115867719",
+    "runnerId": "56844575",
     "runnerOS": "Windows",
-    "runner": "windows-latest",
-    "url": "https://github.com/julian-passebecq/datapass-pm/actions/runs/38173651068",
-    "state": "SUCCESS"
+    "url": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17115867719",
+    "state": "WINDOWS_BUILD_PACKAGE_PASS",
+    "installedJourney": "BLOCKED_NOT_EXECUTED"
   },
   "featureIds": [
     "CK-001",
@@ -155,5 +155,7 @@
       "receipt": "config-dependency.json",
       "role": "DEPENDENCY_ONLY"
     }
-  ]
+  ],
+  "historicalReceipt": "receipt-0.4.14.json",
+  "reconciledAt": "2026-10-12"
 }

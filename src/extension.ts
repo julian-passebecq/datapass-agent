@@ -18,11 +18,14 @@ import {Analyzer} from './ui/analyzer';
 import {agentLensContext} from './interop';
 import {developmentObservations} from './export/development';
 import { registerCockpit } from './ui/cockpit';
+import { NativeTaskRunner, NativeTransportFacade } from './provider-kit';
+import { localHost } from './cockpit/facade';
 
 const TERN_COMMANDS = ['tern.revealWorktree', 'tern.revealRevision', 'tern.revealChangeSet'];
 
 export interface AgentApi {
   cockpitV1: import('./cockpit/facade').CockpitFacade['api'];
+  nativeTransportV1: import('./provider-kit').NativeTransportApi;
   store: SessionStore;
   openWorkspace(view?: string, key?: string): void;
   installed: { claude?: InstalledVersion; codex?: InstalledVersion };
@@ -62,6 +65,10 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
   const workspace = new WorkspacePanel(store, m => onMessage(m), () => ternAvailable);
   const facade = registerCockpit(ctx, store, () => ternAvailable, m => onMessage(m), () => api.installed);
   api.cockpitV1 = facade.api;
+  const native = new NativeTransportFacade(new NativeTaskRunner(path.join(ctx.globalStorageUri.fsPath,'native-tasks')),facade.policy,localHost().hostId,async task=>
+    await vscode.window.showWarningMessage(`Execute the reviewed ${task.selection.transport} task?`,{modal:true,detail:`Task: ${task.taskId}\nTarget: ${task.selection.cwd}\nNative home: ${task.selection.home}\nPermission: ${task.selection.permission}\nRequested model: ${task.selection.requestedIdentity.model}\nStartup audit: ${task.selection.startup.reviewHash}\nConfiguration: ${task.configHash}\nPreset: ${task.presetHash}\nPrompt: ${task.promptHash}\nExact prepared hash: ${task.preparedHash}\n\n${task.text}`},'Execute reviewed task')==='Execute reviewed task',()=>vscode.workspace.isTrusted,async scope=>await vscode.window.showWarningMessage('Authorize this project for native task preparation?',{modal:true,detail:`Organization: ${scope.organizationId}\nPrivacy: ${scope.privacyDomainId}\nProject: ${scope.projectId}\nRepository: ${scope.repoId}\nRoot: ${scope.root}\nRevision: ${scope.revision}\nSource vector: ${scope.sourceVectorHash}\nPolicy: ${scope.policyHash}`},'Authorize reviewed project')==='Authorize reviewed project');
+  api.nativeTransportV1=native.api;
+  ctx.subscriptions.push({dispose:()=>{void native.dispose();}});
   ctx.subscriptions.push(vscode.commands.registerCommand('agent.openCompact', () => workspace.open('compact')));
   registerKnowledgeCommands(ctx, store);
   const analyzer=new Analyzer(store,()=>ternAvailable);
