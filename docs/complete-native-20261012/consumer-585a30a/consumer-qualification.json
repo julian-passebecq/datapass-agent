@@ -1,0 +1,177 @@
+{
+  "schema": "datapass.agent-consumer-qualification/1",
+  "repository": "julian-passebecq/agent-vscode",
+  "productVersion": "0.11.1",
+  "sourceSha": "585a30a64d643648732f213cb890e1bb2dfc2533",
+  "sourceTree": "c1e9ac7c2d2286a2c385992a1a088c35fdd02d36",
+  "sourceArchive": {
+    "sha256": "1901ed6b006191c852d17f4ac31017d6dfe60b41298714fc312837d60c647c82",
+    "bytes": 9431040,
+    "format": "git archive --format=tar"
+  },
+  "sourceCleanAtQualification": true,
+  "fixtureOnlyChange": {
+    "from": "9ab51af6109a780afefabb01accaf600849455ef",
+    "files": [
+      "test/fixtures/installed-pm/datapass-pm-0.5.0-c5db4a1.vsix",
+      "test/fixtures/installed-pm/datapass-pm-0.5.0.vsix",
+      "test/fixtures/installed-pm/qualification-0.5.0-c5db4a1.json",
+      "test/fixtures/installed-pm/qualification-0.5.0.json",
+      "test/fixtures/installed-pm/receipt-0.5.0-c5db4a1.json",
+      "test/fixtures/installed-pm/receipt.json"
+    ],
+    "excludedFromRuntimePackage": true,
+    "rule": ".vscodeignore permits only dist/media/package.json/README.md/LICENSE.md",
+    "runtimeInputsUnchangedFrom": "62a072f0af69352c0bd93855ec30cfb1b2bac4f7",
+    "runtimeBundleSha256": "31ca8f9776a5f6b98de3067d059a2a7f54aaaba0cd2abb406ad9efdefb9ba333",
+    "runtimeBundleMatchesProducer": true
+  },
+  "productArtifact": {
+    "filename": "agent-vscode-0.11.1.vsix",
+    "bytes": 488400,
+    "sha256": "911bfa217e32dedf9b4d2184825577205d83edac59ea1cb9345ecfb830d3f480"
+  },
+  "providerKitProducer": {
+    "sourceSha": "62a072f0af69352c0bd93855ec30cfb1b2bac4f7",
+    "ownerReceiptRevision": "9ab51af6109a780afefabb01accaf600849455ef",
+    "ownerReceiptPath": "docs/complete-native-20261012/provider-kit-owner-receipt.json",
+    "ownerReceiptSha256": "f18cc2ba5ef7c066892bfc7b3603dbea67fa29329182b7e8d768a49f46d02bb6",
+    "artifact": {
+      "filename": "datapass-provider-kit-1.1.1.tgz",
+      "bytes": 56640,
+      "sha256": "9330717566ebdfa1fbee19eb219c96dde78fdf3c594761605f576a1f617e1e4f"
+    },
+    "artifactUnchanged": true
+  },
+  "installedPmFixture": {
+    "sourceSha": "24a8b3fe3020b44469d93fc430b67be0ed2c368e",
+    "sha256": "59ce4e8a7176916109f487a5b8f1074f93eab7420700bc5455425d812c631920",
+    "bytes": 1144403,
+    "featureCount": 107,
+    "qualifiedTests": 195,
+    "historical": "c5db4a1 PM0.5.0 retained alongside0.4.15 and0.4.14"
+  },
+  "qualification": {
+    "runtime": {
+      "version": "v22.23.3",
+      "sha256": "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e"
+    },
+    "state": "LOCAL_WINDOWS_MANDATORY_PASS",
+    "full": 484,
+    "targeted": 28,
+    "localeEnCH": 11,
+    "gates": [
+      {
+        "name": "check",
+        "command": [
+          "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+          "run",
+          "check"
+        ],
+        "exitCode": 0,
+        "startedAt": "2026-10-12T18:54:57.989Z",
+        "completedAt": "2026-10-12T18:55:06.598Z",
+        "log": "check.log",
+        "logSha256": "b8c0a13003908b2dad7523289e159baaa57ef68f2353e835953c35376ff3b0ad"
+      },
+      {
+        "name": "compile-tests",
+        "command": [
+          "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+          "run",
+          "compile-tests"
+        ],
+        "exitCode": 0,
+        "startedAt": "2026-10-12T18:55:06.599Z",
+        "completedAt": "2026-10-12T18:55:13.164Z",
+        "log": "compile-tests.log",
+        "logSha256": "25ffd45f172806ae08d9d8ecea38bd2ae3c81e131100c53c88499ba6f3b02953"
+      },
+      {
+        "name": "targeted",
+        "command": [
+          "--test",
+          "out-test/test/nativeTransport.test.js",
+          "out-test/test/render.test.js",
+          "out-test/test/providerKit.test.js"
+        ],
+        "exitCode": 0,
+        "startedAt": "2026-10-12T18:55:13.164Z",
+        "completedAt": "2026-10-12T18:55:28.361Z",
+        "log": "targeted.log",
+        "logSha256": "7d9b51a325a08eff0ef6249b68cd2522ae7cd128a520019f5e19104b1fcd6030"
+      },
+      {
+        "name": "locale-en-CH",
+        "command": [
+          "--require",
+          "./docs/complete-native-20261012/force-en-CH.cjs",
+          "--test",
+          "out-test/test/render.test.js"
+        ],
+        "exitCode": 0,
+        "startedAt": "2026-10-12T18:55:28.361Z",
+        "completedAt": "2026-10-12T18:55:28.795Z",
+        "log": "locale-en-CH.log",
+        "logSha256": "82300d0d3be5e44a01c5fcae85f2590df44fe15bce8e92afa1503858c8803f87"
+      },
+      {
+        "name": "test",
+        "command": [
+          "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+          "run",
+          "test"
+        ],
+        "exitCode": 0,
+        "startedAt": "2026-10-12T18:55:28.796Z",
+        "completedAt": "2026-10-12T18:55:59.974Z",
+        "log": "test.log",
+        "logSha256": "6181ecdd1f57a68575188ff7889363b2d1cbf6af03b7ec2881f5c91b54ae410f"
+      },
+      {
+        "name": "build",
+        "command": [
+          "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+          "run",
+          "build"
+        ],
+        "exitCode": 0,
+        "startedAt": "2026-10-12T18:55:59.975Z",
+        "completedAt": "2026-10-12T18:56:00.540Z",
+        "log": "build.log",
+        "logSha256": "57534f4974be78f6e353e29a3b119300a47b652f12f732ca95a712cb63f6c756"
+      },
+      {
+        "name": "build:provider-kit",
+        "command": [
+          "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+          "run",
+          "build:provider-kit"
+        ],
+        "exitCode": 0,
+        "startedAt": "2026-10-12T18:56:00.540Z",
+        "completedAt": "2026-10-12T18:56:02.350Z",
+        "log": "build:provider-kit.log",
+        "logSha256": "18d52d6fdddb44a207fc1a9eab3d43bc0738074d2391d863ebc5e7f8bb3960bb"
+      },
+      {
+        "name": "package",
+        "command": [
+          "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+          "run",
+          "package"
+        ],
+        "exitCode": 0,
+        "startedAt": "2026-10-12T18:56:02.350Z",
+        "completedAt": "2026-10-12T18:56:33.100Z",
+        "log": "package.log",
+        "logSha256": "aa1fa803374602f7c090acc1a9ead7ad73ebc103574792480a7c815a17f71ac1"
+      }
+    ],
+    "ciReceiptSha256": "d4dc4e179ce06d466a4cce6d57ab303ba22a940b1386e91b048c15ee46f31486",
+    "qaReceiptSha256": "20aa1de1159767c15b5acaf86a0894f89e6d080d7451eda680ddb96055ae0f1c"
+  },
+  "nativeTasks": 0,
+  "installedGuiJourney": "BLOCKED_NOT_EXECUTED",
+  "hostedExactHeadCI": "PENDING_NEW_PUBLICATION"
+}

@@ -1,0 +1,124 @@
+{
+  "schema": "datapass.agent-native-qa/1",
+  "state": "LOCAL_WINDOWS_MANDATORY_PASS",
+  "startedAt": "2026-10-12T18:54:57.988Z",
+  "completedAt": "2026-10-12T18:56:33.101Z",
+  "runtime": {
+    "version": "v22.23.3",
+    "sha256": "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e"
+  },
+  "productVersion": "0.11.1",
+  "gates": [
+    {
+      "name": "check",
+      "command": [
+        "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "check"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-10-12T18:54:57.989Z",
+      "completedAt": "2026-10-12T18:55:06.598Z",
+      "log": "check.log",
+      "logSha256": "b8c0a13003908b2dad7523289e159baaa57ef68f2353e835953c35376ff3b0ad"
+    },
+    {
+      "name": "compile-tests",
+      "command": [
+        "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "compile-tests"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-10-12T18:55:06.599Z",
+      "completedAt": "2026-10-12T18:55:13.164Z",
+      "log": "compile-tests.log",
+      "logSha256": "25ffd45f172806ae08d9d8ecea38bd2ae3c81e131100c53c88499ba6f3b02953"
+    },
+    {
+      "name": "targeted",
+      "command": [
+        "--test",
+        "out-test/test/nativeTransport.test.js",
+        "out-test/test/render.test.js",
+        "out-test/test/providerKit.test.js"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-10-12T18:55:13.164Z",
+      "completedAt": "2026-10-12T18:55:28.361Z",
+      "log": "targeted.log",
+      "logSha256": "7d9b51a325a08eff0ef6249b68cd2522ae7cd128a520019f5e19104b1fcd6030"
+    },
+    {
+      "name": "locale-en-CH",
+      "command": [
+        "--require",
+        "./docs/complete-native-20261012/force-en-CH.cjs",
+        "--test",
+        "out-test/test/render.test.js"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-10-12T18:55:28.361Z",
+      "completedAt": "2026-10-12T18:55:28.795Z",
+      "log": "locale-en-CH.log",
+      "logSha256": "82300d0d3be5e44a01c5fcae85f2590df44fe15bce8e92afa1503858c8803f87"
+    },
+    {
+      "name": "test",
+      "command": [
+        "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "test"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-10-12T18:55:28.796Z",
+      "completedAt": "2026-10-12T18:55:59.974Z",
+      "log": "test.log",
+      "logSha256": "6181ecdd1f57a68575188ff7889363b2d1cbf6af03b7ec2881f5c91b54ae410f"
+    },
+    {
+      "name": "build",
+      "command": [
+        "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-10-12T18:55:59.975Z",
+      "completedAt": "2026-10-12T18:56:00.540Z",
+      "log": "build.log",
+      "logSha256": "57534f4974be78f6e353e29a3b119300a47b652f12f732ca95a712cb63f6c756"
+    },
+    {
+      "name": "build:provider-kit",
+      "command": [
+        "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "build:provider-kit"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-10-12T18:56:00.540Z",
+      "completedAt": "2026-10-12T18:56:02.350Z",
+      "log": "build:provider-kit.log",
+      "logSha256": "18d52d6fdddb44a207fc1a9eab3d43bc0738074d2391d863ebc5e7f8bb3960bb"
+    },
+    {
+      "name": "package",
+      "command": [
+        "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "package"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-10-12T18:56:02.350Z",
+      "completedAt": "2026-10-12T18:56:33.100Z",
+      "log": "package.log",
+      "logSha256": "aa1fa803374602f7c090acc1a9ead7ad73ebc103574792480a7c815a17f71ac1"
+    }
+  ],
+  "isolation": "Dedicated synthetic home and fixture processes; not an OS security sandbox",
+  "nativeProviderTasks": 0,
+  "ownerDesktopInput": false,
+  "installedGuiJourney": "BLOCKED_NOT_EXECUTED",
+  "liveAccounts": "UNQUALIFIED"
+}
