@@ -1,19 +1,19 @@
 {
   "schema": "datapass.installed-pm-fixture/1",
   "repo": "julian-passebecq/datapass-pm",
-  "sourceSha": "c5db4a1dd8d5781ca33743a19b86dbd7aad885b2",
+  "sourceSha": "24a8b3fe3020b44469d93fc430b67be0ed2c368e",
   "version": "0.5.0",
   "filename": "datapass-pm-0.5.0.vsix",
-  "sha256": "9a88df0495cc2cb72cb572940114ad74527fe08007d00e84f7e5d659e365ca5f",
-  "bytes": 1138511,
+  "sha256": "59ce4e8a7176916109f487a5b8f1074f93eab7420700bc5455425d812c631920",
+  "bytes": 1144403,
   "provenance": {
     "kind": "EXACT_SOURCE_AUTHORIZED_LOCAL_WINDOWS_ARTIFACT",
     "runner": "AUTHORIZED_LOCAL_WINDOWS_SYNTHETIC_HOME",
     "runnerOS": "Windows",
     "state": "TYPECHECK_TEST_PACKAGE_PASS",
     "tests": {
-      "passed": 191,
-      "total": 191
+      "passed": 195,
+      "total": 195
     },
     "installedJourney": "BLOCKED_NOT_EXECUTED",
     "remoteCI": "PENDING_EXACT_HEAD"
@@ -158,10 +158,11 @@
       "role": "DEPENDENCY_ONLY"
     }
   ],
-  "historicalReceipt": "receipt-0.4.15.json",
+  "historicalReceipt": "receipt-0.5.0-c5db4a1.json",
   "reconciledAt": "2026-10-12",
   "historicalFixtures": [
     "receipt-0.4.14.json",
-    "receipt-0.4.15.json"
+    "receipt-0.4.15.json",
+    "receipt-0.5.0-c5db4a1.json"
   ]
 }

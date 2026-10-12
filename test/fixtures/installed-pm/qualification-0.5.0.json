@@ -2,53 +2,60 @@
   "schema": "datapass.pm-product-qualification/1",
   "repository": "julian-passebecq/datapass-pm",
   "version": "0.5.0",
-  "sourceSha": "c5db4a1dd8d5781ca33743a19b86dbd7aad885b2",
-  "sourceTree": "488e0131752b49572a08f73516ea0913a7a3f0f3",
+  "sourceSha": "24a8b3fe3020b44469d93fc430b67be0ed2c368e",
+  "sourceTree": "35f608cf4e2a8a4ad2e2c59f01051d10957bd3d8",
   "sourceCleanAtQualification": true,
   "runner": "AUTHORIZED_LOCAL_WINDOWS_SYNTHETIC_HOME",
   "os": "win32",
   "node": "v22.23.3",
   "nodeSha256": "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e",
-  "capturedAt": "2026-10-12T18:05:40.515Z",
+  "capturedAt": "2026-10-12T18:53:46.438Z",
   "gates": [
     {
+      "id": "ci",
+      "exitCode": 0,
+      "logSha256": "446b73d277e7ddda81653ed7f48558f96d73a15cbc7d0610ad9b35d3f128e648"
+    },
+    {
       "id": "typecheck",
-      "command": "npm run typecheck",
       "exitCode": 0,
       "logSha256": "9174de4e296615bd1feafdde2ad5b3796326783fe616b96917b52feee58a6b0f"
     },
     {
       "id": "test",
-      "command": "npm test",
       "exitCode": 0,
-      "logSha256": "42542d7175a6264b83f6ab1342601181bd3074e382cb56163b2d7604d837a65e"
+      "logSha256": "6e7b6b3150ff4aac56389ff0615ab9010eb3a9c4d536dc801e6eb078ac79f9c1"
     },
     {
       "id": "package",
-      "command": "npm run package",
       "exitCode": 0,
-      "logSha256": "01e963738d46c194fe176f11a331b0ccece79937e06230fb0fe4325268c3b633"
+      "logSha256": "091da4d5ca9d49769da950dabfa0eee70e8f56c22924bdcedf75c2f44fe37a25"
     }
   ],
   "tests": {
-    "total": 191,
-    "passed": 191,
+    "total": 195,
+    "passed": 195,
     "failed": 0,
     "skipped": 0
   },
   "packages": [
     {
       "file": "datapass-pm-0.5.0.vsix",
-      "sha256": "9a88df0495cc2cb72cb572940114ad74527fe08007d00e84f7e5d659e365ca5f",
-      "bytes": 1138511
+      "sha256": "59ce4e8a7176916109f487a5b8f1074f93eab7420700bc5455425d812c631920",
+      "bytes": 1144403
     }
   ],
+  "sourceArchive": {
+    "format": "git archive tar",
+    "sourceSha": "24a8b3fe3020b44469d93fc430b67be0ed2c368e",
+    "sha256": "780ba19e484dfdf9ed5312ecf804e3b9d7f7a3e26f4c163cde36221ff2802c27",
+    "bytes": 5908480
+  },
   "state": "PASS_SCOPED",
-  "dependencyPreparation": "Existing locked dependency installation; fresh npm ci is repeated independently in Linux and authorized CI carrier",
   "installedNativeJourney": "BLOCKED_NOT_EXECUTED",
-  "githubRequiredChecks": "PENDING_REMOTE_PUSH",
+  "githubRequiredChecks": "INDEPENDENT_ACCOUNT_BLOCKED_NOT_SUBSTITUTED",
   "privacy": "SANITIZED_METADATA_NO_RAW_HISTORY",
   "omissions": [
-    "No installed GUI, native account authentication, platform isolation certification or full219-clause acceptance is claimed."
+    "No installed GUI, native account authentication, platform isolation certification or FULL acceptance is claimed."
   ]
 }
