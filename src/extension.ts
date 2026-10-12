@@ -18,7 +18,7 @@ import {Analyzer} from './ui/analyzer';
 import {agentLensContext} from './interop';
 import {developmentObservations} from './export/development';
 import { registerCockpit } from './ui/cockpit';
-import { NativeTaskRunner, NativeTransportFacade } from './provider-kit';
+import { NativeTaskRunner, NativeTransportFacade, NativePlatformVerifier, validateNativePlatformVerifier, safeLocalSource } from './provider-kit';
 import { localHost } from './cockpit/facade';
 
 const TERN_COMMANDS = ['tern.revealWorktree', 'tern.revealRevision', 'tern.revealChangeSet'];
@@ -65,7 +65,18 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
   const workspace = new WorkspacePanel(store, m => onMessage(m), () => ternAvailable);
   const facade = registerCockpit(ctx, store, () => ternAvailable, m => onMessage(m), () => api.installed);
   api.cockpitV1 = facade.api;
-  const native = new NativeTransportFacade(new NativeTaskRunner(path.join(ctx.globalStorageUri.fsPath,'native-tasks')),facade.policy,localHost().hostId,async task=>
+  const nativeVerifierKey='nativePlatformVerifiersV1';
+  const trustedNativeVerifiers=()=>ctx.globalState.get<NativePlatformVerifier[]>(nativeVerifierKey,[]).filter(validateNativePlatformVerifier).slice(0,20);
+  ctx.subscriptions.push(vscode.commands.registerCommand('agent.reviewNativePlatformVerifier',async()=>{
+    if(!vscode.workspace.isTrusted)throw Error('Trusted owned workspace is required.');
+    const selected=await vscode.window.showOpenDialog({canSelectMany:false,filters:{'Native platform verifier':['json']},title:'Select an independent public platform verifier receipt'});if(!selected?.[0])return;
+    const file=selected[0].fsPath;if(!file.endsWith('.native-platform-verifier.json')||!await safeLocalSource(file)||fs.statSync(file).size>8192)throw Error('Select a regular bounded public .native-platform-verifier.json file.');
+    const record=JSON.parse(fs.readFileSync(file,'utf8')) as NativePlatformVerifier;
+    if(Object.keys(record).sort().join(',')!=='fingerprint,issuerId,publicKeyPem'||!validateNativePlatformVerifier(record))throw Error('Only an exact Ed25519 public verifier record is accepted.');
+    const decision=await vscode.window.showWarningMessage('Trust this independent native platform verifier?',{modal:true,detail:`Issuer: ${record.issuerId}\nPublic-key fingerprint: ${record.fingerprint}\nThis verifier must independently certify managed/ambient startup coverage and an enforced execution boundary. A signature authenticates its report; it does not create isolation. PM cannot create this trust. Authentication and native working state remain unknown.`},'Trust reviewed verifier');
+    if(decision!=='Trust reviewed verifier')return;const records=trustedNativeVerifiers().filter(k=>k.issuerId!==record.issuerId);if(records.length>=20)throw Error('Platform verifier bound exceeded.');await ctx.globalState.update(nativeVerifierKey,[...records,record]);
+  }));
+  const native = new NativeTransportFacade(new NativeTaskRunner(path.join(ctx.globalStorageUri.fsPath,'native-tasks'),undefined,trustedNativeVerifiers),facade.policy,localHost().hostId,async task=>
     await vscode.window.showWarningMessage(`Execute the reviewed ${task.selection.transport} task?`,{modal:true,detail:`Task: ${task.taskId}\nTarget: ${task.selection.cwd}\nNative home: ${task.selection.home}\nPermission: ${task.selection.permission}\nRequested model: ${task.selection.requestedIdentity.model}\nStartup audit: ${task.selection.startup.reviewHash}\nConfiguration: ${task.configHash}\nPreset: ${task.presetHash}\nPrompt: ${task.promptHash}\nExact prepared hash: ${task.preparedHash}\n\n${task.text}`},'Execute reviewed task')==='Execute reviewed task',()=>vscode.workspace.isTrusted,async scope=>await vscode.window.showWarningMessage('Authorize this project for native task preparation?',{modal:true,detail:`Organization: ${scope.organizationId}\nPrivacy: ${scope.privacyDomainId}\nProject: ${scope.projectId}\nRepository: ${scope.repoId}\nRoot: ${scope.root}\nRevision: ${scope.revision}\nSource vector: ${scope.sourceVectorHash}\nPolicy: ${scope.policyHash}`},'Authorize reviewed project')==='Authorize reviewed project');
   api.nativeTransportV1=native.api;
   ctx.subscriptions.push({dispose:()=>{void native.dispose();}});

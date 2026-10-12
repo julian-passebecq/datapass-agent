@@ -9,7 +9,7 @@ const node=path.resolve(process.argv[2]??process.execPath),nodeHash=sha(fs.readF
 if(process.argv[3] && nodeHash!==process.argv[3])throw Error('Exact qualification runtime hash mismatch.');
 const nodeHome=path.dirname(node),npm=path.join(nodeHome,'node_modules/npm/bin/npm-cli.js');
 if(!fs.existsSync(npm))throw Error('Selected runtime npm CLI unavailable.');
-const root=process.cwd(),destination=path.join(root,'docs/complete-native-20261012'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'agent-complete-native-qa-'));
+const root=process.cwd(),destination=path.resolve(process.argv[4]??path.join(root,'docs/complete-native-20261012')),temp=fs.mkdtempSync(path.join(os.tmpdir(),'agent-complete-native-qa-'));
 const childEnvironment={...process.env,HOME:temp,USERPROFILE:temp,CODEX_HOME:path.join(temp,'codex'),CLAUDE_CONFIG_DIR:path.join(temp,'claude'),APPDATA:path.join(temp,'appdata'),LOCALAPPDATA:path.join(temp,'localappdata'),PATH:nodeHome+path.delimiter+process.env.PATH};
 for(const key of Object.keys(childEnvironment))if(/token|secret|password|api[_-]?key|credential/i.test(key))delete childEnvironment[key];
 for(const key of ['CODEX_HOME','CLAUDE_CONFIG_DIR','APPDATA','LOCALAPPDATA'])fs.mkdirSync(childEnvironment[key],{recursive:true});

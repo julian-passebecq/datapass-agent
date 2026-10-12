@@ -1,0 +1,54 @@
+{
+  "schema": "datapass.pm-product-qualification/1",
+  "repository": "julian-passebecq/datapass-pm",
+  "version": "0.5.0",
+  "sourceSha": "c5db4a1dd8d5781ca33743a19b86dbd7aad885b2",
+  "sourceTree": "488e0131752b49572a08f73516ea0913a7a3f0f3",
+  "sourceCleanAtQualification": true,
+  "runner": "AUTHORIZED_LOCAL_WINDOWS_SYNTHETIC_HOME",
+  "os": "win32",
+  "node": "v22.23.3",
+  "nodeSha256": "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e",
+  "capturedAt": "2026-10-12T18:05:40.515Z",
+  "gates": [
+    {
+      "id": "typecheck",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "logSha256": "9174de4e296615bd1feafdde2ad5b3796326783fe616b96917b52feee58a6b0f"
+    },
+    {
+      "id": "test",
+      "command": "npm test",
+      "exitCode": 0,
+      "logSha256": "42542d7175a6264b83f6ab1342601181bd3074e382cb56163b2d7604d837a65e"
+    },
+    {
+      "id": "package",
+      "command": "npm run package",
+      "exitCode": 0,
+      "logSha256": "01e963738d46c194fe176f11a331b0ccece79937e06230fb0fe4325268c3b633"
+    }
+  ],
+  "tests": {
+    "total": 191,
+    "passed": 191,
+    "failed": 0,
+    "skipped": 0
+  },
+  "packages": [
+    {
+      "file": "datapass-pm-0.5.0.vsix",
+      "sha256": "9a88df0495cc2cb72cb572940114ad74527fe08007d00e84f7e5d659e365ca5f",
+      "bytes": 1138511
+    }
+  ],
+  "state": "PASS_SCOPED",
+  "dependencyPreparation": "Existing locked dependency installation; fresh npm ci is repeated independently in Linux and authorized CI carrier",
+  "installedNativeJourney": "BLOCKED_NOT_EXECUTED",
+  "githubRequiredChecks": "PENDING_REMOTE_PUSH",
+  "privacy": "SANITIZED_METADATA_NO_RAW_HISTORY",
+  "omissions": [
+    "No installed GUI, native account authentication, platform isolation certification or full219-clause acceptance is claimed."
+  ]
+}

@@ -5,8 +5,9 @@ import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { bounded } from '../util/redact';
 import { hasLinkedAncestor, isPlausibleLocalPath } from '../util/paths';
-import { NativeIdentity, NativeSelection, PreparedNativeTask, nativeEnvironment, nativeHash, nativeIdOk, nativeLaunchArguments, preflightNativeTransport, prepareNativeTask } from './nativeTransport';
+import { NativeIdentity, NativeSelection, PreparedNativeTask, nativeEnvironment, nativeHash, nativeIdOk, nativeLaunchArguments, preflightNativeTransport, prepareNativeTask, nativeSelectionBinding } from './nativeTransport';
 import { readNativeRepositoryIdentity } from './nativeProjectScope';
+import type { NativePlatformVerifier } from './nativePlatform';
 
 export type NativeTaskState = 'SPAWN_INTENT' | 'RUNNING' | 'NEEDS_INPUT' | 'COMPLETED' | 'FAILED' | 'INTERRUPTED' | 'UNCERTAIN';
 export interface NativeTaskObservation {
@@ -29,10 +30,11 @@ interface LiveTask { handle:NativeTaskHandle; cancel:()=>Promise<NativeTaskObser
 /** The standalone kit is a transport, never a scheduler/cognitive loop. The installed facade supplies authority. */
 export class NativeTaskRunner {
   private live=new Map<string,LiveTask>();
-  constructor(readonly ledgerDirectory:string, private spawnProcess:typeof spawn=spawn) {
+  constructor(readonly ledgerDirectory:string, private spawnProcess:typeof spawn=spawn,private platformVerifiers:()=>NativePlatformVerifier[]=()=>[]) {
     let ancestor=ledgerDirectory;while(!fsSync.existsSync(ancestor) && ancestor!==path.dirname(ancestor))ancestor=path.dirname(ancestor);
     if(!isPlausibleLocalPath(ledgerDirectory) || hasLinkedAncestor(ancestor))throw Error('A real owned ledger directory is required.');
   }
+  preflight(selection:NativeSelection){return preflightNativeTransport(selection,this.platformVerifiers());}
   private file(id:string):string {if(!nativeIdOk(id))throw Error('Invalid owned task identity.');return path.join(this.ledgerDirectory,nativeHash(id)+'.json');}
   async lookup(id:string):Promise<NativeTaskObservation|null> {
     if(this.live.has(id))return this.live.get(id)!.handle.observation();
@@ -54,17 +56,17 @@ export class NativeTaskRunner {
   async start(input:PreparedNativeTask, reviewedHash:string, stillAuthorized:()=>boolean=()=>true):Promise<NativeTaskHandle> {
     const task=structuredClone(input), {schema,preparedHash,...i}=task;
     if(schema!=='datapass.native-task/1' || prepareNativeTask(i).preparedHash!==preparedHash || reviewedHash!==preparedHash || !stillAuthorized())throw Error('Exact prepared task approval is required.');
-    const preflight=await preflightNativeTransport(task.selection);if(preflight.state!=='READY')throw Error('Native startup blocked: '+preflight.reasons.join(' '));
+    const preflight=await this.preflight(task.selection);if(preflight.state!=='READY')throw Error('Native startup blocked: '+preflight.reasons.join(' '));
     let resumeId:string|undefined;
     if(task.resumeFromTaskId){
       const prior=await this.lookup(task.resumeFromTaskId);
-      if(!prior || !['COMPLETED','INTERRUPTED'].includes(prior.state) || prior.quiescence!=='NATIVE_TURN_SETTLED' || !prior.sessionId || prior.selectionHash!==nativeHash(task.selection) || prior.targetHash!==task.targetHash || prior.permissionHash!==task.permissionHash || prior.configHash!==task.configHash || prior.presetHash!==task.presetHash || prior.bindingHash!==task.bindingHash || prior.scopeHash!==task.scopeHash || prior.configScopeHash!==task.configScopeHash)throw Error('Resume requires an owned settled native session with unchanged reviewed target, configuration and permission.');
+      if(!prior || !['COMPLETED','INTERRUPTED'].includes(prior.state) || prior.quiescence!=='NATIVE_TURN_SETTLED' || !prior.sessionId || prior.selectionHash!==nativeSelectionBinding(task.selection) || prior.targetHash!==task.targetHash || prior.permissionHash!==task.permissionHash || prior.configHash!==task.configHash || prior.presetHash!==task.presetHash || prior.bindingHash!==task.bindingHash || prior.scopeHash!==task.scopeHash || prior.configScopeHash!==task.configScopeHash)throw Error('Resume requires an owned settled native session with unchanged reviewed target, configuration and permission.');
       resumeId=prior.sessionId;
     }
     await fs.mkdir(this.ledgerDirectory,{recursive:true});
     if(hasLinkedAncestor(this.ledgerDirectory) || !stillAuthorized())throw Error('Owned ledger/authority changed before launch.');
     const filename=this.file(task.taskId), selection=task.selection;
-    let observation:NativeTaskObservation={schema:'datapass.native-task-observation/1',taskId:task.taskId,preparedHash,selectionHash:nativeHash(selection),targetHash:task.targetHash,permissionHash:task.permissionHash,configHash:task.configHash,presetHash:task.presetHash,promptHash:task.promptHash,bindingHash:task.bindingHash,scopeHash:task.scopeHash,configScopeHash:task.configScopeHash,state:'SPAWN_INTENT',sessionId:resumeId??null,turnId:null,sequence:0,requestedIdentity:selection.requestedIdentity,observedIdentity:{model:null,effort:null,accountId:null},resultText:'',resultHash:null,reason:null,updatedAt:new Date().toISOString(),evidence:'NO_COMPLETION_EVIDENCE',quiescence:'UNKNOWN'};
+    let observation:NativeTaskObservation={schema:'datapass.native-task-observation/1',taskId:task.taskId,preparedHash,selectionHash:nativeSelectionBinding(selection),targetHash:task.targetHash,permissionHash:task.permissionHash,configHash:task.configHash,presetHash:task.presetHash,promptHash:task.promptHash,bindingHash:task.bindingHash,scopeHash:task.scopeHash,configScopeHash:task.configScopeHash,state:'SPAWN_INTENT',sessionId:resumeId??null,turnId:null,sequence:0,requestedIdentity:selection.requestedIdentity,observedIdentity:{model:null,effort:null,accountId:null},resultText:'',resultHash:null,reason:null,updatedAt:new Date().toISOString(),evidence:'NO_COMPLETION_EVIDENCE',quiescence:'UNKNOWN'};
     // Exclusive durable intent is committed BEFORE spawn; a failed/uncertain start is never retried.
     const intent=await fs.open(filename,'wx',0o600);try{await intent.writeFile(JSON.stringify(observation));await intent.sync();}finally{await intent.close();}
     // A session lease prevents concurrent different task IDs from resuming the same thread.
@@ -160,6 +162,7 @@ export class NativeTaskRunner {
     };
     try {
       if(!stillAuthorized())throw Error('Native authority revoked before spawn.');
+      const immediate=await this.preflight(selection);if(immediate.state!=='READY')throw Error('Native startup proof drifted before process creation.');
       child=this.spawnProcess(selection.executable,nativeLaunchArguments(task,resumeId),{cwd:selection.cwd,env:nativeEnvironment(selection),windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']}) as ChildProcessWithoutNullStreams;
       child.on('error',()=>enqueue(()=>finish('UNCERTAIN','Native process startup outcome uncertain; no blind retry.')));
       child.stdin.on('error',()=>enqueue(()=>finish('UNCERTAIN','Native stdin failed after launch; no blind retry.')));

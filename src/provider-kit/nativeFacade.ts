@@ -5,11 +5,14 @@ import { ScopePolicy, digest, repoId } from '../cockpit/policy';
 import { NativeSelection, NativeTaskInput, PreparedNativeTask, hashOk, nativeHash, nativeTransportVersion, preflightNativeTransport, prepareNativeTask } from './nativeTransport';
 import { NativeTaskRunner, NativeTaskObservation, NativeTaskEvent, NativeTaskHandle } from './nativeRunner';
 import { NativeProjectScopeInput, verifyNativeProjectScope } from './nativeProjectScope';
+import { NativeStartupManifest, captureNativeStartupManifest, nativeStartupReviewHash } from './nativeStartup';
+import type { NativePreflight } from './nativeTransport';
 
 export interface NativeRoleRuntime { bindingHash:string;scopeHash:string;state:'RUNNING'|'STOPPED'|'UNKNOWN';nativeSessionId:string|null;nativeReceiptRef:string|null;observedAt:string|null; }
 export interface NativeTransportApi {
   readonly major:1;readonly version:typeof nativeTransportVersion;
   reviewProjectScope(input:NativeProjectScopeInput):Promise<{approved:boolean;scope:Scope|null;epoch:number;scopeHash:string|null}>;
+  captureStartup(request:Request,selection:NativeSelection):Promise<{manifest:NativeStartupManifest;configurationHash:string;reviewHash:string;verification:NativePreflight['verification']}>;
   preflight(request:Request,selection:NativeSelection):ReturnType<typeof preflightNativeTransport>;
   prepare(request:Request,input:NativeTaskInput):Promise<PreparedNativeTask>;
   review(request:Request,preparedHash:string):Promise<{approved:boolean;preparedHash:string}>;
@@ -29,7 +32,8 @@ export class NativeTransportFacade {
   constructor(private runner:NativeTaskRunner,private policy:ScopePolicy,private hostId:string,private review:(task:PreparedNativeTask)=>Promise<boolean>,private trusted:()=>boolean=()=>true,private reviewProject:(input:NativeProjectScopeInput)=>Promise<boolean>=async()=>false){
     this.api=Object.freeze({major:1 as const,version:nativeTransportVersion,
       reviewProjectScope:async(i:NativeProjectScopeInput)=>this.projectScope(i),
-      preflight:async(r:Request,s:NativeSelection)=>{this.selection(r,s);return preflightNativeTransport(s);},
+      captureStartup:async(r:Request,s:NativeSelection)=>{this.selection(r,s);const selection=structuredClone(s),manifest=await captureNativeStartupManifest(selection);selection.startup.manifest=manifest;selection.startup.configurationHash=manifest.manifestHash;selection.startup.reviewHash=nativeStartupReviewHash(selection,manifest);const check=await this.runner.preflight(selection);return {manifest,configurationHash:manifest.manifestHash,reviewHash:selection.startup.reviewHash,verification:check.verification};},
+      preflight:async(r:Request,s:NativeSelection)=>{this.selection(r,s);return this.runner.preflight(s);},
       prepare:async(r:Request,i:NativeTaskInput)=>this.prepare(r,i),
       review:async(r:Request,h:string)=>this.approve(r,h),
       start:async(r:Request,i:{taskId:string;preparedHash:string})=>this.start(r,i),
@@ -69,7 +73,7 @@ export class NativeTransportFacade {
     this.selection(r,p.task.selection);return p;
   }
   private async approve(r:Request,hash:string):Promise<{approved:boolean;preparedHash:string}>{
-    const p=this.prepared(r,hash),check=await preflightNativeTransport(p.task.selection);
+    const p=this.prepared(r,hash),check=await this.runner.preflight(p.task.selection);
     if(check.state!=='READY')throw Error('Native startup effects or capabilities are blocked: '+check.reasons.join(' '));
     const accepted=await this.review(structuredClone(p.task));
     this.prepared(r,hash);p.approved=accepted;return {approved:accepted,preparedHash:hash};
