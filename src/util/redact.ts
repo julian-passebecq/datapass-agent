@@ -121,6 +121,13 @@ export function bounded(text: unknown, max = 100): string {
   return one.length > max ? one.slice(0, max - 1) + '…' : one;
 }
 
+/** Native message bodies keep formatting; redact the complete unit before the UTF-8 byte bound. */
+export function boundedMultiline(text:unknown,max=32*1024):string {
+  if(typeof text!=='string')return '';
+  const safe=redact(text),bytes=Buffer.from(safe);
+  return bytes.length<=max?safe:bytes.subarray(0,Math.max(0,max-3)).toString('utf8').replace(/\uFFFD$/,'')+'…';
+}
+
 /**
  * Deep copy of a JSON-like value with every string redacted and every secret-named key's string value replaced by
  * MARK. Use before showing or exporting structured provider data.

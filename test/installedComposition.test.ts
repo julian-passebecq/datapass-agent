@@ -9,7 +9,7 @@ const json=(file:string)=>JSON.parse(fs.readFileSync(path.join(directory,file),'
 const hash=(bytes:Buffer)=>createHash('sha256').update(bytes).digest('hex');
 test('Installed composition binds the PM artifact to its exact successful qualification and retains the previous fixture',()=>{
   const receipt=json('receipt.json'),qualification=json('qualification-'+receipt.version+'.json');
-  assert.equal(receipt.version,'0.5.1');assert.equal(receipt.sourceSha,qualification.sourceSha);
+  assert.equal(receipt.version,'0.5.2');assert.equal(receipt.sourceSha,qualification.sourceSha);
   assert.ok(qualification.gates.every((gate:{exitCode:number})=>gate.exitCode===0));
   assert.equal(qualification.tests.passed,qualification.tests.total);assert.ok(qualification.tests.total>0);
   const bytes=fs.readFileSync(path.join(directory,receipt.filename));assert.equal(hash(bytes),receipt.sha256);assert.equal(bytes.length,receipt.bytes);

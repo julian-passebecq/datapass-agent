@@ -3,7 +3,7 @@ import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { bounded } from '../util/redact';
+import { bounded, boundedMultiline } from '../util/redact';
 import { hasLinkedAncestor, isPlausibleLocalPath } from '../util/paths';
 import { NativeIdentity, NativeSelection, PreparedNativeTask, nativeEnvironment, nativeHash, nativeIdOk, nativeLaunchArguments, preflightNativeTransport, prepareNativeTask, nativeSelectionBinding } from './nativeTransport';
 import { readNativeRepositoryIdentity } from './nativeProjectScope';
@@ -82,6 +82,8 @@ export class NativeTaskRunner {
     let complete!:(value:NativeTaskObservation)=>void;
     const result=new Promise<NativeTaskObservation>(resolve=>{complete=resolve;});
     const listeners=new Set<(event:NativeTaskEvent)=>void>();
+    // Retain incomplete lines privately until a complete redaction unit arrives. Never emit token fragments.
+    const messageLines=new Map<string,string>(),completedMessages=new Set<string>();
     const snapshot=()=>structuredClone(observation);
     const persist=async(value:NativeTaskObservation)=>{const temporary=filename+'.'+randomUUID()+'.tmp',fd=await fs.open(temporary,'wx',0o600);try{await fd.writeFile(JSON.stringify(value));await fd.sync();}finally{await fd.close();}await fs.rename(temporary,filename);};
     const emit=(type:NativeTaskEvent['type'])=>{for(const fn of listeners)try{fn({type,observation:snapshot()});}catch{/* consumer cannot alter transport */}};
@@ -89,7 +91,7 @@ export class NativeTaskRunner {
     const enqueue=(action:()=>Promise<void>)=>{queued=queued.then(action).catch(()=>{finished=true;observation={...observation,state:'UNCERTAIN',reason:'Durable native state commit failed; do not retry.'};child?.kill();clearTimeout(timeout);clearInterval(authorityWatch);this.live.delete(task.taskId);complete(snapshot());});};
     const finish=async(state:NativeTaskState,reason:string|null=null,settled=false)=>{
       if(finished)return;finished=true;clearTimeout(timeout);clearInterval(authorityWatch);
-      await update({state,reason,resultText:bounded(resultText,32*1024),resultHash:resultText?nativeHash(bounded(resultText,32*1024)):null,evidence:state==='COMPLETED'?'NATIVE_REPORTED':'NO_COMPLETION_EVIDENCE',quiescence:settled?'NATIVE_TURN_SETTLED':'UNKNOWN'});
+      await update({state,reason,resultText:boundedMultiline(resultText,32*1024),resultHash:resultText?nativeHash(boundedMultiline(resultText,32*1024)):null,evidence:state==='COMPLETED'?'NATIVE_REPORTED':'NO_COMPLETION_EVIDENCE',quiescence:settled?'NATIVE_TURN_SETTLED':'UNKNOWN'});
       if(lease && settled)await fs.unlink(lease);
       if(settled)for(const file of repoLeases)await fs.unlink(file);
       this.live.delete(task.taskId);complete(snapshot());
@@ -108,8 +110,8 @@ export class NativeTaskRunner {
     this.live.set(task.taskId,{handle,cancel});
     const timeout=setTimeout(()=>{enqueue(()=>finish('UNCERTAIN','Native completion deadline reached; owned process cancellation requested, no automatic retry.'));},10*60*1000);
     const authorityWatch=setInterval(()=>{if(!finished && !stillAuthorized())enqueue(()=>finish('UNCERTAIN','Reviewed authority was revoked; owned process stopped, native descendants require reconciliation.'));},250);
-    const threadParams={cwd:selection.cwd,model:selection.requestedIdentity.model,approvalPolicy:'never',sandbox:selection.permission==='read-only'?'readOnly':'workspaceWrite',...(resumeId?{threadId:resumeId}:{})};
-    const turnParams=()=>({threadId:observation.sessionId,input:[{type:'text',text:task.text}],cwd:selection.cwd,model:selection.requestedIdentity.model,...(selection.requestedIdentity.effort?{effort:selection.requestedIdentity.effort}:{}),approvalPolicy:'never',sandboxPolicy:selection.permission==='read-only'?{type:'readOnly'}:{type:'workspaceWrite',writableRoots:[selection.cwd],networkAccess:false}});
+    const threadParams={cwd:selection.cwd,model:selection.requestedIdentity.model,approvalPolicy:'never',sandbox:selection.permission,...(resumeId?{threadId:resumeId}:{})};
+    const turnParams=()=>({threadId:observation.sessionId,input:[{type:'text',text:task.text}],cwd:selection.cwd,model:selection.requestedIdentity.model,...(selection.requestedIdentity.effort?{effort:selection.requestedIdentity.effort}:{}),approvalPolicy:'never',sandboxPolicy:selection.permission==='read-only'?{type:'readOnly',networkAccess:false}:{type:'workspaceWrite',writableRoots:[selection.cwd],networkAccess:false}});
     const consume=async(message:any)=>{
       if(finished)return;if(!stillAuthorized()){await cancel();return;}
       if(selection.transport==='codex-app-server'){
@@ -128,8 +130,21 @@ export class NativeTaskRunner {
         }
         const p=message.params;
         if(!p || p.threadId!==observation.sessionId || observation.turnId && (p.turnId??p.turn?.id)!==observation.turnId)return;
-        if(message.method==='item/agentMessage/delta'){await update({},'PROGRESS');return;}
-        if(message.method==='item/completed' && p.item?.type==='agentMessage' && typeof p.item.text==='string'){resultText=bounded(p.item.text,32*1024);await update({resultText,resultHash:nativeHash(resultText)},'MESSAGE');}
+        if(message.method==='item/agentMessage/delta'){
+          if(observation.turnId && p.turnId===observation.turnId && nativeIdOk(p.itemId) && typeof p.delta==='string' && !completedMessages.has(p.itemId)){
+            if(!messageLines.has(p.itemId)&&messageLines.size>=16){await finish('UNCERTAIN','Native message stream exceeded bounded item limit.');return;}
+            const accumulated=(messageLines.get(p.itemId)??'')+p.delta;
+            if(Buffer.byteLength(accumulated)>64*1024){await finish('UNCERTAIN','Native message stream exceeded bounded text limit.');return;}
+            messageLines.set(p.itemId,accumulated);
+            const boundary=accumulated.lastIndexOf('\n');
+            if(boundary>=0){const safe=boundedMultiline(accumulated.slice(0,boundary+1),32*1024);if(safe!==resultText){resultText=safe;await update({resultText,resultHash:nativeHash(resultText)},'MESSAGE');return;}}
+          }
+          await update({},'PROGRESS');return;
+        }
+        if(message.method==='item/completed' && p.item?.type==='agentMessage' && typeof p.item.text==='string'){
+          if(nativeIdOk(p.item.id)){messageLines.delete(p.item.id);if(completedMessages.size<256)completedMessages.add(p.item.id);}
+          resultText=boundedMultiline(p.item.text,32*1024);await update({resultText,resultHash:nativeHash(resultText)},'MESSAGE');
+        }
         if(message.method==='turn/completed'){
           if(!observation.turnId && nativeIdOk(p.turn?.id))await update({turnId:p.turn.id});
           if(p.turn?.id!==observation.turnId){await finish('UNCERTAIN','Native completion identity mismatch.');return;}
@@ -140,7 +155,7 @@ export class NativeTaskRunner {
         if(message.type==='thread.started' && nativeIdOk(message.thread_id)){
           if(resumeId && resumeId!==message.thread_id){await finish('UNCERTAIN','Resumed native session mismatch.');return;}
           await update({sessionId:message.thread_id});
-        }else if(message.type==='item.completed' && message.item?.type==='agent_message' && typeof message.item.text==='string'){resultText=bounded(message.item.text,32*1024);await update({resultText,resultHash:nativeHash(resultText)},'MESSAGE');}
+        }else if(message.type==='item.completed' && message.item?.type==='agent_message' && typeof message.item.text==='string'){resultText=boundedMultiline(message.item.text,32*1024);await update({resultText,resultHash:nativeHash(resultText)},'MESSAGE');}
         else if(message.type==='turn.completed'){if(observation.sessionId){cliCompleted=true;nativeTerminal=true;}else await finish('UNCERTAIN','Native session identity missing.');}
         else if(message.type==='turn.failed'){nativeTerminal=true;await update({reason:'Native CLI reported failed turn.'});}
         else if(message.type==='error')await finish('FAILED','Native CLI reported failure.');
@@ -152,10 +167,10 @@ export class NativeTaskRunner {
         }else if(message.type==='stream_event')await update({},'PROGRESS');
         else if(message.type==='assistant'){
           const text=Array.isArray(message.message?.content)?message.message.content.filter((b:any)=>b.type==='text'&&typeof b.text==='string').map((b:any)=>b.text).join('\n'):'';
-          if(text){resultText=bounded(text,32*1024);await update({resultText,resultHash:nativeHash(resultText)},'MESSAGE');}
+          if(text){resultText=boundedMultiline(text,32*1024);await update({resultText,resultHash:nativeHash(resultText)},'MESSAGE');}
         }else if(message.type==='result'){
           if(message.session_id!==observation.sessionId){await finish('UNCERTAIN','Native result session mismatch.');return;}
-          if(typeof message.result==='string')resultText=bounded(message.result,32*1024);
+          if(typeof message.result==='string')resultText=boundedMultiline(message.result,32*1024);
           nativeTerminal=true;if(!message.is_error && message.subtype==='success')cliCompleted=true;else await update({reason:'Native CLI reported failed result.'});
         }
       }

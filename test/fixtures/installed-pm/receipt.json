@@ -1,22 +1,32 @@
 {
   "schema": "datapass.installed-pm-fixture/1",
   "repo": "julian-passebecq/datapass-pm",
-  "sourceSha": "25143d561ba4a962e880a35333a66837a2b0dc39",
-  "version": "0.5.1",
-  "filename": "datapass-pm-0.5.1.vsix",
-  "sha256": "a034665a161ea2a426415a1f1eb46c719ac9d2c3040d3f30273f47aaa4e77b56",
-  "bytes": 1178036,
+  "sourceSha": "0e961eea5765df70d0e2fe6f9dcb06013c090299",
+  "version": "0.5.2",
+  "filename": "datapass-pm-0.5.2.vsix",
+  "sha256": "6c76aefe4b8369435cb55f0cdc2e8b0f4ee1b24b5c27ebeeb8c2df76937844fe",
+  "bytes": 1195155,
   "provenance": {
-    "kind": "EXACT_SOURCE_AUTHORIZED_LOCAL_WINDOWS_ARTIFACT",
-    "runner": "AUTHORIZED_LOCAL_WINDOWS_SYNTHETIC_HOME",
-    "runnerOS": "Windows",
-    "state": "TYPECHECK_TEST_PACKAGE_PASS",
+    "kind": "EXACT_SOURCE_AUTHENTICATED_CI_ARTIFACT",
+    "state": "WINDOWS_GATES_PACKAGE_PASS_REMOTE_BYTES_VERIFIED",
     "tests": {
-      "passed": 206,
-      "total": 206
+      "total": 208,
+      "passed": 208,
+      "failed": 0,
+      "skipped": 0,
+      "basis": "HASH_VERIFIED_EXACT_JOB_GATE_OUTPUT"
     },
     "installedJourney": "BLOCKED_NOT_EXECUTED",
-    "remoteCI": "PENDING_EXACT_HEAD"
+    "remoteCI": {
+      "repository": "gitlab.com/juliandatapass-group/datapass-codex-test",
+      "revision": "ceb602bb2a91da92b397c4b2e9610599f020cc8b",
+      "pipelineId": "2940302617",
+      "jobId": "17124779543",
+      "jobUrl": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17124779543",
+      "jobStatus": "success",
+      "attempt": "FIRST_DISPATCH_OBSERVED",
+      "retried": null
+    }
   },
   "featureIds": [
     "CK-001",
@@ -158,12 +168,13 @@
       "role": "DEPENDENCY_ONLY"
     }
   ],
-  "historicalReceipt": "receipt-0.5.0-24a8b3f.json",
-  "reconciledAt": "2026-10-12",
+  "historicalReceipt": "receipt-0.5.1-25143d5.json",
+  "reconciledAt": "2026-10-13",
   "historicalFixtures": [
     "receipt-0.4.14.json",
     "receipt-0.4.15.json",
     "receipt-0.5.0-c5db4a1.json",
-    "receipt-0.5.0-24a8b3f.json"
+    "receipt-0.5.0-24a8b3f.json",
+    "receipt-0.5.1-25143d5.json"
   ]
 }

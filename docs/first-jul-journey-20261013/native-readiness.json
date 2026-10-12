@@ -1,0 +1,85 @@
+{
+  "home": {
+    "schema": "galaxy.native-home-consistency/1",
+    "profileIdentity": "e047a6bc253165bc9faa71a03b17fb74eabc892e9bd167b69ede17be7b716c9b",
+    "version": "0.160.0",
+    "executableSha256": "fdda5fa3cf3fb3d000b876720742857676293e4315e4b045fae6f8bd7e866d1d",
+    "executableBytes": 326872368,
+    "launcher": {
+      "home": "<approved-isolated-user-home>",
+      "codexHome": "<approved-isolated-user-home>/.codex",
+      "credentialStore": "file"
+    },
+    "agent": {
+      "home": "<approved-isolated-user-home>",
+      "codexHome": "<approved-isolated-user-home>/.codex",
+      "credentialStore": "file",
+      "apiVersion": "1.0.2"
+    },
+    "startup": {
+      "home": "<approved-isolated-user-home>/.codex",
+      "localState": "VERIFIED_NO_CUSTOMIZATIONS",
+      "manifestHash": "681be5710eeb40c31887170adaadcdedf793d07d3dbddf4bba91331f3237f7e4",
+      "managedState": "UNKNOWN",
+      "isolationState": "ASSERTED"
+    },
+    "state": "HOME_PATHS_MATCH_EXACT_NATIVE_BINARY_VERIFIED",
+    "preflight": {
+      "schema": "datapass.native-preflight/1",
+      "version": "1.0.2",
+      "state": "BLOCKED",
+      "selectionHash": "09ebfbe66faa2483553b6833e8db907830e388a9b8c8ba6624f9c1ead2cfe9d7",
+      "reasons": [
+        "An independent signed platform verification receipt is required.",
+        "Verified isolated native execution host is required.",
+        "Installed native version lacks a reviewed required capability."
+      ],
+      "verification": {
+        "installed": "EXACT_BINARY_VERIFIED",
+        "configured": "LOCAL_MANIFEST_VERIFIED",
+        "authenticated": "UNKNOWN",
+        "working": "UNKNOWN",
+        "platform": {
+          "state": "UNKNOWN",
+          "issuerId": null,
+          "reason": "An independent signed platform verification receipt is required."
+        },
+        "capabilities": "ASSERTED"
+      },
+      "limitations": [
+        "Provider-owned tools remain unprobed; installed/configured/startup-safe does not certify testing, tool execution, subagent support or account entitlement.",
+        "Native permission requests are refused for native/manual handling."
+      ],
+      "tools": {
+        "policy": "NATIVE_PROVIDER_OWNED_UNPROBED",
+        "toolNames": null,
+        "working": "UNKNOWN",
+        "humanApprovalRoundTrip": "NATIVE_REFUSAL"
+      },
+      "capabilities": {
+        "start": false,
+        "stream": false,
+        "resume": false,
+        "cancel": "OWNED_TURN",
+        "securityRequests": "NATIVE_REFUSAL",
+        "observedIdentity": "PROVIDER_EVIDENCE_ONLY"
+      }
+    },
+    "selectionBasis": "READ_ONLY_PROBE_WITH_UNSELECTED_MODEL_NO_ROLE_BINDING_OR_PLATFORM_GRANT",
+    "liveExecution": "BLOCKED_INDEPENDENT_ISOLATION_UNVERIFIED",
+    "authentication": "NOT_AUTHENTICATED_LAST_OWNER_PROFILE_EVIDENCE_NO_NEW_LOGIN_REQUEST",
+    "credentialPayloadRead": false,
+    "providerTaskStarted": false
+  },
+  "schema": {
+    "schema": "galaxy.installed-native-schema-probe/1",
+    "executableSha256": "fdda5fa3cf3fb3d000b876720742857676293e4315e4b045fae6f8bd7e866d1d",
+    "version": "0.160.0",
+    "command": "codex -c cli_auth_credentials_store=\"file\" app-server generate-json-schema --out <mission-owned schema directory>",
+    "exitCode": 0,
+    "home": "<approved-isolated-user-home>",
+    "codexHome": "<approved-isolated-user-home>/.codex",
+    "providerTaskStarted": false,
+    "credentialsReadByAgent": false
+  }
+}

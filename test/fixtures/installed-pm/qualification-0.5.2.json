@@ -1,0 +1,55 @@
+{
+  "schema": "datapass.pm-product-qualification/1",
+  "sourceSha": "0e961eea5765df70d0e2fe6f9dcb06013c090299",
+  "version": "0.5.2",
+  "gates": [
+    {
+      "command": "npm ci",
+      "exitCode": 0,
+      "logSha256": "a1652f5229be143eaedaa2ecafc5b49bf1d46e67d6bcb46c7f6fbb206f2c5450"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "logSha256": "61c51bc3da28e80fddd860199ebe317956ea8203e87b11212182eb9131dce01f"
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "logSha256": "eda558e0ad912595e13824e503c929fc815dfb9d7d6c51b183254166b46ca2a0"
+    },
+    {
+      "command": "npm run package",
+      "exitCode": 0,
+      "logSha256": "362e2f7e1b72c30ee701281c070aa3cd0a76595faad2854a1a9f1f1b5f731f0f"
+    }
+  ],
+  "tests": {
+    "total": 208,
+    "passed": 208,
+    "failed": 0,
+    "skipped": 0,
+    "basis": "HASH_VERIFIED_EXACT_JOB_GATE_OUTPUT"
+  },
+  "artifacts": [
+    {
+      "filename": "datapass-pm-0.5.2.vsix",
+      "bytes": 1195155,
+      "sha256": "6c76aefe4b8369435cb55f0cdc2e8b0f4ee1b24b5c27ebeeb8c2df76937844fe",
+      "sourceSha": "0e961eea5765df70d0e2fe6f9dcb06013c090299",
+      "os": "Windows",
+      "availability": "EXACT_AUTHENTICATED_JOB_BYTES_VERIFIED"
+    }
+  ],
+  "carrier": {
+    "repository": "gitlab.com/juliandatapass-group/datapass-codex-test",
+    "revision": "ceb602bb2a91da92b397c4b2e9610599f020cc8b",
+    "pipelineId": "2940302617",
+    "jobId": "17124779543",
+    "jobUrl": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17124779543",
+    "jobStatus": "success",
+    "attempt": "FIRST_DISPATCH_OBSERVED",
+    "retried": null
+  },
+  "installedJourney": "BLOCKED_NOT_EXECUTED"
+}

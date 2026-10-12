@@ -1,0 +1,25 @@
+{
+  "schema": "datapass.installed-native-protocol-projection/1",
+  "version": "0.160.0",
+  "executableSha256": "fdda5fa3cf3fb3d000b876720742857676293e4315e4b045fae6f8bd7e866d1d",
+  "source": "Installed codex app-server generate-json-schema; no provider task",
+  "threadStartSchemaSha256": "e9c6d3cc18d049bfbc0249add3808fb8e5a27e1a0b5a423767aafbc3859a9428",
+  "threadResumeSchemaSha256": "c818e26d830ac4430791eab7d4a872d2384fa6006b14c505d8caf46e7e093527",
+  "deltaSchemaSha256": "996e6c0ea65e57bed5a00f410b94381fe5ebf804333e5d00c2b6e6d47e5c55f6",
+  "threadSandboxModes": [
+    "read-only",
+    "workspace-write",
+    "danger-full-access"
+  ],
+  "resumeSandboxModes": [
+    "read-only",
+    "workspace-write",
+    "danger-full-access"
+  ],
+  "deltaRequired": [
+    "delta",
+    "itemId",
+    "threadId",
+    "turnId"
+  ]
+}

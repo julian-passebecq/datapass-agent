@@ -1,4 +1,5 @@
 import * as fs from 'node:fs/promises';
+import {createReadStream} from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { canonicalJson, sha256 } from '../galaxy';
@@ -6,7 +7,7 @@ import { hasLinkedAncestor, isPlausibleLocalPath } from '../util/paths';
 import { NativeStartupManifest, captureNativeStartupManifest, nativeStartupReviewHash } from './nativeStartup';
 import { NativePlatformProof, NativePlatformVerifier, NativePlatformVerification, verifyNativePlatformProof } from './nativePlatform';
 
-export const nativeTransportVersion = '1.0.1' as const;
+export const nativeTransportVersion = '1.0.2' as const;
 export type NativeTransport = 'codex-app-server' | 'codex-cli' | 'claude-cli';
 export interface NativeIdentity { model: string; effort: string | null; accountId: string | null; }
 export interface NativeSelection {
@@ -14,6 +15,8 @@ export interface NativeSelection {
   /** Regular executable, never a shell, script shim, PATH lookup or caller-supplied argv. */
   executable: string; executableSha256: string; nativeVersion: string;
   cwd: string; home: string; hostId: string;
+  /** Explicit provider-state directory; omitted legacy targets use home directly. Never discover credentials. */
+  providerHome?: string;
   permission: 'read-only' | 'workspace-write';
   requestedIdentity: NativeIdentity;
   /** Explicit Config reference to native-name mapping, independently reported by the platform verifier. */
@@ -46,13 +49,18 @@ export function nativeSelectionBinding(selection:NativeSelection):string{
 export const hashOk = (v: unknown): v is string => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v);
 export const nativeIdOk = (v: unknown): v is string => typeof v === 'string' && /^[a-zA-Z0-9._:-]{1,160}$/.test(v);
 const identityOk = (v: unknown): v is string => typeof v === 'string' && /^[a-zA-Z0-9._:/-]{1,160}$/.test(v);
+async function executableHash(file:string,expectedBytes:number):Promise<string>{
+  const hash=createHash('sha256');let bytes=0;
+  for await(const chunk of createReadStream(file)){bytes+=chunk.length;if(bytes>512*1024*1024)throw Error('Executable exceeds bounded verification');hash.update(chunk);}
+  if(bytes!==expectedBytes)throw Error('Executable changed during verification');return hash.digest('hex');
+}
 export function nativeToolPolicy(selection:NativeSelection):{configToolRefs:string[];toolNames:string[]}|null{
   if(selection.transport!=='claude-cli')return null;
   return selection.nativeTools??{configToolRefs:[],toolNames:selection.permission==='read-only'?['Read','Glob','Grep']:['Read','Glob','Grep','Edit','Write']};
 }
 export function validateNativeSelection(s: NativeSelection): boolean {
   return !!s && ['codex-app-server','codex-cli','claude-cli'].includes(s.transport) &&
-    [s.executable,s.cwd,s.home].every(p=>isPlausibleLocalPath(p) && !hasLinkedAncestor(p)) && hashOk(s.executableSha256) && identityOk(s.nativeVersion) && nativeIdOk(s.hostId) &&
+    [s.executable,s.cwd,s.home,...(s.providerHome===undefined?[]:[s.providerHome])].every(p=>isPlausibleLocalPath(p) && !hasLinkedAncestor(p)) && hashOk(s.executableSha256) && identityOk(s.nativeVersion) && nativeIdOk(s.hostId) &&
     ['read-only','workspace-write'].includes(s.permission) && !!s.requestedIdentity && identityOk(s.requestedIdentity.model) && (s.requestedIdentity.effort===null || ['minimal','low','medium','high','xhigh','max'].includes(s.requestedIdentity.effort)) && (s.requestedIdentity.accountId===null || identityOk(s.requestedIdentity.accountId)) &&
     (s.nativeTools===undefined || s.transport==='claude-cli' && !!s.nativeTools && Array.isArray(s.nativeTools.configToolRefs)&&s.nativeTools.configToolRefs.length>0&&s.nativeTools.configToolRefs.length<=20&&s.nativeTools.configToolRefs.every(identityOk)&&Array.isArray(s.nativeTools.toolNames)&&s.nativeTools.toolNames.length>0&&s.nativeTools.toolNames.length<=8&&new Set(s.nativeTools.toolNames).size===s.nativeTools.toolNames.length&&s.nativeTools.toolNames.every(t=>['Read','Glob','Grep','Edit','Write','Bash','Agent','Task'].includes(t))) &&
     !!s.startup && hashOk(s.startup.reviewHash) && hashOk(s.startup.configurationHash) && ['NONE','REVIEWED'].includes(s.startup.hooks) && ['NONE','REVIEWED'].includes(s.startup.mcp) && ['NONE','REVIEWED'].includes(s.startup.managed) && typeof s.startup.isolated==='boolean' && Array.isArray(s.startup.supported) && s.startup.supported.length<=40 && s.startup.supported.every(identityOk);
@@ -61,10 +69,10 @@ export async function preflightNativeTransport(selection: NativeSelection,truste
   const s=structuredClone(selection), reasons:string[]=[];
   let installed:NativePreflight['verification']['installed']='UNKNOWN',configured:NativePreflight['verification']['configured']='UNKNOWN';
   if(!validateNativeSelection(s)) throw Error('Invalid native transport selection.');
-  for(const directory of [s.cwd,s.home]) { try { if(!(await fs.lstat(directory)).isDirectory() || hasLinkedAncestor(directory))reasons.push('Reviewed directories must be real local directories.'); }catch{reasons.push('Reviewed directory is unavailable.');} }
+  for(const directory of [s.cwd,s.home,s.providerHome??s.home]) { try { if(!(await fs.lstat(directory)).isDirectory() || hasLinkedAncestor(directory))reasons.push('Reviewed directories must be real local directories.'); }catch{reasons.push('Reviewed directory is unavailable.');} }
   try {
     const stat=await fs.lstat(s.executable);
-    if(!stat.isFile() || stat.isSymbolicLink() || /\.(cmd|bat|ps1|sh|js|cjs|mjs)$/i.test(s.executable) || stat.size>200*1024*1024 || createHash('sha256').update(await fs.readFile(s.executable)).digest('hex')!==s.executableSha256) reasons.push('Exact native executable hash is unavailable or changed.');else installed='EXACT_BINARY_VERIFIED';
+    if(!stat.isFile() || stat.isSymbolicLink() || /\.(cmd|bat|ps1|sh|js|cjs|mjs)$/i.test(s.executable) || stat.size>512*1024*1024 || await executableHash(s.executable,stat.size)!==s.executableSha256) reasons.push('Exact native executable hash is unavailable or changed.');else installed='EXACT_BINARY_VERIFIED';
   }catch{reasons.push('Exact native executable is unavailable.');}
   const current=await captureNativeStartupManifest(s);
   if(!s.startup.manifest || nativeHash(s.startup.manifest)!==nativeHash(current)||s.startup.configurationHash!==current.manifestHash||s.startup.reviewHash!==nativeStartupReviewHash(s,current))reasons.push('Exact Agent startup manifest/review proof is missing or changed.');
@@ -93,9 +101,9 @@ export function prepareNativeTask(input: NativeTaskInput): PreparedNativeTask {
 export function nativeLaunchArguments(task: PreparedNativeTask, resumeId?:string): string[] {
   const s=task.selection;
   if(resumeId!==undefined && !nativeIdOk(resumeId))throw Error('Invalid owned native session.');
-  if(s.transport==='codex-app-server')return ['app-server','--listen','stdio://'];
+  if(s.transport==='codex-app-server')return ['-c','cli_auth_credentials_store="file"','app-server','--listen','stdio://'];
   if(s.transport==='codex-cli') {
-    const args=['exec',...(resumeId?['resume',resumeId]:[]),'--json','-c','approval_policy="never"','-c',`sandbox_mode="${s.permission}"`,'-c','sandbox_workspace_write.network_access=false','--model',s.requestedIdentity.model];
+    const args=['exec',...(resumeId?['resume',resumeId]:[]),'--json','-c','cli_auth_credentials_store="file"','-c','approval_policy="never"','-c',`sandbox_mode="${s.permission}"`,'-c','sandbox_workspace_write.network_access=false','--model',s.requestedIdentity.model];
     if(s.requestedIdentity.effort)args.push('-c',`model_reasoning_effort="${s.requestedIdentity.effort}"`);
     return [...args,'-'];
   }
@@ -104,5 +112,6 @@ export function nativeLaunchArguments(task: PreparedNativeTask, resumeId?:string
 }
 /** Deliberately no inherited PATH, credentials, command hooks, agents or token environment. Native owns auth in reviewed home. */
 export function nativeEnvironment(selection:NativeSelection): NodeJS.ProcessEnv {
-  return {HOME:selection.home,USERPROFILE:selection.home,CODEX_HOME:selection.home,CLAUDE_CONFIG_DIR:selection.home,...(process.platform==='win32'?{SystemRoot:process.env.SystemRoot}:{} )};
+  const providerHome=selection.providerHome??selection.home;
+  return {HOME:selection.home,USERPROFILE:selection.home,CODEX_HOME:providerHome,CLAUDE_CONFIG_DIR:providerHome,...(process.platform==='win32'?{SystemRoot:process.env.SystemRoot}:{} )};
 }

@@ -1,0 +1,7 @@
+# First real Jul journey
+
+Owner approved this bounded continuation in chat 01a131bc-6180-7bb1-afc1-fd83729776a5 on 13 October 2026 (Europe/Zurich); native message ID unknown. Previous writer finished; original worktrees and dedicated branches were clean at PM066215c and Agentdb8c216. Reuse Config7d08098, Lens95ebd7e, carrier2940115143 and prior Computer Use evidence. No global audit or profile recreation.
+
+Implement and verify explicit isolated provider-home selection, safe streamed reply integration and existing recovery. A read-only Codex task and one owned continuation are conditional on owner authentication and independently verified execution isolation. No second write task, trust/permission change, isolation bypass, active-desktop control, raw history, merge or deployment. The existing profile has path isolation only; actual installed GUI and provider execution remain BLOCKED. Sign-in alone cannot clear that gate.
+
+Authorized evidence filesets: each product docs/first-jul-journey-20261013/** and Archive workflow/2026-10-12/COCKPIT-NATIVE-20261009-FULL/first-jul-journey-20261013/**. Existing package upgrades and synthetic workspace configuration are authorized. Affected tests plus mandatory changed-product CI; ordinary pushes and existing drafts only. Synchronize may adopt the published mission package into the test workspace without executing its contents. Preserve219/63/30 criteria and all historical evidence.

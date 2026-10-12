@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
+import {readFileSync} from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { EventEmitter } from 'node:events';
@@ -40,11 +41,12 @@ function fakeSpawn(process:FakeProcess,onInput?:(chunk:string)=>void){
   const fn=((executable:string,argv:string[],options:any)=>{launches.push({executable,argv,options});if(onInput)process.stdin.on('data',b=>onInput(b.toString()));setImmediate(()=>process.emit('spawn'));return process;}) as unknown as typeof spawn;
   return {fn,launches};
 }
+const installedProtocol=JSON.parse(readFileSync(path.resolve('test/fixtures/native-protocol/codex-0.160.0.json'),'utf8'));
 function appProtocol(process:FakeProcess,options:{fail?:boolean;security?:boolean;resume?:string}={}){
   const messages:any[]=[];
   const fake=fakeSpawn(process,chunk=>{for(const line of chunk.trim().split('\n')){const m=JSON.parse(line);messages.push(m);
     if(m.id===0)process.record({id:0,result:{userAgent:'fixture'}});
-    if(m.id===1)process.record({id:1,result:{thread:{id:options.resume??'owned-session'},model:'native-reported-model'}});
+    if(m.id===1){assert.ok((options.resume?installedProtocol.resumeSandboxModes:installedProtocol.threadSandboxModes).includes(m.params.sandbox),'Request must match the installed native thread sandbox enum');process.record({id:1,result:{thread:{id:options.resume??'owned-session'},model:'native-reported-model'}});}
     if(m.id===2){process.record({id:2,result:{turn:{id:'owned-turn',status:'inProgress'}}});
       if(options.security){process.record({id:99,method:'item/permissions/requestApproval',params:{threadId:'owned-session',turnId:'owned-turn'}});continue;}
       process.record({method:'item/agentMessage/delta',params:{threadId:'owned-session',turnId:'owned-turn',delta:'sk-proj-PARTIAL_SECRET_FRAGMENT'}});
@@ -197,4 +199,27 @@ test('explicit Config mapped native tools are signed and never auto-approved; us
     const drift=structuredClone(selected);drift.nativeTools!.toolNames.push('Write');assert.equal((await preflightNativeTransport(drift,f.keys)).state,'BLOCKED','Tool mapping must retain independently signed policy');
     const defaultCheck=await preflightNativeTransport(f.selection,f.keys);assert.equal(defaultCheck.tools.policy,'RESTRICTED_DEFAULT_UNPROBED');assert.ok(defaultCheck.limitations.some(s=>s.includes('no verified human')));
   }finally{await f.cleanup();}
+});
+
+
+test('Separate provider home binds the same Codex state directory as owner sign-in and keeps legacy homes explicit',async()=>{
+ const f=await fixture();try{
+  const providerHome=path.join(f.selection.home,'.codex');await fs.mkdir(providerHome);await fs.writeFile(path.join(f.selection.home,'config.toml'),'unknown_parent_setting=true\n');await fs.writeFile(path.join(providerHome,'config.toml'),'model="fixture"\n');await fs.writeFile(path.join(providerHome,'auth.json'),'SYNTHETIC_PRIVATE_CREDENTIAL_NEVER_READ');
+  const selection=await f.seal({...f.selection,providerHome});const env=nativeEnvironment(selection);assert.equal(env.HOME,f.selection.home);assert.equal(env.CODEX_HOME,providerHome);assert.equal(selection.startup.manifest!.home,providerHome);assert.equal((await preflightNativeTransport(selection,f.keys)).state,'READY');assert.doesNotMatch(JSON.stringify(selection.startup.manifest),/SYNTHETIC_PRIVATE/);
+  assert.equal(nativeEnvironment(f.selection).CODEX_HOME,f.selection.home);assert.equal((await preflightNativeTransport({...selection,providerHome:f.selection.home},f.keys)).state,'BLOCKED');
+  for(const transport of ['codex-cli','codex-app-server'] as const)assert.ok(nativeLaunchArguments(prepareNativeTask({...f.input,selection:{...selection,transport}})).includes('cli_auth_credentials_store="file"'));
+ }finally{await f.cleanup();}
+});
+
+test('Owned Codex text streams complete redacted lines before terminal completion and preserves the final receipt',async()=>{
+ const f=await fixture();const process=new FakeProcess();let runner:NativeTaskRunner|undefined;try{
+  const fake=fakeSpawn(process,chunk=>{for(const line of chunk.trim().split('\n')){const m=JSON.parse(line);if(m.id===0)process.record({id:0,result:{}});if(m.id===1)process.record({id:1,result:{thread:{id:'stream-session'},model:'observed-model'}});if(m.id===2)process.record({id:2,result:{turn:{id:'stream-turn'}}});}});
+  runner=new NativeTaskRunner(f.ledger,fake.fn,()=>f.keys);const task=prepareNativeTask(f.input),handle=await runner.start(task,task.preparedHash),events:any[]=[];handle.subscribe(e=>events.push(e));
+  const until=async(check:()=>boolean)=>{for(let i=0;i<1000&&!check();i++)await new Promise(r=>setTimeout(r,5));assert.ok(check(),'Expected owned stream update');};await until(()=>handle.observation().turnId==='stream-turn');
+  const delta=(text:string,threadId='stream-session')=>process.record({method:'item/agentMessage/delta',params:{threadId,turnId:'stream-turn',itemId:'reply',delta:text}});
+  delta('EXCLUDED_OUTSIDE\n','foreign-session');delta('First answer line.\napi_');await until(()=>handle.observation().resultText==='First answer line.\n');assert.equal(handle.observation().state,'RUNNING');assert.equal(handle.observation().evidence,'NO_COMPLETION_EVIDENCE');
+  delta('key=PRIVATE_');delta('SECRET_VALUE\nSecond line');await until(()=>handle.observation().resultText.includes('[REDACTED]'));assert.doesNotMatch(JSON.stringify(events),/PRIVATE_|SECRET_VALUE|EXCLUDED_OUTSIDE/);
+  process.record({method:'item/completed',params:{threadId:'stream-session',turnId:'stream-turn',item:{id:'reply',type:'agentMessage',text:'First answer line.\napi_key=PRIVATE_SECRET_VALUE\nSecond line.'}}});delta('LATE_REWRITE\n');
+  process.record({method:'turn/completed',params:{threadId:'stream-session',turn:{id:'stream-turn',status:'completed'}}});const result=await handle.result;assert.equal(result.state,'COMPLETED');assert.match(result.resultText,/Second line\.$/);assert.doesNotMatch(JSON.stringify(events),/PRIVATE_|SECRET_VALUE|LATE_REWRITE/);assert.equal(result.observedIdentity.model,'observed-model');assert.deepEqual(await runner.lookup(task.taskId),result);
+ }finally{process.emit('close',1,null);await runner?.dispose();await new Promise(r=>setTimeout(r,30));await f.cleanup();}
 });

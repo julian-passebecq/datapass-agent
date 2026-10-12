@@ -1,0 +1,85 @@
+{
+  "schema": "galaxy.first-jul-synchronize/1",
+  "state": "REAL_PUBLISHED_PACKAGE_ADOPTED_BY_PRODUCTION_CORE",
+  "productSource": "0e961eea5765df70d0e2fe6f9dcb06013c090299",
+  "reference": {
+    "repository": "julian-passebecq/galaxy-archive",
+    "revision": "c324fb131953dc20266f5e752f7b649dd5c0fa7a",
+    "directory": "workflow/2026-10-12/COCKPIT-NATIVE-20261009-FULL/continuation-pm051",
+    "manifestHash": "aa63f7ec43a6775c4575d4c98282f31ee30e0d50ebd950d02de3a3269985f791",
+    "sourceVectorHash": "9520d208f913e2f07b87d8f8a0c830a2694a0345c5b1a36bc6af19a2475308ec"
+  },
+  "checkpointHash": "966158776aceeb330d6b7188d5e13a3d5093e7a5a15b4e4ad393ab95f58e6e65",
+  "verifiedFiles": 8,
+  "changes": [
+    {
+      "file": ".gitattributes",
+      "state": "NEW",
+      "before": null,
+      "after": "705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da"
+    },
+    {
+      "file": "OUTCOME.md",
+      "state": "NEW",
+      "before": null,
+      "after": "5b8b084115b0cbf371018609bf8b868d2cacb2484a46b7450dde00f566e440cb"
+    },
+    {
+      "file": "RESUME.md",
+      "state": "NEW",
+      "before": null,
+      "after": "a33270b9240614ba930f819f59f667dc69a958d4039cc47aad220338f0241bf4"
+    },
+    {
+      "file": "SOURCE-VECTOR.json",
+      "state": "NEW",
+      "before": null,
+      "after": "9520d208f913e2f07b87d8f8a0c830a2694a0345c5b1a36bc6af19a2475308ec"
+    },
+    {
+      "file": "START.md",
+      "state": "NEW",
+      "before": null,
+      "after": "3a91624c3543ec0ffc127233b797bf5e37a77d6ed9fd708ed5cc3eaa337d52d2"
+    },
+    {
+      "file": "affected-dispositions.csv",
+      "state": "NEW",
+      "before": null,
+      "after": "b5677df33c7a043026f0ecf5d65eb357b65ecb4f79df37c142cefe3be1559c96"
+    },
+    {
+      "file": "remaining-gates.json",
+      "state": "NEW",
+      "before": null,
+      "after": "3268a4ecfa275f78d26e75141a789828a1296b6fd9a0b72d7ca9055a6805cedb"
+    },
+    {
+      "file": "source-channel-verification.json",
+      "state": "NEW",
+      "before": null,
+      "after": "672be27a93aa1fa1ab4ca695da2d6d36b3b379469c9e99d4817732be22e5cb1a"
+    }
+  ],
+  "preview": {
+    "path": "OUTCOME.md",
+    "sha256": "5b8b084115b0cbf371018609bf8b868d2cacb2484a46b7450dde00f566e440cb"
+  },
+  "adoption": {
+    "authorization": "Explicit current owner approval",
+    "textHash": "6fb15c182d6c217efd55ed2c5de0d0b8d156d8b0d441f23dbe7727a122a31d62",
+    "binding": {
+      "actingView": "synthetic-qualification",
+      "scopeHash": "848c1e971682bc01b0f2cb5ad31bb7d09f65165ca7f65a570cd54985ab8a9ec2",
+      "scopeSourceVectorHash": "9520d208f913e2f07b87d8f8a0c830a2694a0345c5b1a36bc6af19a2475308ec",
+      "policyHash": "6059002b739114739387fa51a8063a7d76fcec104634d194223f7ae80013ade3",
+      "bindingHash": "ab2c836af331ce69ca0e41c8fd5ccceddde17380a9b534fffdc3d5af7f8d668e"
+    },
+    "recovered": true,
+    "destination": "prepared synthetic workspace/.datapass/first-jul-journey-20261013/adopted-source-instruction.json"
+  },
+  "installedGui": "BLOCKED_NOT_EXECUTED",
+  "providerTasks": 0,
+  "runningSessionsChanged": false,
+  "appGlobalStateChanged": false
+}

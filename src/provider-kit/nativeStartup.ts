@@ -15,8 +15,8 @@ export interface NativeStartupManifest {
 }
 const hash=(value:unknown)=>sha256(canonicalJson(value));
 /** Fixed startup inventory only. No CLI, auth store, history, arbitrary file path or payload projection. */
-export async function captureNativeStartupManifest(selection:Pick<NativeSelection,'transport'|'cwd'|'home'>):Promise<NativeStartupManifest>{
-  const s=structuredClone(selection);
+export async function captureNativeStartupManifest(selection:Pick<NativeSelection,'transport'|'cwd'|'home'|'providerHome'>):Promise<NativeStartupManifest>{
+  const s={...structuredClone(selection),home:selection.providerHome??selection.home};
   if(!s || !['codex-app-server','codex-cli','claude-cli'].includes(s.transport) || ![s.cwd,s.home].every(p=>isPlausibleLocalPath(p)&&!hasLinkedAncestor(p)))throw Error('Invalid bounded startup inventory.');
   const files:NativeStartupManifest['files']=[],directories:NativeStartupManifest['directories']=[],issues:string[]=[];
   const codex=s.transport!=='claude-cli';
