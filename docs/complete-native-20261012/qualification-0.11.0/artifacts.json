@@ -1,0 +1,18 @@
+{
+  "schema": "datapass.agent-native-artifacts/1",
+  "productVersion": "0.11.0",
+  "providerKitVersion": "1.1.0",
+  "nativeTransportVersion": "1.0.0",
+  "artifacts": [
+    {
+      "filename": "agent-vscode-0.11.0.vsix",
+      "bytes": 484361,
+      "sha256": "a645db5e7c1da13f7dbb4144c068b475f2da1626e3f8e1bacdd08700b8c38a32"
+    },
+    {
+      "filename": "datapass-provider-kit-1.1.0.tgz",
+      "bytes": 49156,
+      "sha256": "9e562bdba1c6bf3ea73459910cfc0e7e0152f5d5ccfd9b9eb29b0d09fa469855"
+    }
+  ]
+}

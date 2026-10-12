@@ -1,0 +1,101 @@
+{
+  "schema": "datapass.provider-kit-owner-receipt/1",
+  "repository": "julian-passebecq/agent-vscode",
+  "sourceSha": "22ce5dd07e2fc1c042a9fdf155bfc213418f326a",
+  "sourceTree": "7e12080a2712fbd8d97445e4ef49da1106147073",
+  "productVersion": "0.11.0",
+  "providerKitVersion": "1.1.0",
+  "nativeTransportVersion": "1.0.0",
+  "artifact": {
+    "filename": "datapass-provider-kit-1.1.0.tgz",
+    "bytes": 49156,
+    "sha256": "9e562bdba1c6bf3ea73459910cfc0e7e0152f5d5ccfd9b9eb29b0d09fa469855"
+  },
+  "productArtifact": {
+    "filename": "agent-vscode-0.11.0.vsix",
+    "bytes": 484361,
+    "sha256": "a645db5e7c1da13f7dbb4144c068b475f2da1626e3f8e1bacdd08700b8c38a32"
+  },
+  "sourceInputs": [
+    {
+      "path": "src/provider-kit/index.ts",
+      "gitBlobSha256": "bcca51fd8244fefd9e2e81eb60f57058191876a636e161af3447297de2e0dd7c",
+      "bytes": 3835
+    },
+    {
+      "path": "src/provider-kit/nativeTransport.ts",
+      "gitBlobSha256": "d50eb02e2329182d9e81eb9ca3b0fc1792b85d12efa27d37aa56560c4b69ea10",
+      "bytes": 7958
+    },
+    {
+      "path": "src/provider-kit/nativeRunner.ts",
+      "gitBlobSha256": "8e0fcb050d61862f89e5f9457214f6c0c2e0c2f828a11ad1fb0a2d4bc8218795",
+      "bytes": 19315
+    },
+    {
+      "path": "src/provider-kit/nativeFacade.ts",
+      "gitBlobSha256": "65378c7c3a483db4da0d9eaa91780044bd8521501bcdb09fe603cbf6f8e2cf6d",
+      "bytes": 10264
+    },
+    {
+      "path": "src/provider-kit/nativeProjectScope.ts",
+      "gitBlobSha256": "7de852c09878294ac77ff41a8951dc7b0a060a5749fa2138a56c850a00184813",
+      "bytes": 3230
+    },
+    {
+      "path": "src/extension.ts",
+      "gitBlobSha256": "9533dbb5859e1a7ea75a30643eaddb1cd79ab7a7adfc5335d1fb7ada2feb61f2",
+      "bytes": 16352
+    },
+    {
+      "path": "src/render/views.ts",
+      "gitBlobSha256": "e79f79d6bbd330147bf19ae356531d0377a24a639139f1639d778c425ae2c019",
+      "bytes": 26212
+    },
+    {
+      "path": "scripts/build-provider-kit.mjs",
+      "gitBlobSha256": "4957972e652378c084ee868cd473e718b4991585cf4250c1b710b68881080457",
+      "bytes": 3566
+    },
+    {
+      "path": "package.json",
+      "gitBlobSha256": "62ef56cf55d6122a9b8226b1a7b4487309f76b9cf55f3a233360242094d323b0",
+      "bytes": 26590
+    },
+    {
+      "path": "package-lock.json",
+      "gitBlobSha256": "f4c4fcb13dea544fc7cd67e8efc6d2e5aa14e6c308dbbeb6676a354b8e1c3fe8",
+      "bytes": 151510
+    },
+    {
+      "path": "test/nativeTransport.test.ts",
+      "gitBlobSha256": "10b89eafaad2a02b00db0a62f2d026d0ecb8c3d13aedd80146d141fc600516d0",
+      "bytes": 20400
+    },
+    {
+      "path": "test/render.test.ts",
+      "gitBlobSha256": "289082c344b0fe30fee4bac09709c1e50b40509e97af591423c0a991bdb5ee80",
+      "bytes": 10556
+    }
+  ],
+  "qa": {
+    "receipt": "qa-receipt.json",
+    "sha256": "1bf16d106885819991616869a32ed8783ce4395e96b1cd5e18c902b98d45d11a",
+    "fullTests": {
+      "pass": 480,
+      "total": 480
+    },
+    "targetedTests": {
+      "pass": 24,
+      "total": 24
+    },
+    "forcedEnCH": {
+      "pass": 11,
+      "total": 11
+    },
+    "nativeProviderTasks": 0,
+    "installedGuiJourney": "BLOCKED_NOT_EXECUTED",
+    "liveAccounts": "UNQUALIFIED"
+  },
+  "privacy": "Synthetic fixtures and sanitized product-owned evidence; no owner history, reasoning, credentials or desktop captures."
+}

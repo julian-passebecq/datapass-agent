@@ -1,17 +1,22 @@
 [
   {
-    "id": "@datapass/provider-kit@1.1.0",
+    "id": "@datapass/provider-kit@1.1.1",
     "name": "@datapass/provider-kit",
-    "version": "1.1.0",
-    "size": 49156,
-    "unpackedSize": 172807,
-    "shasum": "11244b2609389c1d3b97a2dea3f2d5185b822c25",
-    "integrity": "sha512-RontgPMd29dBlMKebepB+29FB6VP6ypTJoFxUh4Urlmoe9O/ZHG58cY99pmBRJ1/nkX8uHByzEqF+vvT80LEGA==",
-    "filename": "datapass-provider-kit-1.1.0.tgz",
+    "version": "1.1.1",
+    "size": 56640,
+    "unpackedSize": 199843,
+    "shasum": "adc2cfc461d05112f219b24a58e2554e386b4735",
+    "integrity": "sha512-6ofys5tUhxMKzu3aT/+O14vTopl+Qouhp3CDe9oy4eX3mqKfUFgnbadaop4hYkNzv/hzEe10li0sJAACuXtiNw==",
+    "filename": "datapass-provider-kit-1.1.1.tgz",
     "files": [
       {
+        "path": "NATIVE-STARTUP-PROOF.md",
+        "size": 5431,
+        "mode": 420
+      },
+      {
         "path": "NATIVE-TRANSPORT.md",
-        "size": 6951,
+        "size": 8078,
         "mode": 420
       },
       {
@@ -26,12 +31,12 @@
       },
       {
         "path": "index.cjs",
-        "size": 101442,
+        "size": 116711,
         "mode": 420
       },
       {
         "path": "package.json",
-        "size": 436,
+        "size": 467,
         "mode": 420
       },
       {
@@ -91,12 +96,17 @@
       },
       {
         "path": "types/provider-kit/index.d.ts",
-        "size": 1590,
+        "size": 1657,
         "mode": 420
       },
       {
         "path": "types/provider-kit/nativeFacade.d.ts",
-        "size": 2827,
+        "size": 3185,
+        "mode": 420
+      },
+      {
+        "path": "types/provider-kit/nativePlatform.d.ts",
+        "size": 1897,
         "mode": 420
       },
       {
@@ -106,12 +116,17 @@
       },
       {
         "path": "types/provider-kit/nativeRunner.d.ts",
-        "size": 2186,
+        "size": 2447,
+        "mode": 420
+      },
+      {
+        "path": "types/provider-kit/nativeStartup.d.ts",
+        "size": 1166,
         "mode": 420
       },
       {
         "path": "types/provider-kit/nativeTransport.d.ts",
-        "size": 2859,
+        "size": 4288,
         "mode": 420
       },
       {
@@ -130,7 +145,7 @@
         "mode": 420
       }
     ],
-    "entryCount": 24,
+    "entryCount": 27,
     "bundled": []
   }
 ]

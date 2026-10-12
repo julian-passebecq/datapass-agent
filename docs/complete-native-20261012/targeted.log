@@ -2,153 +2,177 @@ TAP version 13
 # Subtest: native preflight is inert and exact binary/startup/capability mismatches block
 ok 1 - native preflight is inert and exact binary/startup/capability mismatches block
   ---
-  duration_ms: 506.5247
+  duration_ms: 874.4969
   type: 'test'
   ...
 # Subtest: native commands have no caller shell/argv/env or credential inheritance
 ok 2 - native commands have no caller shell/argv/env or credential inheritance
   ---
-  duration_ms: 93.8547
+  duration_ms: 236.4339
   type: 'test'
   ...
 # Subtest: owned app-server handshake, exact task, sanitized streams, completed ledger and duplicate refusal
 ok 3 - owned app-server handshake, exact task, sanitized streams, completed ledger and duplicate refusal
   ---
-  duration_ms: 308.5383
+  duration_ms: 666.8819
   type: 'test'
   ...
 # Subtest: native failure/security refusal cannot become success or approval
 ok 4 - native failure/security refusal cannot become success or approval
   ---
-  duration_ms: 407.5804
+  duration_ms: 976.0508
   type: 'test'
   ...
 # Subtest: uncertain durable intent blocks blind retries and reload does not claim stopped
 ok 5 - uncertain durable intent blocks blind retries and reload does not claim stopped
   ---
-  duration_ms: 311.7103
+  duration_ms: 631.9119
   type: 'test'
   ...
 # Subtest: owned completed session can resume; changed target/permission/Config binding cannot
 ok 6 - owned completed session can resume; changed target/permission/Config binding cannot
   ---
-  duration_ms: 422.727
+  duration_ms: 915.2297
   type: 'test'
   ...
 # Subtest: codex-cli requires native completion AND zero exit; requested identity never inferred
 ok 7 - codex-cli requires native completion AND zero exit; requested identity never inferred
   ---
-  duration_ms: 399.6394
+  duration_ms: 1044.6918
   type: 'test'
   ...
 # Subtest: claude-cli requires native completion AND zero exit; requested identity never inferred
 ok 8 - claude-cli requires native completion AND zero exit; requested identity never inferred
   ---
-  duration_ms: 386.631
+  duration_ms: 1024.4807
   type: 'test'
   ...
 # Subtest: host facade requires independent exact approval, scope/epoch guards and own Config role association
 ok 9 - host facade requires independent exact approval, scope/epoch guards and own Config role association
   ---
-  duration_ms: 344.7379
+  duration_ms: 609.9255
   type: 'test'
   ...
 # Subtest: empty owned project receives a separate reviewed execution scope; Git/root/revision and trust are verified
 ok 10 - empty owned project receives a separate reviewed execution scope; Git/root/revision and trust are verified
   ---
-  duration_ms: 2386.0481
+  duration_ms: 2304.0747
   type: 'test'
   ...
 # Subtest: durable native writer lease excludes same repo, linked worktrees and proven same-origin clones; uncertainty retains lease
 ok 11 - durable native writer lease excludes same repo, linked worktrees and proven same-origin clones; uncertainty retains lease
   ---
-  duration_ms: 2275.8742
+  duration_ms: 2614.7201
   type: 'test'
   ...
 # Subtest: proven native completed write releases lease for a newly reviewed owned task
 ok 12 - proven native completed write releases lease for a newly reviewed owned task
   ---
-  duration_ms: 1017.2846
+  duration_ms: 1497.2065
+  type: 'test'
+  ...
+# Subtest: startup manifest missing/drifted config and untrusted/expired platform proof cannot create native process
+ok 13 - startup manifest missing/drifted config and untrusted/expired platform proof cannot create native process
+  ---
+  duration_ms: 1065.2053
+  type: 'test'
+  ...
+# Subtest: current hook/MCP/plugin/inherited coverage blocks; auth/history bytes are never part of the startup manifest
+ok 14 - current hook/MCP/plugin/inherited coverage blocks; auth/history bytes are never part of the startup manifest
+  ---
+  duration_ms: 648.6403
+  type: 'test'
+  ...
+# Subtest: proof drift after intent/lease work is checked again immediately before process creation
+ok 15 - proof drift after intent/lease work is checked again immediately before process creation
+  ---
+  duration_ms: 466.7034
+  type: 'test'
+  ...
+# Subtest: explicit Config mapped native tools are signed and never auto-approved; usability remains unknown
+ok 16 - explicit Config mapped native tools are signed and never auto-approved; usability remains unknown
+  ---
+  duration_ms: 667.3492
   type: 'test'
   ...
 # Subtest: standalone kit uses the Agent collector, stable safe hashes and no history/secret payloads
-ok 13 - standalone kit uses the Agent collector, stable safe hashes and no history/secret payloads
+ok 17 - standalone kit uses the Agent collector, stable safe hashes and no history/secret payloads
   ---
-  duration_ms: 186.5676
+  duration_ms: 267.6178
   type: 'test'
   ...
 # Subtest: webview page has strict CSP with nonce and no remote/eval sources
-ok 14 - webview page has strict CSP with nonce and no remote/eval sources
+ok 18 - webview page has strict CSP with nonce and no remote/eval sources
   ---
-  duration_ms: 1.3644
+  duration_ms: 1.8861
   type: 'test'
   ...
 # Subtest: webview messages are validated
-ok 15 - webview messages are validated
+ok 19 - webview messages are validated
   ---
-  duration_ms: 0.8107
+  duration_ms: 1.2693
   type: 'test'
   ...
 # Subtest: rendered provider text is escaped (no HTML/script injection from titles or commands)
-ok 16 - rendered provider text is escaped (no HTML/script injection from titles or commands)
+ok 20 - rendered provider text is escaped (no HTML/script injection from titles or commands)
   ---
-  duration_ms: 21.7033
+  duration_ms: 26.7867
   type: 'test'
   ...
 # Subtest: ended without commit is not FAILED
-ok 17 - ended without commit is not FAILED
+ok 21 - ended without commit is not FAILED
   ---
-  duration_ms: 0.3634
+  duration_ms: 0.4411
   type: 'test'
   ...
 # Subtest: cockpit: counts, provider not detected state, recent list
-ok 18 - cockpit: counts, provider not detected state, recent list
+ok 22 - cockpit: counts, provider not detected state, recent list
   ---
-  duration_ms: 0.4347
+  duration_ms: 0.5406
   type: 'test'
   ...
 # Subtest: graph: worker edges only where the provider exposed a parent
-ok 19 - graph: worker edges only where the provider exposed a parent
+ok 23 - graph: worker edges only where the provider exposed a parent
   ---
-  duration_ms: 0.5785
+  duration_ms: 0.6598
   type: 'test'
   ...
 # Subtest: activity: weekly rollup, no productivity score
-ok 20 - activity: weekly rollup, no productivity score
+ok 24 - activity: weekly rollup, no productivity score
   ---
-  duration_ms: 0.7158
+  duration_ms: 1.0322
   type: 'test'
   ...
 # Subtest: timeline renders chronologically with day headers
-ok 21 - timeline renders chronologically with day headers
+ok 25 - timeline renders chronologically with day headers
   ---
-  duration_ms: 0.3249
+  duration_ms: 0.6422
   type: 'test'
   ...
 # Subtest: inspector: State (permission mode, current tool), Usage, Related, honest end and test verdicts
-ok 22 - inspector: State (permission mode, current tool), Usage, Related, honest end and test verdicts
+ok 26 - inspector: State (permission mode, current tool), Usage, Related, honest end and test verdicts
   ---
-  duration_ms: 3.8126
+  duration_ms: 6.4578
   type: 'test'
   ...
 # Subtest: inspector usage preserves exact provider values in en-CH
-ok 23 - inspector usage preserves exact provider values in en-CH
+ok 27 - inspector usage preserves exact provider values in en-CH
   ---
-  duration_ms: 0.906
+  duration_ms: 1.4799
   type: 'test'
   ...
 # Subtest: inspector usage preserves exact provider values in en-US
-ok 24 - inspector usage preserves exact provider values in en-US
+ok 28 - inspector usage preserves exact provider values in en-US
   ---
-  duration_ms: 0.5551
+  duration_ms: 0.8287
   type: 'test'
   ...
-1..24
-# tests 24
+1..28
+# tests 28
 # suites 0
-# pass 24
+# pass 28
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 9009.0187
+# duration_ms 16445.9437

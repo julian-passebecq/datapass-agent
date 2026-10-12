@@ -1,15 +1,16 @@
 {
-  "schema": "datapass.agent-native-package-verification/1",
-  "manifestVersion": "0.11.0",
-  "entrypointMatchesBuiltSource": true,
-  "entries": {
-    "extension/package.json": {
-      "bytes": 26590,
-      "sha256": "62ef56cf55d6122a9b8226b1a7b4487309f76b9cf55f3a233360242094d323b0"
-    },
-    "extension/dist/extension.js": {
-      "bytes": 1303030,
-      "sha256": "ced569dba71106d49233b31d816c8e7726dcd54d22ee7d66e707a0de228295e7"
-    }
+  "sourceSha": "62a072f0af69352c0bd93855ec30cfb1b2bac4f7",
+  "productArtifact": {
+    "filename": "agent-vscode-0.11.1.vsix",
+    "bytes": 488400,
+    "sha256": "e356c1ced50717c0601b0d027403fbacec5fb17e683423953cc09aef84dbbf34"
+  },
+  "manifestVersion": "0.11.1",
+  "bundleSha256": "31ca8f9776a5f6b98de3067d059a2a7f54aaaba0cd2abb406ad9efdefb9ba333",
+  "matchesBuild": true,
+  "kitArtifact": {
+    "filename": "datapass-provider-kit-1.1.1.tgz",
+    "bytes": 56640,
+    "sha256": "9330717566ebdfa1fbee19eb219c96dde78fdf3c594761605f576a1f617e1e4f"
   }
 }

@@ -1,18 +1,23 @@
 {
-  "schema": "datapass.agent-native-artifacts/1",
-  "productVersion": "0.11.0",
-  "providerKitVersion": "1.1.0",
-  "nativeTransportVersion": "1.0.0",
-  "artifacts": [
-    {
-      "filename": "agent-vscode-0.11.0.vsix",
-      "bytes": 484361,
-      "sha256": "a645db5e7c1da13f7dbb4144c068b475f2da1626e3f8e1bacdd08700b8c38a32"
-    },
-    {
-      "filename": "datapass-provider-kit-1.1.0.tgz",
-      "bytes": 49156,
-      "sha256": "9e562bdba1c6bf3ea73459910cfc0e7e0152f5d5ccfd9b9eb29b0d09fa469855"
-    }
-  ]
+  "sourceSha": "62a072f0af69352c0bd93855ec30cfb1b2bac4f7",
+  "sourceArchive": {
+    "format": "git archive --format=tar",
+    "sha256": "d5f0394dce962e73e088abb0a99b347c7b7cee370b3c1d74d9f4c09ce7534906",
+    "bytes": 7854080
+  },
+  "artifact": {
+    "filename": "datapass-provider-kit-1.1.1.tgz",
+    "bytes": 56640,
+    "sha256": "9330717566ebdfa1fbee19eb219c96dde78fdf3c594761605f576a1f617e1e4f"
+  },
+  "productArtifact": {
+    "filename": "agent-vscode-0.11.1.vsix",
+    "bytes": 488400,
+    "sha256": "e356c1ced50717c0601b0d027403fbacec5fb17e683423953cc09aef84dbbf34"
+  },
+  "paths": {
+    "nativeToolkit": "docs/complete-native-20261012/datapass-provider-kit-1.1.1.tgz",
+    "productPackage": "D:\\PROJ\\.cockpit-integration\\COMPLETE-NATIVE-20261012\\qualification\\agent-62a072f-windows-final\\agent-vscode-0.11.1.vsix"
+  },
+  "scope": "Clean producer-source mandatory gates; reporting wrapper separately published. Native GUI/accounts/platform unqualified."
 }

@@ -1,0 +1,136 @@
+[
+  {
+    "id": "@datapass/provider-kit@1.1.0",
+    "name": "@datapass/provider-kit",
+    "version": "1.1.0",
+    "size": 49156,
+    "unpackedSize": 172807,
+    "shasum": "11244b2609389c1d3b97a2dea3f2d5185b822c25",
+    "integrity": "sha512-RontgPMd29dBlMKebepB+29FB6VP6ypTJoFxUh4Urlmoe9O/ZHG58cY99pmBRJ1/nkX8uHByzEqF+vvT80LEGA==",
+    "filename": "datapass-provider-kit-1.1.0.tgz",
+    "files": [
+      {
+        "path": "NATIVE-TRANSPORT.md",
+        "size": 6951,
+        "mode": 420
+      },
+      {
+        "path": "README.md",
+        "size": 931,
+        "mode": 420
+      },
+      {
+        "path": "capture.schema.json",
+        "size": 2216,
+        "mode": 420
+      },
+      {
+        "path": "index.cjs",
+        "size": 101442,
+        "mode": 420
+      },
+      {
+        "path": "package.json",
+        "size": 436,
+        "mode": 420
+      },
+      {
+        "path": "types/cockpit/configuration.d.ts",
+        "size": 1244,
+        "mode": 420
+      },
+      {
+        "path": "types/cockpit/interfaces.d.ts",
+        "size": 7623,
+        "mode": 420
+      },
+      {
+        "path": "types/cockpit/policy.d.ts",
+        "size": 1141,
+        "mode": 420
+      },
+      {
+        "path": "types/cockpit/processMetadata.d.ts",
+        "size": 646,
+        "mode": 420
+      },
+      {
+        "path": "types/cockpit/resources.d.ts",
+        "size": 2194,
+        "mode": 420
+      },
+      {
+        "path": "types/feeds/catalog.d.ts",
+        "size": 6173,
+        "mode": 420
+      },
+      {
+        "path": "types/feeds/settings.d.ts",
+        "size": 4890,
+        "mode": 420
+      },
+      {
+        "path": "types/galaxy/configSnapshot.d.ts",
+        "size": 3665,
+        "mode": 420
+      },
+      {
+        "path": "types/galaxy/index.d.ts",
+        "size": 1249,
+        "mode": 420
+      },
+      {
+        "path": "types/git/git.d.ts",
+        "size": 3158,
+        "mode": 420
+      },
+      {
+        "path": "types/model.d.ts",
+        "size": 11841,
+        "mode": 420
+      },
+      {
+        "path": "types/provider-kit/index.d.ts",
+        "size": 1590,
+        "mode": 420
+      },
+      {
+        "path": "types/provider-kit/nativeFacade.d.ts",
+        "size": 2827,
+        "mode": 420
+      },
+      {
+        "path": "types/provider-kit/nativeProjectScope.d.ts",
+        "size": 810,
+        "mode": 420
+      },
+      {
+        "path": "types/provider-kit/nativeRunner.d.ts",
+        "size": 2186,
+        "mode": 420
+      },
+      {
+        "path": "types/provider-kit/nativeTransport.d.ts",
+        "size": 2859,
+        "mode": 420
+      },
+      {
+        "path": "types/sessions/classify.d.ts",
+        "size": 4829,
+        "mode": 420
+      },
+      {
+        "path": "types/util/paths.d.ts",
+        "size": 898,
+        "mode": 420
+      },
+      {
+        "path": "types/util/redact.d.ts",
+        "size": 1008,
+        "mode": 420
+      }
+    ],
+    "entryCount": 24,
+    "bundled": []
+  }
+]

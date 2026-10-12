@@ -1,9 +1,9 @@
 
-> agent-vscode@0.11.0 package
+> agent-vscode@0.11.1 package
 > npm run build && vsce package --no-dependencies
 
 
-> agent-vscode@0.11.0 build
+> agent-vscode@0.11.1 build
 > node scripts/build.mjs
 
 built dist/extension.js
@@ -11,21 +11,21 @@ built dist/export-conversations.cjs
 built dist/search-knowledge.cjs
 built dist/export-provider-history.cjs
  INFO  Files included in the VSIX:
-agent-vscode-0.11.0.vsix
+agent-vscode-0.11.1.vsix
 ├─ [Content_Types].xml 
 ├─ extension.vsixmanifest 
 └─ extension/
    ├─ LICENSE.md [0.12 KB]
-   ├─ package.json [25.97 KB]
+   ├─ package.json [26.11 KB]
    ├─ readme.md [40.95 KB]
    ├─ dist/
    │  ├─ export-conversations.cjs [24.28 KB]
    │  ├─ export-provider-history.cjs [115.85 KB]
-   │  ├─ extension.js [1.24 MB]
+   │  ├─ extension.js [1.25 MB]
    │  └─ search-knowledge.cjs [11.41 KB]
    └─ media/
       └─ agent.svg [0.32 KB]
 
-The file extension/dist/extension.js is large (1.24 MB)
+The file extension/dist/extension.js is large (1.25 MB)
 
- DONE  Packaged: D:\PROJ\.cockpit-integration\COMPLETE-NATIVE-20261012\worktrees\AGENT\agent-vscode-0.11.0.vsix (10 files, 473.01 KB)
+ DONE  Packaged: D:\PROJ\.cockpit-integration\COMPLETE-NATIVE-20261012\worktrees\AGENT\agent-vscode-0.11.1.vsix (10 files, 476.95 KB)

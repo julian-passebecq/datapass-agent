@@ -1,13 +1,13 @@
 {
   "schema": "datapass.agent-native-qa/1",
   "state": "LOCAL_WINDOWS_MANDATORY_PASS",
-  "startedAt": "2026-10-12T17:15:14.108Z",
-  "completedAt": "2026-10-12T17:16:11.178Z",
+  "startedAt": "2026-10-12T18:21:02.619Z",
+  "completedAt": "2026-10-12T18:22:53.669Z",
   "runtime": {
     "version": "v22.23.3",
     "sha256": "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e"
   },
-  "productVersion": "0.11.0",
+  "productVersion": "0.11.1",
   "gates": [
     {
       "name": "check",
@@ -17,10 +17,10 @@
         "check"
       ],
       "exitCode": 0,
-      "startedAt": "2026-10-12T17:15:14.109Z",
-      "completedAt": "2026-10-12T17:15:19.699Z",
+      "startedAt": "2026-10-12T18:21:02.620Z",
+      "completedAt": "2026-10-12T18:21:13.327Z",
       "log": "check.log",
-      "logSha256": "17ee454f3d0319518d9193df37d472b8b20d82cc32bb8f0b88680ad19b8ae0b7"
+      "logSha256": "b8c0a13003908b2dad7523289e159baaa57ef68f2353e835953c35376ff3b0ad"
     },
     {
       "name": "compile-tests",
@@ -30,10 +30,10 @@
         "compile-tests"
       ],
       "exitCode": 0,
-      "startedAt": "2026-10-12T17:15:19.700Z",
-      "completedAt": "2026-10-12T17:15:28.083Z",
+      "startedAt": "2026-10-12T18:21:13.328Z",
+      "completedAt": "2026-10-12T18:21:21.762Z",
       "log": "compile-tests.log",
-      "logSha256": "8b24dd911f3697e40b476e92017f789b01165a4a626382b3c0398c8403e784be"
+      "logSha256": "25ffd45f172806ae08d9d8ecea38bd2ae3c81e131100c53c88499ba6f3b02953"
     },
     {
       "name": "targeted",
@@ -44,10 +44,10 @@
         "out-test/test/providerKit.test.js"
       ],
       "exitCode": 0,
-      "startedAt": "2026-10-12T17:15:28.083Z",
-      "completedAt": "2026-10-12T17:15:37.180Z",
+      "startedAt": "2026-10-12T18:21:21.762Z",
+      "completedAt": "2026-10-12T18:21:38.319Z",
       "log": "targeted.log",
-      "logSha256": "f619778c6d99476d8aa324d9d391263f560aaf8e557a4b70d97cf6f73e8c76c1"
+      "logSha256": "c9554a76f09f10fe54f401f1506a43d8370cca18a12c6bbe8b052c3224c97d32"
     },
     {
       "name": "locale-en-CH",
@@ -58,10 +58,10 @@
         "out-test/test/render.test.js"
       ],
       "exitCode": 0,
-      "startedAt": "2026-10-12T17:15:37.180Z",
-      "completedAt": "2026-10-12T17:15:37.614Z",
+      "startedAt": "2026-10-12T18:21:38.319Z",
+      "completedAt": "2026-10-12T18:21:38.834Z",
       "log": "locale-en-CH.log",
-      "logSha256": "8dd2d4eecedd349c9c809aa453c1877b639e0e1c5371a4aaff248358b978e101"
+      "logSha256": "f3976143817ce0f3b35bd7652afd6b8e732986129c811b37e88d37c26553e8ac"
     },
     {
       "name": "test",
@@ -71,10 +71,10 @@
         "test"
       ],
       "exitCode": 0,
-      "startedAt": "2026-10-12T17:15:37.615Z",
-      "completedAt": "2026-10-12T17:16:06.029Z",
+      "startedAt": "2026-10-12T18:21:38.834Z",
+      "completedAt": "2026-10-12T18:22:13.803Z",
       "log": "test.log",
-      "logSha256": "91e0f3e4c0b87fc7ef5091c67fa5d34269bb1011cb9b10f8c03e62cd05ff8f06"
+      "logSha256": "969a80270b3e6d4ee901326f5eba38489b11675506b54239ee40166129f683b0"
     },
     {
       "name": "build",
@@ -84,10 +84,10 @@
         "build"
       ],
       "exitCode": 0,
-      "startedAt": "2026-10-12T17:16:06.029Z",
-      "completedAt": "2026-10-12T17:16:06.533Z",
+      "startedAt": "2026-10-12T18:22:13.803Z",
+      "completedAt": "2026-10-12T18:22:14.453Z",
       "log": "build.log",
-      "logSha256": "b9263af35710dccb9dd49f857c61c1c38271977b7a377400e170bdd1f2ac4e80"
+      "logSha256": "57534f4974be78f6e353e29a3b119300a47b652f12f732ca95a712cb63f6c756"
     },
     {
       "name": "build:provider-kit",
@@ -97,10 +97,10 @@
         "build:provider-kit"
       ],
       "exitCode": 0,
-      "startedAt": "2026-10-12T17:16:06.533Z",
-      "completedAt": "2026-10-12T17:16:08.380Z",
+      "startedAt": "2026-10-12T18:22:14.453Z",
+      "completedAt": "2026-10-12T18:22:16.567Z",
       "log": "build:provider-kit.log",
-      "logSha256": "bfb46ee90a4122b024c8b861e34032e5f61ead6a56072bad718cd752778883c9"
+      "logSha256": "18d52d6fdddb44a207fc1a9eab3d43bc0738074d2391d863ebc5e7f8bb3960bb"
     },
     {
       "name": "package",
@@ -110,10 +110,10 @@
         "package"
       ],
       "exitCode": 0,
-      "startedAt": "2026-10-12T17:16:08.380Z",
-      "completedAt": "2026-10-12T17:16:11.178Z",
+      "startedAt": "2026-10-12T18:22:16.568Z",
+      "completedAt": "2026-10-12T18:22:53.668Z",
       "log": "package.log",
-      "logSha256": "0e9afc3ed2065391ad438859c7a07e090b0b42ef0bd87ca20d1a2bb07173f6d5"
+      "logSha256": "aa1fa803374602f7c090acc1a9ead7ad73ebc103574792480a7c815a17f71ac1"
     }
   ],
   "isolation": "Dedicated synthetic home and fixture processes; not an OS security sandbox",

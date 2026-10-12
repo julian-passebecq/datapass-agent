@@ -1,0 +1,76 @@
+TAP version 13
+# Subtest: webview page has strict CSP with nonce and no remote/eval sources
+ok 1 - webview page has strict CSP with nonce and no remote/eval sources
+  ---
+  duration_ms: 2.6057
+  type: 'test'
+  ...
+# Subtest: webview messages are validated
+ok 2 - webview messages are validated
+  ---
+  duration_ms: 1.1676
+  type: 'test'
+  ...
+# Subtest: rendered provider text is escaped (no HTML/script injection from titles or commands)
+ok 3 - rendered provider text is escaped (no HTML/script injection from titles or commands)
+  ---
+  duration_ms: 28.1401
+  type: 'test'
+  ...
+# Subtest: ended without commit is not FAILED
+ok 4 - ended without commit is not FAILED
+  ---
+  duration_ms: 0.7108
+  type: 'test'
+  ...
+# Subtest: cockpit: counts, provider not detected state, recent list
+ok 5 - cockpit: counts, provider not detected state, recent list
+  ---
+  duration_ms: 0.9296
+  type: 'test'
+  ...
+# Subtest: graph: worker edges only where the provider exposed a parent
+ok 6 - graph: worker edges only where the provider exposed a parent
+  ---
+  duration_ms: 1.9092
+  type: 'test'
+  ...
+# Subtest: activity: weekly rollup, no productivity score
+ok 7 - activity: weekly rollup, no productivity score
+  ---
+  duration_ms: 1.0686
+  type: 'test'
+  ...
+# Subtest: timeline renders chronologically with day headers
+ok 8 - timeline renders chronologically with day headers
+  ---
+  duration_ms: 0.4385
+  type: 'test'
+  ...
+# Subtest: inspector: State (permission mode, current tool), Usage, Related, honest end and test verdicts
+ok 9 - inspector: State (permission mode, current tool), Usage, Related, honest end and test verdicts
+  ---
+  duration_ms: 8.4551
+  type: 'test'
+  ...
+# Subtest: inspector usage preserves exact provider values in en-CH
+ok 10 - inspector usage preserves exact provider values in en-CH
+  ---
+  duration_ms: 1.3809
+  type: 'test'
+  ...
+# Subtest: inspector usage preserves exact provider values in en-US
+ok 11 - inspector usage preserves exact provider values in en-US
+  ---
+  duration_ms: 0.8713
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 734.7927

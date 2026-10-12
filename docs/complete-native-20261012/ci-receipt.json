@@ -1,0 +1,13 @@
+{
+  "sourceSha": "62a072f0af69352c0bd93855ec30cfb1b2bac4f7",
+  "command": [
+    "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+    "ci"
+  ],
+  "exitCode": 0,
+  "startedAt": "2026-10-12T18:20:43.314Z",
+  "completedAt": "2026-10-12T18:21:02.443Z",
+  "logSha256": "deb6e5b8dcc884971ac915008422e58de8fa4621ba5da85e43f8198f80afbfe2",
+  "runtimeSha256": "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e",
+  "isolation": "synthetic home, credential environment stripped"
+}
