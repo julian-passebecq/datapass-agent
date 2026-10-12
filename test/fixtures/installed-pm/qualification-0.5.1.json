@@ -1,0 +1,45 @@
+{
+  "schema": "datapass.pm-product-qualification/1",
+  "repository": "julian-passebecq/datapass-pm",
+  "version": "0.5.1",
+  "sourceSha": "25143d561ba4a962e880a35333a66837a2b0dc39",
+  "sourceTree": "c4652ac174a0bdc0e8bdf33a9cb63ce6b05f3301",
+  "sourceCleanAtQualification": true,
+  "node": "v22.23.3",
+  "nodeSha256": "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e",
+  "runner": "AUTHORIZED_LOCAL_WINDOWS_SYNTHETIC_HOME",
+  "capturedAt": "2026-10-12T20:46:48.200Z",
+  "gates": [
+    {
+      "id": "ci",
+      "exitCode": 0,
+      "logSha256": "1e21bbb7eb2baf1ce6d03bb28ac587c97a3890e3a158d681ca38b64bac22703f"
+    },
+    {
+      "id": "typecheck",
+      "exitCode": 0,
+      "logSha256": "2fd13a1a31956f6713fa5bf2a555fed603ded78049f3338c90e1ac67968c09f2"
+    },
+    {
+      "id": "test",
+      "exitCode": 0,
+      "logSha256": "5e4195d07cbe50c9e4467695c0b4f4a36cf9ba1253a5070fb3229da1525c739b"
+    },
+    {
+      "id": "package",
+      "exitCode": 0,
+      "logSha256": "43d93bfc12d2724c3cc217ae387075f9155c8576e519d8257dfd080b0043379e"
+    }
+  ],
+  "tests": {
+    "passed": 206,
+    "total": 206
+  },
+  "artifact": {
+    "filename": "datapass-pm-0.5.1.vsix",
+    "bytes": 1178036,
+    "sha256": "a034665a161ea2a426415a1f1eb46c719ac9d2c3040d3f30273f47aaa4e77b56"
+  },
+  "installedJourney": "BLOCKED_NOT_EXECUTED",
+  "nativeProviderTasks": "NOT_EXECUTED"
+}

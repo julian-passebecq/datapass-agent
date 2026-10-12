@@ -1,0 +1,16 @@
+{
+  "schema": "datapass.installed-companion-dependency/1",
+  "candidate": false,
+  "role": "DEPENDENCY_ONLY",
+  "qualificationScope": "PM_NATIVE_PREPARATION_ONLY",
+  "extensionId": "julian-passebecq.datapass-native-config",
+  "version": "0.7.2",
+  "sourceSha": "f9291b2ecf7ceab7e479c3be60e6c448e9e6bd40",
+  "filename": "datapass-native-config-0.7.2.vsix",
+  "sha256": "5e5604bf0fed55689cb961bf0a0ce49b4f886c340e3df7aa6438ca7fcedb9bc5",
+  "bytes": 65230,
+  "modifications": false,
+  "authentication": false,
+  "providerExecution": false,
+  "source": "Existing unchanged approved Config candidate"
+}

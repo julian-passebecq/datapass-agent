@@ -4,13 +4,14 @@
   "role": "DEPENDENCY_ONLY",
   "qualificationScope": "PM_NATIVE_PREPARATION_ONLY",
   "extensionId": "julian-passebecq.datapass-native-config",
-  "version": "0.7.2",
-  "sourceSha": "f9291b2ecf7ceab7e479c3be60e6c448e9e6bd40",
-  "filename": "datapass-native-config-0.7.2.vsix",
-  "sha256": "5e5604bf0fed55689cb961bf0a0ce49b4f886c340e3df7aa6438ca7fcedb9bc5",
-  "bytes": 65230,
+  "version": "0.8.1",
+  "sourceSha": "7d080980a0c679b6106a7e655450340dc8862edf",
+  "filename": "datapass-native-config-0.8.1.vsix",
+  "sha256": "a7aab6434d54d1253820c214241174f5407dd1175001cd1566ba8f0b3a6ee7a0",
+  "bytes": 91070,
   "modifications": false,
   "authentication": false,
   "providerExecution": false,
-  "source": "Existing unchanged approved Config candidate"
+  "source": "Exact qualified Config carrier artifact; pipeline 2939906408, job 17121915776",
+  "historicalReceipt": "config-dependency-0.7.2.json"
 }
