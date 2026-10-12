@@ -10,7 +10,7 @@ import os from 'os';
 import path from 'path';
 import { createHash } from 'node:crypto';
 import { buildFixtureHome } from './smoke-fixture.mjs';
-import { preparePmAgentFixture, qualifyPmAgent, installObserver } from './smoke-pm-agent.mjs';
+import { preparePmAgentFixture, qualifyPmAgent, installObserver, visibleOwnedFrame } from './smoke-pm-agent.mjs';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const vsix = path.join(root, `agent-vscode-${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}.vsix`);
@@ -95,6 +95,7 @@ async function webviewText(win, needle, timeout = 30_000) {
   while (Date.now() - t0 < timeout) {
     for (const f of win.frames()) {
       try {
+        if(!await visibleOwnedFrame(win,f))continue;
         const txt = await f.evaluate(() => document.body?.textContent ?? '');
         if (txt.includes(needle)) return { frame: f, txt };
       } catch { /* detached */ }
