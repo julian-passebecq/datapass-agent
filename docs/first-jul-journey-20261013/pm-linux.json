@@ -1,0 +1,52 @@
+{
+  "schema": "datapass.linux-qualification/1",
+  "repository": "julian-passebecq/datapass-pm",
+  "sourceSha": "0e961eea5765df70d0e2fe6f9dcb06013c090299",
+  "sourceTree": "bd55b815c2d8ead575ea0e73fc04a01a34f771ad",
+  "runner": "AUTHORIZED_LOCAL_WSL_UBUNTU_SHELL",
+  "os": "linux",
+  "architecture": "x64",
+  "node": "v22.23.3",
+  "capturedAt": "2026-10-12T22:19:15.768Z",
+  "gates": [
+    {
+      "id": "ci",
+      "exitCode": 0,
+      "logSha256": "a0fc1dfae839b375ddbb5743ce88ec49ea79b963988a988c38aa6ecf03eb2529"
+    },
+    {
+      "id": "typecheck",
+      "exitCode": 0,
+      "logSha256": "12a80ef0d80176ebd69134fc6c1de69b694f91942fc685e91a90dd309a22600a"
+    },
+    {
+      "id": "test",
+      "exitCode": 0,
+      "logSha256": "1ef49d0767a8772c4dbe528d80bf9f9f51fbeb1dac23a8c83ab0359cebde7e2d"
+    },
+    {
+      "id": "package",
+      "exitCode": 0,
+      "logSha256": "421d33f60cc2e5fa6ec9d1c1ba872b0c62247abd957c6597e96cb390d685f0e1"
+    }
+  ],
+  "tests": {
+    "total": 208,
+    "passed": 208,
+    "failed": 0,
+    "skipped": 0
+  },
+  "packages": [
+    {
+      "file": "datapass-pm-0.5.2.vsix",
+      "sha256": "8315b70bc5a6e4c1b377590f3b978c40a19bfaba922f6e449069afeff9b2e916",
+      "bytes": 1195155
+    }
+  ],
+  "state": "PASS_SCOPED",
+  "githubRequiredCheck": "NOT_SUBSTITUTED",
+  "installedNativeJourney": "NOT_RUN",
+  "omissions": [
+    "No native GUI, authentication, hardware or full219-clause acceptance is claimed."
+  ]
+}

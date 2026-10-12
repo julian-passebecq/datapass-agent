@@ -1,0 +1,9 @@
+# Resume first Jul journey
+
+Previous writer completed the bounded code, qualification, profile package update and scoped publication. Start from the published source vector, original native worktrees and existing codex/complete-native-cockpit-20261012 branches. Do not recreate profiles, re-audit the contract or rerun unchanged passes.
+
+First unresolved prerequisite is independently verified supported native execution isolation and GUI isolation. The prepared same-account directories do not satisfy it; retain Agent's independent platform-proof checks. No trust keys, permission changes or isolation bypass are authorized. Last authentication evidence is NOT_AUTHENTICATED. Once isolation is independently available, the owner may run the existing owner-profile.ps1 -Action SignIn; use exactly the existing interactive-home/.codex verified in native-readiness.json. Do not copy credentials or access personal profiles.
+
+Then use the already-authorized one read-only task and one owned continuation through PM's Jul conversation: “Read this synthetic project's README.md and briefly summarize it. Do not change files, use network tools, or delegate.” Verify the selected project repository identity, Config role/provider/model binding and actual reported model before task dispatch. The prepared synthetic repository currently has no canonical remote; scope is not fabricated. Capture only sanitized task/session/provenance evidence. Verify actual PM response, native state and close/reopen recovery. No second write task is authorized.
+
+Reuse exact PM Windows/Linux and Agent Windows receipts in this directory. Synthetic stream tests and installed protocol generation do not certify actual provider execution. Synchronize adoption is persisted under the existing test workspace .datapass/first-jul-journey-20261013; it does not modify PM global state or running sessions. Required GitHub billing checks and other FULL gates remain separate.

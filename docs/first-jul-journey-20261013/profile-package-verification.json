@@ -1,0 +1,33 @@
+{
+  "schema": "galaxy.first-jul-installed-packages/1",
+  "profileIdentity": "e047a6bc253165bc9faa71a03b17fb74eabc892e9bd167b69ede17be7b716c9b",
+  "state": "QUALIFIED_PM_AGENT_INSTALLED_CLI_ONLY",
+  "packages": [
+    {
+      "product": "pm",
+      "id": "juliandatapass.datapass-pm",
+      "version": "0.5.2",
+      "sha256": "6c76aefe4b8369435cb55f0cdc2e8b0f4ee1b24b5c27ebeeb8c2df76937844fe",
+      "entriesVerified": 95,
+      "state": "INSTALLED_PAYLOAD_MATCHES_EXACT_VSIX"
+    },
+    {
+      "product": "agent",
+      "id": "juliandatapass.agent-vscode",
+      "version": "0.11.2",
+      "sha256": "bedd6395936fc8ec989a1c5005158da9679b201793fabbadd03b739969ddb1d7",
+      "entriesVerified": 8,
+      "state": "INSTALLED_PAYLOAD_MATCHES_EXACT_VSIX"
+    }
+  ],
+  "settings": "UNCHANGED_NO_CONTENT_READ",
+  "guiInputCalls": 0,
+  "nativeWindowLaunched": false,
+  "providerExecution": false,
+  "authentication": "NOT_AUTHENTICATED_LAST_EVIDENCE_NO_NEW_PROBE",
+  "isolation": "BLOCKED_INDEPENDENT_EXECUTION_AND_GUI_ISOLATION_UNVERIFIED",
+  "unchangedCandidates": {
+    "config": "7d080980a0c679b6106a7e655450340dc8862edf",
+    "lens": "95ebd7e73ab21ce674c3e77153f6c29677fc0099"
+  }
+}

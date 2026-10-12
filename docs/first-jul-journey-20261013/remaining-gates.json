@@ -1,0 +1,61 @@
+{
+  "schema": "galaxy.full-continuation-gates/1",
+  "selectedContract": {
+    "canonicalClauses": 219,
+    "refinements": 63,
+    "journeys": 30,
+    "status": "OPEN_NOT_FULLY_ACCEPTED",
+    "untouchedDispositions": "REUSE_PRIOR_PUBLISHED_CHECKPOINT_NO_REAUDIT"
+  },
+  "gates": [
+    {
+      "id": "native-provider-journeys",
+      "state": "BLOCKED_NOT_EXECUTED",
+      "reason": "Independent execution isolation remains unverified; last isolated profile authentication evidence is NOT_AUTHENTICATED. Home-path mismatch and installed protocol sandbox mismatch fixed. No provider task dispatched.",
+      "requires": "Independently verified supported execution isolation, then owner sign-in in the corrected isolated home and the already-authorized one read-only task plus one owned continuation. No new live-task authority required for those two conditional tasks."
+    },
+    {
+      "id": "installed-family-gui",
+      "state": "BLOCKED_NOT_EXECUTED",
+      "reason": "Qualified PM0.5.2 and Agent0.11.2 installed into the reused prepared profile and changed payloads verified. Path separation still is not independent GUI isolation; no installed GUI journey executed.",
+      "requires": "Qualify changed PM/Agent vector in supported isolated GUI; retain unchanged prior Computer Use evidence"
+    },
+    {
+      "id": "required-github-checks",
+      "state": "BLOCKED_BEFORE_STEPS",
+      "reason": "Exact-source hosted jobs report recent account payments/spending-limit failure",
+      "requires": "Account owner resolves billing externally; retain independent carrier/local results without substituting required checks"
+    },
+    {
+      "id": "voice",
+      "state": "NOT_ACCEPTED_UNSUPPORTED_PM_WEBVIEW_API",
+      "reason": "PM uses supported native dictation surfaces; no PM microphone API or qualified actual voice journey",
+      "requires": "Verify selected supported native voice/dictation surface in the authorized isolated environment; implement supported adapter only when that surface provides one"
+    },
+    {
+      "id": "native-modes",
+      "state": "PARTIAL_PROVIDER_SUPPORT_UNQUALIFIED_RUNTIME",
+      "reason": "Requested native tool/subagent/worktree modes require verified provider and platform capabilities; unsupported combinations remain explicit",
+      "requires": "Supported native mode/tool model entitlement evidence and affected actual journeys; no invented capability equivalence"
+    },
+    {
+      "id": "canonical-organization-adoption",
+      "state": "STAGED_OWNER_DECISION",
+      "reason": "Reviewed local ownership migration implemented; actual organization IDs and broader Galaxy registry governance adoption not changed",
+      "requires": "One consolidated owner review of actual organization identities and intended project memberships; use exact-source migration after native settlement"
+    },
+    {
+      "id": "full-selected-acceptance",
+      "state": "OPEN",
+      "reason": "Source and synthetic host passes do not accept all selected installed journeys",
+      "requires": "Actual Jul response displayed and persisted, reopen recovery, and remaining selected journeys against preserved 219 clauses, 63 refinements and 30 journeys. Synthetic streams and package installation are not acceptance."
+    }
+  ],
+  "exclusions": [
+    "No merge or deployment",
+    "No permission changes or active desktop operation",
+    "No raw history export",
+    "No live execution until both approved prerequisites pass; no additional live tasks"
+  ],
+  "repeatPolicy": "Only affected tests and outstanding gates; no unchanged Config/Lens or Computer Use reruns"
+}

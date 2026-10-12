@@ -1,0 +1,105 @@
+{
+  "schema": "galaxy.exact-carrier-product-qualification/1",
+  "pilot": "agent",
+  "state": "WINDOWS_GATES_PACKAGE_PASS_REMOTE_BYTES_VERIFIED",
+  "productSource": {
+    "repository": "github.com/julian-passebecq/agent-vscode",
+    "revision": "8cad071b34affb3c5ee6c315d6314f65e118f028",
+    "version": "0.11.2",
+    "tree": "a153edd0927ab134724ee006c9efa42cc52cdd42"
+  },
+  "gateRecipe": {
+    "repository": "github.com/julian-passebecq/agent-vscode",
+    "revision": "8cad071b34affb3c5ee6c315d6314f65e118f028",
+    "path": ".ci/windows-qualification.json",
+    "gitBlob": "88514249a9280bfa4e4223bad0497882a5cb4b4f",
+    "sha256": "09624869f6ad069041cb2719d2705c495ec0fc41292ca7c79eeefbfd634c7074",
+    "availability": "SOURCE_PINNED_GIT_BLOB_BYTES_VERIFIED"
+  },
+  "concreteInput": {
+    "sha256": "4a853962b9a35973b3587693b1a7f8cdeb0e972e434d79962abbfd60ef827168",
+    "derivation": "ONLY_SCHEMA_AND_PRODUCT_SOURCE_SHA_REPLACED",
+    "availability": "EXACT_JOB_BYTES_VERIFIED"
+  },
+  "carrierSource": {
+    "repository": "gitlab.com/juliandatapass-group/datapass-codex-test",
+    "revision": "eb888d4f781797571d8343e06ba8f2487f00d4ef",
+    "pipelineId": "2940310071",
+    "jobId": "17124835284",
+    "jobUrl": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17124835284",
+    "jobStatus": "success",
+    "attempt": "FIRST_DISPATCH_OBSERVED",
+    "retried": null
+  },
+  "runner": {
+    "id": 56844575,
+    "os": "windows",
+    "architecture": "amd64",
+    "executor": "powershell",
+    "identity": "RUNNER_ID_ONLY_PRIVATE_HOST_IDENTITY_OMITTED",
+    "nodeVersion": "v22.23.3",
+    "nodeSha256": "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e",
+    "nodeLocale": "en-CH"
+  },
+  "receipt": {
+    "sha256": "29b146561e22006a8279321ea93533db03083960b05139f5e6cb261fb2b1cdde",
+    "bytes": 4486,
+    "path": "evidence/receipt.json",
+    "availability": "EXACT_AUTHENTICATED_JOB_BYTES_VERIFIED"
+  },
+  "gates": [
+    {
+      "command": "npm ci",
+      "exitCode": 0,
+      "logSha256": "b9743859eae99321a5de006cbc6f9b4960874f2ad67930b328893238ce79c60e"
+    },
+    {
+      "command": "npm run check",
+      "exitCode": 0,
+      "logSha256": "0efd5315ae3b324e1f06b445ab1112529e90fb594537cfd1bfc59f758bf55089"
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "logSha256": "a7492e6bfb7fb8919c818cdab7d61d129832b475f485b87ac1262f9870acfde5"
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "logSha256": "033a4149a914f4ab463923d8182164380c1bbbc1c097fa910f44175bb24902ff"
+    },
+    {
+      "command": "npm run build:provider-kit",
+      "exitCode": 0,
+      "logSha256": "8524954fc1fe58ea92c83f17703c1a8323321eecc2ac4abf67ad42961a9516b2"
+    },
+    {
+      "command": "npm run package",
+      "exitCode": 0,
+      "logSha256": "f078b63d0a32b2a48c3756c38f3e3efe3e2de5e40edfbd50ff7b23b33bac1739"
+    }
+  ],
+  "tests": {
+    "total": 488,
+    "passed": 488,
+    "failed": 0,
+    "skipped": 0,
+    "basis": "HASH_VERIFIED_EXACT_JOB_GATE_OUTPUT"
+  },
+  "artifacts": [
+    {
+      "filename": "agent-vscode-0.11.2.vsix",
+      "bytes": 488795,
+      "sha256": "bedd6395936fc8ec989a1c5005158da9679b201793fabbadd03b739969ddb1d7",
+      "sourceSha": "8cad071b34affb3c5ee6c315d6314f65e118f028",
+      "os": "Windows",
+      "availability": "EXACT_AUTHENTICATED_JOB_BYTES_VERIFIED"
+    }
+  ],
+  "expiresAt": "2026-11-11T22:33:04.254Z",
+  "installedNativeJourney": "BLOCKED_NOT_EXECUTED",
+  "githubRequiredChecks": "INDEPENDENT_ACCOUNT_BILLING_BLOCKED_NOT_SUBSTITUTED",
+  "linuxParity": "NOT_CLAIMED_BY_WINDOWS_CARRIER",
+  "nextAction": "Resolve required hosted billing/platform and isolated installed native/auth/tool qualification scopes before acceptance.",
+  "privacy": "SANITIZED_METADATA_NO_RAW_LOGS_HISTORY_OR_HOST_IDENTITY"
+}

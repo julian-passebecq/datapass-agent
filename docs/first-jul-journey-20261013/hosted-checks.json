@@ -1,0 +1,20 @@
+{
+  "schema": "galaxy.required-hosted-checks/1",
+  "state": "BLOCKED_BEFORE_STEPS",
+  "reason": "Recent account payments failed or spending limit needs increase; verified API annotations",
+  "checks": [
+    {
+      "repository": "julian-passebecq/datapass-pm",
+      "source": "0e961eea5765df70d0e2fe6f9dcb06013c090299",
+      "run": 38315872809,
+      "check": 115032239127
+    },
+    {
+      "repository": "julian-passebecq/agent-vscode",
+      "source": "8cad071b34affb3c5ee6c315d6314f65e118f028",
+      "run": 38316567775,
+      "check": 115034488900
+    }
+  ],
+  "substitution": false
+}

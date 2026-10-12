@@ -1,0 +1,95 @@
+{
+  "schema": "galaxy.exact-carrier-product-qualification/1",
+  "pilot": "pm",
+  "state": "WINDOWS_GATES_PACKAGE_PASS_REMOTE_BYTES_VERIFIED",
+  "productSource": {
+    "repository": "github.com/julian-passebecq/datapass-pm",
+    "revision": "0e961eea5765df70d0e2fe6f9dcb06013c090299",
+    "version": "0.5.2",
+    "tree": "bd55b815c2d8ead575ea0e73fc04a01a34f771ad"
+  },
+  "gateRecipe": {
+    "repository": "github.com/julian-passebecq/datapass-pm",
+    "revision": "0e961eea5765df70d0e2fe6f9dcb06013c090299",
+    "path": ".ci/windows-qualification.json",
+    "gitBlob": "097b7164c69d5bc722e2c22d006b5eeed7d6d394",
+    "sha256": "b78dc683a4a959e87928e4a19d820927b60a8a0b9a97cc786f7a24a04321b6b0",
+    "availability": "SOURCE_PINNED_GIT_BLOB_BYTES_VERIFIED"
+  },
+  "concreteInput": {
+    "sha256": "77efd17c74572303e92321f8bf41ab1d4df0e8d1399618def7625365affe82fe",
+    "derivation": "ONLY_SCHEMA_AND_PRODUCT_SOURCE_SHA_REPLACED",
+    "availability": "EXACT_JOB_BYTES_VERIFIED"
+  },
+  "carrierSource": {
+    "repository": "gitlab.com/juliandatapass-group/datapass-codex-test",
+    "revision": "ceb602bb2a91da92b397c4b2e9610599f020cc8b",
+    "pipelineId": "2940302617",
+    "jobId": "17124779543",
+    "jobUrl": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17124779543",
+    "jobStatus": "success",
+    "attempt": "FIRST_DISPATCH_OBSERVED",
+    "retried": null
+  },
+  "runner": {
+    "id": 56844575,
+    "os": "windows",
+    "architecture": "amd64",
+    "executor": "powershell",
+    "identity": "RUNNER_ID_ONLY_PRIVATE_HOST_IDENTITY_OMITTED",
+    "nodeVersion": "v22.23.3",
+    "nodeSha256": "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e",
+    "nodeLocale": "en-CH"
+  },
+  "receipt": {
+    "sha256": "9ad5a1775e887cd3bf341c960541b9082726ec6567dff10d9a3dd55e31eafa6c",
+    "bytes": 3816,
+    "path": "evidence/receipt.json",
+    "availability": "EXACT_AUTHENTICATED_JOB_BYTES_VERIFIED"
+  },
+  "gates": [
+    {
+      "command": "npm ci",
+      "exitCode": 0,
+      "logSha256": "a1652f5229be143eaedaa2ecafc5b49bf1d46e67d6bcb46c7f6fbb206f2c5450"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "logSha256": "61c51bc3da28e80fddd860199ebe317956ea8203e87b11212182eb9131dce01f"
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "logSha256": "eda558e0ad912595e13824e503c929fc815dfb9d7d6c51b183254166b46ca2a0"
+    },
+    {
+      "command": "npm run package",
+      "exitCode": 0,
+      "logSha256": "362e2f7e1b72c30ee701281c070aa3cd0a76595faad2854a1a9f1f1b5f731f0f"
+    }
+  ],
+  "tests": {
+    "total": 208,
+    "passed": 208,
+    "failed": 0,
+    "skipped": 0,
+    "basis": "HASH_VERIFIED_EXACT_JOB_GATE_OUTPUT"
+  },
+  "artifacts": [
+    {
+      "filename": "datapass-pm-0.5.2.vsix",
+      "bytes": 1195155,
+      "sha256": "6c76aefe4b8369435cb55f0cdc2e8b0f4ee1b24b5c27ebeeb8c2df76937844fe",
+      "sourceSha": "0e961eea5765df70d0e2fe6f9dcb06013c090299",
+      "os": "Windows",
+      "availability": "EXACT_AUTHENTICATED_JOB_BYTES_VERIFIED"
+    }
+  ],
+  "expiresAt": "2026-11-11T22:24:11.227Z",
+  "installedNativeJourney": "BLOCKED_NOT_EXECUTED",
+  "githubRequiredChecks": "INDEPENDENT_ACCOUNT_BILLING_BLOCKED_NOT_SUBSTITUTED",
+  "linuxParity": "NOT_CLAIMED_BY_WINDOWS_CARRIER",
+  "nextAction": "Resolve required hosted billing/platform and isolated installed native/auth/tool qualification scopes before acceptance.",
+  "privacy": "SANITIZED_METADATA_NO_RAW_LOGS_HISTORY_OR_HOST_IDENTITY"
+}
