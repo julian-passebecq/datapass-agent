@@ -1,0 +1,19 @@
+{
+  "schema": "galaxy.hosted-required-checks/1",
+  "sourceSha": "e80341589bccbed23fef40b024c30c8f83819ba7",
+  "runId": "38306645053",
+  "url": "https://github.com/julian-passebecq/agent-vscode/actions/runs/38306645053",
+  "state": "BLOCKED_BEFORE_STEPS_ACCOUNT_BILLING",
+  "jobs": [
+    {
+      "id": 115002207317,
+      "name": "build",
+      "url": "https://github.com/julian-passebecq/agent-vscode/actions/runs/38306645053/job/115002207317",
+      "conclusion": "failure",
+      "executedSteps": 0,
+      "reason": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings"
+    }
+  ],
+  "substitution": "NONE",
+  "accountSettingsChanged": false
+}
