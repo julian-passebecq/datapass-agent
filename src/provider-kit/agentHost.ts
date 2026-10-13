@@ -9,6 +9,7 @@ import { idOk, repoId, validateRequest } from '../cockpit/policy';
 import type { Request } from '../cockpit/interfaces';
 import type { AHPBinding, AHPHost, AHPInspection, AHPPrepared, AHPObservation, AHPReply, AHPState, AgentHostApi, AHPApproval } from './agentHostTypes';
 export * from './agentHostTypes';
+import { AHPPermissionError, readOnlyConfig, validExecutionPolicy, validateResolvedPolicy, reviewedHostPolicy, restrictiveValues, requireEffectivePermissionEvidence } from './agentHostPolicy';
 export const ahpHash=(value:unknown)=>createHash('sha256').update(canonicalJson(value)).digest('hex');
 export const ahpTextHash=(value:string)=>createHash('sha256').update(value).digest('hex');
 const ROOT='ahp-root://', versions=['1.0.0','0.9.0'];
@@ -25,7 +26,7 @@ type SDK=Awaited<ReturnType<typeof sdk>>;
 export interface ReviewedAHPHost { host:AHPHost; scopeHash:string; root:string; revision:string; authorized():boolean; open():Promise<AhpTransport>; }
 export interface AHPStorage { load():unknown; save(records:AHPLedger[]):Promise<void>; }
 export interface AHPLedger { prepared:AHPPrepared; observation:AHPObservation; request:Request; clientId:string; phase:'PREPARED'|'CREATE_INTENT'|'SESSION_BOUND'|'SEND_INTENT'|'SENT'; integrityHash:string; }
-interface Connection { descriptor:ReviewedAHPHost; client:AhpClient; sdk:SDK; agents:AgentInfo[]; protocolVersion:string; inventoryHash:string; sessions:Map<string,SessionState>; chats:Map<string,ChatState>; seq:Map<string,number>; active:boolean; }
+interface Connection { descriptor:ReviewedAHPHost; client:AhpClient; sdk:SDK; agents:AgentInfo[]; protocolVersion:string; inventoryHash:string; sessions:Map<string,SessionState>; chats:Map<string,ChatState>; seq:Map<string,number>; active:boolean; root:unknown; }
 export interface AHPServices {
   storage:AHPStorage; authorize(request:Request):boolean; sourceGrantCurrent?(request:Request):boolean; verifySource(binding:AHPBinding,request?:Request):Promise<boolean>;
   reviewProject(request:Request,binding:AHPBinding):Promise<boolean>;
@@ -33,11 +34,11 @@ export interface AHPServices {
   reviewTask(prepared:AHPPrepared):Promise<boolean>;
 }
 function bindingOk(b:AHPBinding,r:Request):boolean {
-  return !!b && Object.keys(b).every(k=>['taskId','roleId','root','revision','authorityHash','preparedTaskHash','compiledPromptHash','configScopeHash','presetHash','provider','requestedModel','requestedEffort','prompt','promptHash','requestedMode','testPolicyHash','outputPolicyHash','taskRevision'].includes(k)) && (b.taskRevision===undefined||Number.isSafeInteger(b.taskRevision)&&b.taskRevision>0) && [b.taskId,b.roleId].every(idOk) && ['codex','claude'].includes(b.provider) && path.isAbsolute(b.root) && !/[\x00-\x1f]/.test(b.root) && /^[a-f0-9]{40}$/.test(b.revision) &&
+  return !!b && Object.keys(b).every(k=>['taskId','roleId','root','revision','authorityHash','preparedTaskHash','compiledPromptHash','configScopeHash','presetHash','provider','requestedModel','requestedEffort','prompt','promptHash','requestedMode','testPolicyHash','outputPolicyHash','taskRevision','executionPolicy'].includes(k)) && (b.taskRevision===undefined||Number.isSafeInteger(b.taskRevision)&&b.taskRevision>0) && [b.taskId,b.roleId].every(idOk) && ['codex','claude'].includes(b.provider) && path.isAbsolute(b.root) && !/[\x00-\x1f]/.test(b.root) && /^[a-f0-9]{40}$/.test(b.revision) &&
     [b.authorityHash,b.preparedTaskHash,b.compiledPromptHash,b.configScopeHash,b.presetHash,b.promptHash].every(h=>typeof h==='string' && /^[a-f0-9]{64}$/.test(h)) &&
     typeof b.prompt==='string' && b.prompt.trim().length>0 && b.prompt.length<=32768 && ahpTextHash(b.prompt)===b.promptHash &&
     [b.testPolicyHash,b.outputPolicyHash].every(h=>h===undefined||typeof h==='string'&&/^[a-f0-9]{64}$/.test(h)) &&
-    [b.requestedModel,b.requestedEffort??null].every(s=>s===null || typeof s==='string' && /^[a-zA-Z0-9_.:@/+ -]{1,160}$/.test(s)) && r.scope.repoIds.length>0;
+    [b.requestedModel,b.requestedEffort??null].every(s=>s===null || typeof s==='string' && /^[a-zA-Z0-9_.:@/+ -]{1,160}$/.test(s)) && r.scope.repoIds.length>0 && (b.executionPolicy===undefined || validExecutionPolicy(b.executionPolicy)&&b.executionPolicy.sourcePolicyHash===b.testPolicyHash);
 }
 const sameRoot=(a:string,b:string)=>path.resolve(a).replace(/\\/g,'/').toLowerCase()===path.resolve(b).replace(/\\/g,'/').toLowerCase();
 const safeUri=(v:unknown,kind:'session'|'chat')=>typeof v==='string' && new RegExp('^ahp-'+kind+':/[a-zA-Z0-9._-]{1,160}$').test(v);
@@ -85,7 +86,7 @@ export class AgentHostAdapter {
     if(!host.authorized())throw Error('DENIED');
     const libs=await sdk(),transport=await host.open(); if(!host.authorized()){await transport.close();throw Error('DENIED');}
     const client=new libs[1].AhpClient(transport,{requestTimeoutMs:5000,subscriptionBuffer:512});
-    const c:Connection={descriptor:host,client,sdk:libs,agents:[],protocolVersion:'',inventoryHash:'',sessions:new Map(),chats:new Map(),seq:new Map(),active:true};
+    const c:Connection={descriptor:host,client,sdk:libs,agents:[],protocolVersion:'',inventoryHash:'',sessions:new Map(),chats:new Map(),seq:new Map(),active:true,root:undefined};
     const stream=client.events();client.connect();
     try {
       const init=await client.initialize({clientId:'datapass-agent-'+host.host.identityHash.slice(0,24),protocolVersions:versions,initialSubscriptions:[ROOT]});
@@ -101,7 +102,7 @@ export class AgentHostAdapter {
   private snapshot(c:Connection,s:Snapshot):void{
     if(!Number.isSafeInteger(s.fromSeq)||s.fromSeq<0)throw Error('Malformed snapshot');
     c.seq.set(s.resource,s.fromSeq);
-    if(s.resource===ROOT){const state=s.state as {agents:AgentInfo[]};if(!Array.isArray(state.agents)||state.agents.length>100)throw Error('Malformed inventory');c.agents=state.agents;}
+    if(s.resource===ROOT){const state=s.state as {agents:AgentInfo[]};if(!Array.isArray(state.agents)||state.agents.length>100)throw Error('Malformed inventory');c.agents=state.agents;c.root=s.state;}
     else if(safeUri(s.resource,'session'))c.sessions.set(s.resource,s.state as SessionState);
     else if(safeUri(s.resource,'chat'))c.chats.set(s.resource,s.state as ChatState);
   }
@@ -111,10 +112,10 @@ export class AgentHostAdapter {
       if(event.event.type!=='action')continue;const env=event.event.params;
       if(!Number.isSafeInteger(env.serverSeq)||env.serverSeq<0)throw Error('Malformed sequence');
       if(env.serverSeq<=(c.seq.get(env.channel)??-1))continue;c.seq.set(env.channel,env.serverSeq);
-      if(env.channel===ROOT)c.agents=c.sdk[0].rootReducer({agents:c.agents},env.action as Parameters<SDK[0]['rootReducer']>[1]).agents;
+      if(env.channel===ROOT){c.root=c.sdk[0].rootReducer(c.root as Parameters<SDK[0]['rootReducer']>[0],env.action as Parameters<SDK[0]['rootReducer']>[1]);c.agents=(c.root as {agents:AgentInfo[]}).agents;}
       else if(c.sessions.has(env.channel))c.sessions.set(env.channel,c.sdk[0].sessionReducer(c.sessions.get(env.channel)!,env.action as Parameters<SDK[0]['sessionReducer']>[1]));
       else if(c.chats.has(env.channel))c.chats.set(env.channel,c.sdk[0].chatReducer(c.chats.get(env.channel)!,env.action as ChatAction));
-      for(const rec of this.records.values())if(rec.observation.hostId===c.descriptor.host.hostId&&[rec.observation.sessionId,rec.observation.chatId].includes(env.channel))await this.project(c,rec,env);
+      for(const rec of this.records.values())if(rec.observation.hostId===c.descriptor.host.hostId&&[rec.observation.sessionId,rec.observation.chatId].includes(env.channel)){if(rec.prepared.binding.executionPolicy&&env.channel===rec.observation.chatId&&env.action.type===c.sdk[0].ActionType.ChatToolCallReady&&env.action.turnId===rec.observation.turnId){c.client.dispatch(env.channel,{type:c.sdk[0].ActionType.ChatToolCallConfirmed,turnId:env.action.turnId,toolCallId:env.action.toolCallId,approved:false,reason:c.sdk[0].ToolCallCancellationReason.Denied});}await this.project(c,rec,env);}
     }}catch{c.active=false;for(const rec of this.records.values())if(rec.observation.hostId===c.descriptor.host.hostId&&!['COMPLETED','FAILED','STOPPED'].includes(rec.observation.state))this.transition(rec,'UNCERTAIN','Host stream unavailable. Recovery never resends.');}
   }
   private async monitor(c:Connection){for await(const state of c.client.stateChanges())if(state.status==='closed'){c.active=false;for(const rec of this.records.values())if(rec.observation.hostId===c.descriptor.host.hostId&&!['COMPLETED','FAILED','STOPPED'].includes(rec.observation.state))this.transition(rec,'UNCERTAIN','Connection closed. Recover exact session; no retry.');}}
@@ -131,17 +132,38 @@ export class AgentHostAdapter {
     }catch(error){const state=this.errorState(error);return this.reply(r,state,{...this.empty(state),hosts:[selected.host]},'Connection/negotiation unavailable; raw endpoint errors are suppressed.');}
   }
   private errorState(e:unknown):AHPState {const code=(e as {code?:number})?.code;return code===-32002?'PROVIDER_UNSUPPORTED':code===-32007||String(e).includes('AUTH_REQUIRED')?'AUTH_REQUIRED':code===-32005||String(e).includes('PROTOCOL_UNSUPPORTED')?'PROTOCOL_UNSUPPORTED':code===-32009?'PERMISSION_REQUIRED':String(e).includes('DENIED')?'DENIED':'UNAVAILABLE';}
+  private async resolvePolicy(c:Connection,b:AHPBinding){
+    if(!b.executionPolicy)return undefined;
+    if(b.provider!=='codex')throw new AHPPermissionError('Read-only policy is not supported by this provider contract.');
+    const before=ahpHash(reviewedHostPolicy(c.root));
+    const result=await c.client.request('resolveSessionConfig',{channel:ROOT,provider:b.provider,workingDirectory:pathToFileURL(b.root).href,config:readOnlyConfig()});
+    const config=validateResolvedPolicy(result);
+    const after=ahpHash(reviewedHostPolicy(c.root));
+    if(before!==after)throw new AHPPermissionError('Host permission configuration changed during resolution.');
+    return {policyHash:ahpHash(b.executionPolicy),resolvedConfigHash:ahpHash(config),hostConfigHash:after,configuration:'SUPPORTED' as const,nativeEffective:'UNKNOWN' as const,hostTools:'UNVERIFIED' as const,stage:'RESOLVED' as const,message:'Restrictive configuration resolved; independent native and host-tool enforcement evidence remains unavailable.'};
+  }
+  private verifySessionPolicy(c:Connection,rec:AHPLedger){
+    if(!rec.prepared.binding.executionPolicy)return;
+    const review=rec.prepared.permissionReview,s=c.sessions.get(rec.observation.sessionId!);
+    if(!review||rec.observation.executionPolicyHash!==review.policyHash||review.policyHash!==ahpHash(rec.prepared.binding.executionPolicy)||ahpHash(reviewedHostPolicy(c.root))!==review.hostConfigHash)
+      throw new AHPPermissionError('Reviewed task policy or host permission configuration changed.');
+    if(!s||!restrictiveValues(s.config?.values))throw new AHPPermissionError('Session permission configuration is missing, unsafe or overridden.');
+    rec.observation.permissionReview={...review,stage:'SESSION_CONFIG_OBSERVED',message:'Server session configuration observed; this is not proof of native enforcement.'};
+    requireEffectivePermissionEvidence();
+  }
   async prepare(r:Request,b:AHPBinding,hostId:string):Promise<AHPReply<AHPPrepared|null>>{
     if(!this.authorized(r,b)||!await this.services.verifySource(b,r))return this.reply(r,'DENIED',null,'Source scope, task or revision unavailable.');
-    const inspection=await this.inspect(r,b.provider,hostId,b);if(inspection.state!=='AHP_AVAILABLE')return this.reply(r,inspection.state,null,inspection.message);
+    const inspection=await this.inspect(r,b.provider,hostId,b);if(!['AHP_AVAILABLE','AUTH_REQUIRED'].includes(inspection.state))return this.reply(r,inspection.state,null,inspection.message);
+    let permissionReview;try{permissionReview=await this.resolvePolicy(this.connections.get(hostId)!,b);}catch(error){return this.reply(r,'PERMISSION_REQUIRED',null,error instanceof AHPPermissionError?error.message:'Supported permission configuration could not be resolved.');}
+    if(inspection.state!=='AHP_AVAILABLE')return this.reply(r,inspection.state,null,permissionReview?.message??inspection.message);
     const c=this.connections.get(hostId)!;const models=c.agents.find(a=>a.provider===b.provider)?.models.filter(m=>m.id===b.requestedModel&&m.policyState!=='disabled')??[];const model=models.length===1?models[0]:undefined;
     if(b.requestedMode&&b.requestedMode!=='DEFAULT')return this.reply(r,'PROVIDER_UNSUPPORTED',null,'Native PLAN/GOAL mode mapping is not qualified.');
     if(b.requestedModel&&!model)return this.reply(r,'PROVIDER_UNSUPPORTED',null,'Requested model is absent from this exact provider inventory.');
     if(b.requestedEffort&&(!model||!qualifiedAHPEfforts(b.provider,model).includes(b.requestedEffort)))return this.reply(r,'PROVIDER_UNSUPPORTED',null,'Requested effort is absent from the qualified thinkingLevel enum for this exact native model. No other configuration key or permission mapping is used.');
-    const data={schema:'datapass.agent-host-prepared/1' as const,handleId:'ahp:'+randomUUID(),hostId,hostIdentityHash:c.descriptor.host.identityHash,protocolVersion:c.protocolVersion,scopeHash:ahpHash(r.scope),binding:structuredClone(b),inventoryHash:ahpHash(this.inventory(c)),capturedAt:new Date().toISOString()};
+    const data={schema:'datapass.agent-host-prepared/1' as const,handleId:'ahp:'+randomUUID(),hostId,hostIdentityHash:c.descriptor.host.identityHash,protocolVersion:c.protocolVersion,scopeHash:ahpHash(r.scope),binding:structuredClone(b),...(permissionReview?{permissionReview}:{}),inventoryHash:ahpHash(this.inventory(c)),capturedAt:new Date().toISOString()};
     const prepared={...data,preparedHash:ahpHash(data)};this.prepared.set(prepared.preparedHash,prepared);
-    const observation=this.initialObservation(prepared,c,'AHP_AVAILABLE');await this.persist({prepared,observation,request:structuredClone(r),clientId:'datapass-agent-'+prepared.hostIdentityHash.slice(0,24),phase:'PREPARED',integrityHash:''});
-    return this.reply(r,'AHP_AVAILABLE',prepared);
+    const observation=this.initialObservation(prepared,c,permissionReview?'PERMISSION_REQUIRED':'AHP_AVAILABLE');await this.persist({prepared,observation,request:structuredClone(r),clientId:'datapass-agent-'+prepared.hostIdentityHash.slice(0,24),phase:'PREPARED',integrityHash:''});
+    return this.reply(r,permissionReview?'PERMISSION_REQUIRED':'AHP_AVAILABLE',prepared,permissionReview?.message??'');
   }
   private async persist(rec:AHPLedger):Promise<void>{const {integrityHash,...rest}=rec;rec.integrityHash=ledgerHash(rest);this.records.set(rec.observation.handleId,rec);const records=structuredClone([...this.records.values()]);if(records.length>100)throw Error('Owned handle bound exceeded');this.writes=this.writes.then(()=>this.services.storage.save(records));await this.writes;}
   private transition(rec:AHPLedger,state:AHPState,message:string){rec.observation={...rec.observation,state,message:bounded(message,1000),capturedAt:new Date().toISOString()};void this.persist(rec).then(()=>this.emit(rec.observation)).catch(()=>{rec.observation.state='UNCERTAIN';});}
@@ -151,6 +173,7 @@ export class AgentHostAdapter {
     const executionKey=taskActionKey(p);
     const existing=[...this.records.values()].find(x=>x.phase!=='PREPARED'&&taskActionKey(x.prepared)===executionKey);
     if(existing&&existing.observation.scopeHash!==ahpHash(r.scope))return this.reply(r,'DENIED',null,'This exact action has a durable intent in another scope; no resend or cross-scope result disclosure.');
+    if(existing&&ahpHash(existing.prepared.binding.executionPolicy??null)!==ahpHash(p.binding.executionPolicy??null))return this.reply(r,'DENIED',null,'Durable task policy differs; recovery cannot downgrade or resend.');
     if(existing)return this.reply(r,existing.observation.state,existing.observation,'Existing durable intent. No duplicate task or resend.');
     if(this.execution.has(executionKey))return this.reply(r,'UNCERTAIN',null,'This exact task is already being submitted.');
     if(!a||a.preparedHash!==hash||a.taskId!==p.binding.taskId||a.promptHash!==p.binding.promptHash||a.hostId!==p.hostId||a.provider!==p.binding.provider||a.protocolVersion!==p.protocolVersion)return this.reply(r,'DENIED',null,'Exact task approval binding differs.');
@@ -159,24 +182,27 @@ export class AgentHostAdapter {
     try{
       const c=this.connections.get(p.hostId);if(!c?.active||c.protocolVersion!==p.protocolVersion||c.descriptor.host.identityHash!==p.hostIdentityHash||!c.descriptor.authorized()||ahpHash(this.inventory(c))!==p.inventoryHash)return this.reply(r,'PROTOCOL_UNSUPPORTED',null,'Host identity, protocol or provider capability changed.');
       if(!await this.services.reviewTask(structuredClone(p))||!this.authorized(r,p.binding)||!await this.services.verifySource(p.binding,r))return this.reply(r,'DENIED',null,'Native task review declined or source changed.');
+      if(p.binding.executionPolicy){const current=await this.resolvePolicy(c,p.binding);if(!current||!p.permissionReview||ahpHash(current)!==ahpHash(p.permissionReview))throw new AHPPermissionError('Prepared permission policy is stale or missing.');}
       const handleId=p.handleId,sessionId='ahp-session:/'+randomUUID(),turnId='turn-'+randomUUID();
-      const observation:AHPObservation={schema:'datapass.agent-host-observation/1',handleId,taskId:p.binding.taskId,roleId:p.binding.roleId,preparedHash:hash,scopeHash:p.scopeHash,hostId:p.hostId,hostIdentityHash:p.hostIdentityHash,protocolVersion:p.protocolVersion,provider:p.binding.provider,root:p.binding.root,revision:p.binding.revision,promptHash:p.binding.promptHash,sessionId,chatId:null,turnId,state:'RUNNING',resultText:'',resultHash:ahpTextHash(''),requestedModel:p.binding.requestedModel,requestedEffort:p.binding.requestedEffort??null,observedModel:null,observedEffort:null,lastServerSeq:0,capturedAt:new Date().toISOString(),evidence:c.descriptor.host.kind==='SYNTHETIC'?'SYNTHETIC':'NATIVE_AHP_OBSERVED',message:'Durable create intent recorded; native completion is separate from task acceptance.',acceptedTaskCompletion:false};
+      const observation:AHPObservation={schema:'datapass.agent-host-observation/1',handleId,taskId:p.binding.taskId,roleId:p.binding.roleId,preparedHash:hash,scopeHash:p.scopeHash,hostId:p.hostId,hostIdentityHash:p.hostIdentityHash,protocolVersion:p.protocolVersion,provider:p.binding.provider,root:p.binding.root,revision:p.binding.revision,promptHash:p.binding.promptHash,sessionId,chatId:null,turnId,state:'RUNNING',resultText:'',resultHash:ahpTextHash(''),requestedModel:p.binding.requestedModel,requestedEffort:p.binding.requestedEffort??null,observedModel:null,observedEffort:null,lastServerSeq:0,capturedAt:new Date().toISOString(),evidence:c.descriptor.host.kind==='SYNTHETIC'?'SYNTHETIC':'NATIVE_AHP_OBSERVED',message:'Durable create intent recorded; native completion is separate from task acceptance.',acceptedTaskCompletion:false,...(p.permissionReview?{executionPolicyHash:p.permissionReview.policyHash,permissionReview:structuredClone(p.permissionReview)}:{})};
       rec={prepared:p,observation,request:structuredClone(r),clientId:'datapass-agent-'+p.hostIdentityHash.slice(0,24),phase:'CREATE_INTENT',integrityHash:''};await this.persist(rec);
       if(!this.authorized(r,p.binding)||!c.descriptor.authorized())throw Error('DENIED');
-      await c.client.request('createSession',{channel:sessionId,provider:p.binding.provider,workingDirectories:[pathToFileURL(p.binding.root).href]});
+      if(p.binding.executionPolicy&&ahpHash(reviewedHostPolicy(c.root))!==p.permissionReview?.hostConfigHash)throw new AHPPermissionError('Host permission configuration changed before creation.');
+      await c.client.request('createSession',{channel:sessionId,provider:p.binding.provider,workingDirectories:[pathToFileURL(p.binding.root).href],...(p.binding.executionPolicy?{config:readOnlyConfig()}:{} )});
       const subscribed=await c.client.subscribe(sessionId);if(!subscribed.result.snapshot)throw Error('Missing session snapshot');this.snapshot(c,subscribed.result.snapshot);
       const session=await this.readySession(c,sessionId);if(!this.sessionMatches(rec,session)||!safeUri(session.defaultChat,'chat'))throw Error('Session binding changed');
       rec.observation.chatId=session.defaultChat!;rec.phase='SESSION_BOUND';await this.persist(rec);
       const chat=await c.client.subscribe(rec.observation.chatId!);if(!chat.result.snapshot)throw Error('Missing chat snapshot');this.snapshot(c,chat.result.snapshot);
       if(!this.chatMatches(rec,c.chats.get(rec.observation.chatId!)!)||!this.authorized(r,p.binding)||!c.descriptor.authorized()||!await this.services.verifySource(p.binding,r))throw Error('DENIED');
+      this.verifySessionPolicy(c,rec);
       rec.phase='SEND_INTENT';await this.persist(rec);
       // The intent is durable before this fire-and-forget action. An uncertain outcome is never retried.
       c.client.dispatch(rec.observation.chatId!,{type:c.sdk[0].ActionType.ChatTurnStarted,turnId,startedAt:new Date().toISOString(),message:{text:p.binding.prompt,origin:{kind:c.sdk[0].MessageKind.User},...(p.binding.requestedModel?{model:{id:p.binding.requestedModel,...(p.binding.requestedEffort?{config:{thinkingLevel:p.binding.requestedEffort}}:{})}}:{})}});
       rec.phase='SENT';await this.persist(rec);this.emit(rec.observation);return this.reply(r,rec.observation.state,rec.observation);
-    }catch(error){if(rec){const state:AHPState=String(error).includes('AHP_FAILED')?'FAILED':(error as {code?:number})?.code!==undefined?this.errorState(error):'UNCERTAIN';this.transition(rec,state,state==='UNCERTAIN'?'Submission or startup uncertain. Recover exact stored identities; do not retry.':'Host reported failed or unavailable startup; no prompt retry.');await this.writes;return this.reply(r,state,rec.observation);}return this.reply(r,this.errorState(error),null,'Native route unavailable; raw connection errors omitted.');}
+    }catch(error){if(rec){const state:AHPState=error instanceof AHPPermissionError?'PERMISSION_REQUIRED':String(error).includes('AHP_FAILED')?'FAILED':(error as {code?:number})?.code!==undefined?this.errorState(error):'UNCERTAIN';this.transition(rec,state,state==='UNCERTAIN'?'Submission or startup uncertain. Recover exact stored identities; do not retry.':error instanceof AHPPermissionError?error.message:'Host reported failed or unavailable startup; no prompt retry.');await this.writes;return this.reply(r,state,rec.observation);}return this.reply(r,error instanceof AHPPermissionError?'PERMISSION_REQUIRED':this.errorState(error),null,error instanceof AHPPermissionError?error.message:'Native route unavailable; raw connection errors omitted.');}
     finally{this.execution.delete(executionKey);}
   }
-  private initialObservation(p:AHPPrepared,c:Connection,state:AHPState):AHPObservation{return {schema:'datapass.agent-host-observation/1',handleId:p.handleId,taskId:p.binding.taskId,roleId:p.binding.roleId,preparedHash:p.preparedHash,scopeHash:p.scopeHash,hostId:p.hostId,hostIdentityHash:p.hostIdentityHash,protocolVersion:p.protocolVersion,provider:p.binding.provider,root:p.binding.root,revision:p.binding.revision,promptHash:p.binding.promptHash,sessionId:null,chatId:null,turnId:null,state,resultText:'',resultHash:ahpTextHash(''),requestedModel:p.binding.requestedModel,requestedEffort:p.binding.requestedEffort??null,observedModel:null,observedEffort:null,lastServerSeq:0,capturedAt:new Date().toISOString(),evidence:c.descriptor.host.kind==='SYNTHETIC'?'SYNTHETIC':'NATIVE_AHP_OBSERVED',message:'Prepared ordinary task; no native session created or prompt sent.',acceptedTaskCompletion:false};}
+  private initialObservation(p:AHPPrepared,c:Connection,state:AHPState):AHPObservation{return {schema:'datapass.agent-host-observation/1',handleId:p.handleId,taskId:p.binding.taskId,roleId:p.binding.roleId,preparedHash:p.preparedHash,scopeHash:p.scopeHash,hostId:p.hostId,hostIdentityHash:p.hostIdentityHash,protocolVersion:p.protocolVersion,provider:p.binding.provider,root:p.binding.root,revision:p.binding.revision,promptHash:p.binding.promptHash,sessionId:null,chatId:null,turnId:null,state,resultText:'',resultHash:ahpTextHash(''),requestedModel:p.binding.requestedModel,requestedEffort:p.binding.requestedEffort??null,observedModel:null,observedEffort:null,lastServerSeq:0,capturedAt:new Date().toISOString(),evidence:c.descriptor.host.kind==='SYNTHETIC'?'SYNTHETIC':'NATIVE_AHP_OBSERVED',message:'Prepared ordinary task; no native session created or prompt sent.',acceptedTaskCompletion:false,...(p.permissionReview?{executionPolicyHash:p.permissionReview.policyHash,permissionReview:structuredClone(p.permissionReview)}:{})};}
   private sessionMatches(rec:AHPLedger,s:SessionState):boolean{return !!s&&s.provider===rec.observation.provider&&s.workingDirectories?.length===1&&s.workingDirectories[0]===pathToFileURL(rec.observation.root).href;}
   private chatMatches(rec:AHPLedger,s:ChatState):boolean{return !!s&&s.resource===rec.observation.chatId&&(!s.workingDirectories||s.workingDirectories.length===1&&s.workingDirectories[0]===pathToFileURL(rec.observation.root).href);}
   private async readySession(c:Connection,id:string):Promise<SessionState>{const until=Date.now()+5000;while(c.active&&c.descriptor.authorized()&&Date.now()<until){const s=c.sessions.get(id);if(s?.lifecycle==='ready')return s;if(s?.lifecycle==='failed')throw Error('AHP_FAILED');await new Promise(resolve=>setTimeout(resolve,20));}throw Error('Host startup disappeared');}
@@ -184,6 +210,7 @@ export class AgentHostAdapter {
     if(!this.authorized(rec.request,rec.prepared.binding)||!await this.services.verifySource(rec.prepared.binding,rec.request)){this.transition(rec,'DENIED','Source permission, root or revision changed during observation.');return;}
     const o=rec.observation,s=c.sessions.get(o.sessionId!),chat=c.chats.get(o.chatId!);
     if(!s||!this.sessionMatches(rec,s)||chat&&!this.chatMatches(rec,chat)){this.transition(rec,'DENIED','Host session/root/provider binding changed.');return;}
+    if(rec.prepared.binding.executionPolicy){try{this.verifySessionPolicy(c,rec);}catch(error){this.transition(rec,'PERMISSION_REQUIRED',error instanceof Error?error.message:'Permission enforcement is unknown.');return;}}
     if(!chat)return;
     const turn=[...chat.turns,chat.activeTurn].filter(t=>t?.id===o.turnId);if(turn.length>1){this.transition(rec,'DENIED','Ambiguous native turn identity.');return;}if(!turn.length)return;
     const selected=turn[0]!;if(ahpTextHash(selected.message.text)!==o.promptHash){this.transition(rec,'DENIED','Observed prompt differs from durable task.');return;}

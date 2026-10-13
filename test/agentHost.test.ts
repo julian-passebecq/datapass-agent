@@ -81,3 +81,60 @@ test('SYNTHETIC exact task action deduplicates across restart while reviewed tas
     const otherScope={...f.request,scope:{...f.request.scope,privacyDomainIds:['other-synthetic-domain']}};f.descriptor.scopeHash=ahpHash(otherScope.scope);const scoped=await reopened.api.prepare({request:otherScope,binding:revised,hostId:f.descriptor.host.hostId});assert.ok(scoped.data);const denied=await reopened.api.execute({request:otherScope,preparedHash:scoped.data!.preparedHash,approval:f.approval(scoped.data!)});assert.equal(denied.state,'DENIED');assert.equal(denied.data,null);assert.equal(f.sent.filter(x=>x.method==='createSession').length,3);await reopened.dispose();
   }finally{await f.close();}
 });
+
+// READ_ONLY_NO_DELEGATION intentionally refuses native execution when public
+// configuration observations cannot prove provider/host enforcement.
+async function guardedFixture(options:Parameters<typeof syntheticAHPFixture>[1]={}){
+ const f=await syntheticAHPFixture(root,options);f.binding.testPolicyHash='6'.repeat(64);
+ f.binding.executionPolicy={mode:'READ_ONLY_NO_DELEGATION',sourcePolicyHash:f.binding.testPolicyHash};return f;
+}
+async function guardedPrepared(f:Awaited<ReturnType<typeof guardedFixture>>){
+ const p=await f.adapter.api.prepare({request:f.request,binding:f.binding,hostId:f.descriptor.host.hostId});
+ assert.equal(p.state,'PERMISSION_REQUIRED');assert.ok(p.data,p.message);return p.data!;
+}
+test('SYNTHETIC guarded resolution and exact creation config; an echoed session config never qualifies enforcement',async()=>{
+ const f=await guardedFixture();try{const p=await guardedPrepared(f);
+ assert.equal(p.permissionReview?.nativeEffective,'UNKNOWN');assert.equal(p.permissionReview?.hostTools,'UNVERIFIED');
+ const result=await f.adapter.api.execute({request:f.request,preparedHash:p.preparedHash,approval:f.approval(p)});
+ assert.equal(result.state,'PERMISSION_REQUIRED');assert.match(result.data!.message,/UNKNOWN/);
+ const resolve=f.sent.find(x=>x.method==='resolveSessionConfig')!.params;
+ assert.equal(resolve.provider,'codex');assert.equal(resolve.workingDirectory,f.uri);
+ const config={'codex.sandboxMode':'read-only','codex.approvalPolicy':'never','codex.networkAccessEnabled':false,'codex.webSearchMode':'disabled','codex.additionalDirectories':[],permissions:{allow:[],deny:[]}};
+ assert.deepEqual(resolve.config,config);assert.deepEqual(f.sent.find(x=>x.method==='createSession')!.params.config,config);
+ assert.equal(f.sent.filter(x=>x.params?.action?.type==='chat/turnStarted').length,0);
+ assert.equal(result.data?.executionPolicyHash,ahpHash(f.binding.executionPolicy));
+ assert.equal(result.data?.permissionReview?.stage,'SESSION_CONFIG_OBSERVED');
+ }finally{await f.close();}
+});
+for(const [name,alter]of Object.entries({write:(v:Record<string,unknown>)=>({...v,'codex.sandboxMode':'workspace-write'}),preset:(v:Record<string,unknown>)=>({...v,'codex.permissionsPreset':'default'}),network:(v:Record<string,unknown>)=>({...v,'codex.networkAccessEnabled':true}),search:(v:Record<string,unknown>)=>({...v,'codex.webSearchMode':'live'}),directories:(v:Record<string,unknown>)=>({...v,'codex.additionalDirectories':['C:/unsafe']}),allow:(v:Record<string,unknown>)=>({...v,permissions:{allow:['create_session'],deny:[]}}),missing:(v:Record<string,unknown>)=>{const x={...v};delete x['codex.approvalPolicy'];return x;}}) as [string,(v:Record<string,unknown>)=>Record<string,unknown>][]){
+ test('SYNTHETIC unsafe resolved '+name+' blocks creation',async()=>{
+ const {readOnlyConfig}=await import('../src/provider-kit/agentHostPolicy');const f=await guardedFixture({policyValues:alter(readOnlyConfig())});
+ try{const p=await f.adapter.api.prepare({request:f.request,binding:f.binding,hostId:f.descriptor.host.hostId});assert.equal(p.state,'PERMISSION_REQUIRED');assert.equal(p.data,null);assert.equal(f.sent.filter(x=>x.method==='createSession').length,0);}finally{await f.close();}
+ });
+}
+test('SYNTHETIC missing or unsupported schema blocks creation and unsupported provider/policy is refused',async()=>{
+ for(const opt of [{missingPolicyKey:'codex.sandboxMode'},{unsafePolicySchema:true}]){const f=await guardedFixture(opt);try{const p=await f.adapter.api.prepare({request:f.request,binding:f.binding,hostId:f.descriptor.host.hostId});assert.equal(p.state,'PERMISSION_REQUIRED');assert.equal(p.data,null);assert.equal(f.sent.filter(x=>x.method==='createSession').length,0);}finally{await f.close();}}
+ const f=await guardedFixture();try{f.binding.executionPolicy!.sourcePolicyHash='7'.repeat(64);assert.equal((await f.adapter.api.prepare({request:f.request,binding:f.binding,hostId:f.descriptor.host.hostId})).state,'DENIED');}finally{await f.close();}
+});
+test('SYNTHETIC changed host configuration invalidates preparation before session creation',async()=>{
+ const f=await guardedFixture();try{const p=await guardedPrepared(f);await f.hostAction('ahp-root://',{type:ActionType.RootConfigChanged,config:{globalAutoApproveEnabled:true}});await pause();const r=await f.adapter.api.execute({request:f.request,preparedHash:p.preparedHash,approval:f.approval(p)});assert.equal(r.state,'PERMISSION_REQUIRED');assert.equal(f.sent.filter(x=>x.method==='createSession').length,0);}finally{await f.close();}
+});
+test('SYNTHETIC unsafe or missing observed session configuration refuses the first turn',async()=>{
+ for(const values of [{},{'codex.sandboxMode':'workspace-write'}]){const f=await guardedFixture({sessionPolicyValues:values});try{const p=await guardedPrepared(f);const r=await f.adapter.api.execute({request:f.request,preparedHash:p.preparedHash,approval:f.approval(p)});assert.equal(r.state,'PERMISSION_REQUIRED');assert.equal(f.sent.filter(x=>x.params?.action?.type==='chat/turnStarted').length,0);}finally{await f.close();}}
+});
+test('SYNTHETIC policy provenance and blocked session survive crash/reconnect without a prompt or duplicate session',async()=>{
+ const f=await guardedFixture();try{const p=await guardedPrepared(f);const first=await f.adapter.api.execute({request:f.request,preparedHash:p.preparedHash,approval:f.approval(p)});await f.adapter.dispose();const reopened=f.makeAdapter();reopened.registerHost(f.descriptor);
+ const recovered=await reopened.api.recover({request:f.request,handleId:p.handleId});assert.equal(recovered.state,'PERMISSION_REQUIRED');assert.equal(recovered.data?.sessionId,first.data?.sessionId);assert.equal(recovered.data?.executionPolicyHash,ahpHash(f.binding.executionPolicy));
+ await reopened.api.execute({request:f.request,preparedHash:p.preparedHash,approval:f.approval(p)});assert.equal(f.sent.filter(x=>x.method==='createSession').length,1);assert.equal(f.sent.filter(x=>x.params?.action?.type==='chat/turnStarted').length,0);
+ const changed=f.sessions.get(first.data!.sessionId!)!;changed.config!.values['codex.sandboxMode']='workspace-write';assert.equal((await reopened.api.recover({request:f.request,handleId:p.handleId})).state,'PERMISSION_REQUIRED');await reopened.dispose();
+ }finally{await f.close();}
+});
+test('SYNTHETIC guarded host confirmation is explicitly denied, never inferred from native sandbox',async()=>{
+ const f=await guardedFixture();try{const p=await guardedPrepared(f);const r=await f.adapter.api.execute({request:f.request,preparedHash:p.preparedHash,approval:f.approval(p)});const o=r.data!;
+ // Fixture-owned server turn, not an Agent submission or a real provider task.
+ await f.broadcast(o.chatId!,{type:ActionType.ChatTurnStarted,turnId:o.turnId!,startedAt:new Date().toISOString(),message:{text:f.binding.prompt,origin:{kind:'user' as any}}});
+ await f.broadcast(o.chatId!,{type:ActionType.ChatToolCallStart,turnId:o.turnId!,toolCallId:'prohibited-host-tool',toolName:'create_session',displayName:'Synthetic host tool'});
+ await f.broadcast(o.chatId!,{type:ActionType.ChatToolCallReady,turnId:o.turnId!,toolCallId:'prohibited-host-tool',invocationMessage:'Synthetic host delegation request'});await pause();
+ const denial=f.sent.find(x=>x.params?.action?.type==='chat/toolCallConfirmed')!.params.action;assert.equal(denial.approved,false);assert.equal(denial.toolCallId,'prohibited-host-tool');assert.equal(f.sent.filter(x=>x.params?.action?.type==='chat/turnStarted').length,0);
+ }finally{await f.close();}
+});

@@ -1,0 +1,38 @@
+{
+  "schema": "datapass.rc2-permission-guard-local/1",
+  "capturedAt": "2026-10-13T18:45:37.687Z",
+  "baseline": {
+    "archive": "50e5df0c2ba494cad2bfc48313bceea3cf7c1b67",
+    "pm": "d1d12a59ffb0a602de89d49ab4c6560ae58a658e",
+    "agent": "69cd301808bc1dfa027039718ef61044bf9a4382",
+    "workspace": "185131ecf82d60f306bf96d030cb3ad9d017c0c9"
+  },
+  "classification": "SYNTHETIC_AHP_GUARD_AND_PRODUCT_CONTROLLER_ONLY",
+  "tests": {
+    "agentAHP": 29,
+    "agentProviderKit": 1,
+    "pmAHP": 7,
+    "pmManual": 4,
+    "passed": true
+  },
+  "configTransmission": "Exact restrictive configuration in official createSession.config tested with synthetic host",
+  "refusals": [
+    "unsafe/missing/schema unsupported configuration",
+    "workspace-write replacement",
+    "permission preset override",
+    "added directories/network/web search/allow-list",
+    "host configuration change",
+    "unknown effective native and host enforcement"
+  ],
+  "recovery": "Policy and retained blocked session survive reopen; zero guarded prompts or duplicate session",
+  "prohibitedToolConfirmation": "Owned synthetic confirmation explicitly denied by official public action; no automatic approval",
+  "nativePermission": "UNKNOWN_NOT_QUALIFIED",
+  "hostTools": "UNVERIFIED_NOT_QUALIFIED",
+  "liveTask": "NOT_RUN",
+  "editorGUI": "NOT_CLAIMED",
+  "noSourceChanges": [
+    "Config",
+    "Lens",
+    "protected direct-spawn transport"
+  ]
+}

@@ -7,11 +7,19 @@ export interface AHPBinding {
   requestedModel:string|null; requestedEffort?:string|null; prompt:string; promptHash:string;
   requestedMode?:'PLAN'|'GOAL'|'DEFAULT'; testPolicyHash?:string; outputPolicyHash?:string;
   taskRevision?:number;
+  executionPolicy?: AHPExecutionPolicy;
+}
+/** Config owns selection; Agent owns protocol validation and enforcement. */
+export interface AHPExecutionPolicy { mode:'READ_ONLY_NO_DELEGATION'; sourcePolicyHash:string; }
+export interface AHPPermissionReview {
+  policyHash:string; resolvedConfigHash:string; hostConfigHash:string;
+  configuration:'SUPPORTED'; nativeEffective:'UNKNOWN'; hostTools:'UNVERIFIED';
+  stage:'RESOLVED'|'SESSION_CONFIG_OBSERVED'; message:string;
 }
 export interface AHPHost { hostId:string; kind:'VSCODE_AGENT_HOST'|'STANDALONE_AGENT_HOST'|'SYNTHETIC'; label:string; protocolVersion:string|null; connectionState:AHPState; identityHash:string; }
 export interface AHPProvider { provider:string; state:AHPState; models:{id:string;provider:string;name:string;efforts:string[]}[]; }
 export interface AHPInspection { state:AHPState; hosts:AHPHost[]; providers:AHPProvider[]; capabilities:string[]; selectedHostId:string|null; protocolVersion:string|null; sessions:{hostId:string;sessionId:string;taskId:string}[]; message:string; }
-export interface AHPPrepared { schema:'datapass.agent-host-prepared/1'; handleId:string; preparedHash:string; hostId:string; hostIdentityHash:string; protocolVersion:string; scopeHash:string; binding:AHPBinding; inventoryHash:string; capturedAt:string; }
+export interface AHPPrepared { schema:'datapass.agent-host-prepared/1'; handleId:string; preparedHash:string; hostId:string; hostIdentityHash:string; protocolVersion:string; scopeHash:string; binding:AHPBinding; inventoryHash:string; capturedAt:string; permissionReview?:AHPPermissionReview; }
 export interface AHPApproval { preparedHash:string; taskId:string; promptHash:string; hostId:string; provider:'codex'|'claude'; protocolVersion:string; }
 export interface AHPObservation {
   schema:'datapass.agent-host-observation/1'; handleId:string; taskId:string; roleId:string; preparedHash:string; scopeHash:string;
@@ -19,6 +27,7 @@ export interface AHPObservation {
   sessionId:string|null; chatId:string|null; turnId:string|null; state:AHPState; resultText:string; resultHash:string;
   observedModel:string|null; observedEffort:string|null; requestedModel:string|null; requestedEffort:string|null;
   lastServerSeq:number; capturedAt:string; evidence:'SYNTHETIC'|'NATIVE_AHP_OBSERVED'; message:string; acceptedTaskCompletion:false;
+  executionPolicyHash?:string; permissionReview?:AHPPermissionReview;
 }
 export interface AgentHostApi {
   readonly major:1;
