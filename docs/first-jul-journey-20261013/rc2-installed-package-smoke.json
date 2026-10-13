@@ -1,0 +1,22 @@
+{
+  "schema": "datapass.rc2-installed-package-smoke/1",
+  "state": "PASS_SYNTHETIC_API_ONLY",
+  "installedPmVersion": "0.5.4",
+  "installedAgentVersion": "0.11.4",
+  "checks": [
+    "Installed AHP journal and reserved handle survive reactivation",
+    "Agent unavailable prevents native recovery without a send",
+    "Installed PM activates against bounded synthetic VS Code API",
+    "Installed Agent module exports activate/deactivate",
+    "Copy/Open workflow renders",
+    "Workspace journal survives reactivation",
+    "Exact task/role/prompt/UNAVAILABLE state recovered",
+    "Missing source permissions refuse Copy before native call"
+  ],
+  "nativeCalls": 0,
+  "providerExecution": false,
+  "guiInputCalls": 0,
+  "nativeExtensionHost": "NOT_RUN",
+  "installedGui": "BLOCKED_NO_APPROVED_ISOLATED_GUI_AUTOMATION",
+  "capturedAt": "2026-10-13T16:20:38.952Z"
+}

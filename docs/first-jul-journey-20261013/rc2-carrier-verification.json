@@ -1,0 +1,72 @@
+{
+  "schema": "datapass.rc2-exact-carrier/1",
+  "pilot": "agent",
+  "state": "PASS_EXACT_SOURCE_RECIPE_LOG_AND_PACKAGE_BYTES",
+  "source": "7d573a909a70c566a4d43a8475cf95628c483159",
+  "sourceTree": "4ff03aa9bb5e39456a28efe5fb5e41f73d154f3f",
+  "carrier": "9c4a9b25e98d1badd8952bed5f593daf39ea7384",
+  "manifestSha256": "c0205cd3e409549e40dccea779705ae64b0cdef2dad846953e1e3ad66fcfdcc7",
+  "templateGitBlob": "081bfdb308c30f096de3f557b33ac51c9761ed06",
+  "templateSha256": "a35600c86200d5f095c09a6842dd87d026e27761e797e9110c17b272f0b97e81",
+  "concreteSha256": "c9c140ef6a7d19bd6a831c9db6d80f849501f1309a5d258881e121ba1a7c3b3e",
+  "receiptSha256": "002fba8699d4ad50268433793569205af936c1e77136489ed17463cc379a5863",
+  "jobId": "17146561460",
+  "pipelineId": "2943221123",
+  "jobUrl": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17146561460",
+  "jobStatus": "success",
+  "runnerId": "56844575",
+  "nodeVersion": "v22.23.3",
+  "nodeSha256": "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e",
+  "gates": [
+    {
+      "command": "npm ci",
+      "exitCode": 0,
+      "logSha256": "4edff42a6fa7518d0645fe10b76c589d8a91ad1025cbb72a286164ef37ed894c"
+    },
+    {
+      "command": "npm run check",
+      "exitCode": 0,
+      "logSha256": "77771060193cac8a30c2ae726af1ddab82ae06ebd1d2665f80bf325864b52740"
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "logSha256": "8788aeaf1875da061a1c91d4428036ac2140618b48813b11ccb8bafb6f2939c2"
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "logSha256": "73a1e634a4a9be921923b685fc8c452319cbe55552245f38347f661689ecbc58"
+    },
+    {
+      "command": "npm run build:provider-kit",
+      "exitCode": 0,
+      "logSha256": "e85b73a6897831762301b7030c88405b342d231a94efc33208649e1e258c24ad"
+    },
+    {
+      "command": "npm run package",
+      "exitCode": 0,
+      "logSha256": "25c2edd832a228e67d927085691a922ace29138eadf53d62ba13a1b167a4661b"
+    }
+  ],
+  "tests": {
+    "total": 511,
+    "passed": 511,
+    "failed": 0,
+    "skipped": 0
+  },
+  "artifacts": [
+    {
+      "filename": "agent-vscode-0.11.4.vsix",
+      "bytes": 530434,
+      "sha256": "a0b95f40ba53be6daf0a101758f2396891e8a2be93f085b537862f127b3e0e56",
+      "sourceSha": "7d573a909a70c566a4d43a8475cf95628c483159",
+      "os": "Windows"
+    }
+  ],
+  "expiresAt": "2026-11-12T16:15:40.120Z",
+  "installedGui": "NOT_CLAIMED",
+  "nativeTurn": "NOT_CLAIMED",
+  "hostedChecks": "SEPARATE_BILLING_BLOCKED",
+  "privacy": "NO_RAW_TRACE_AUTH_OR_HISTORY"
+}

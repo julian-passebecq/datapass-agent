@@ -1,0 +1,32 @@
+{
+  "schema": "datapass.isolated-profile-installed-payload/1",
+  "capturedAt": "2026-10-13T16:20:37.5506465Z",
+  "phase": "first-jul-qualified",
+  "profileIdentity": "e047a6bc253165bc9faa71a03b17fb74eabc892e9bd167b69ede17be7b716c9b",
+  "packages": [
+    {
+      "product": "pm",
+      "id": "juliandatapass.datapass-pm",
+      "version": "0.5.4",
+      "vsixPath": "D:\\PROJ\\.cockpit-integration\\COMPLETE-NATIVE-20261012\\worktrees\\ARCHIVE\\workflow\\2026-10-12\\COCKPIT-NATIVE-20261009-FULL\\first-jul-journey-20261013\\rc2\\carrier-pm-17145976817/datapass-pm-0.5.4.vsix",
+      "vsixSha256": "c2cf2732f18b07221aa259e67bf86fc54286916bd3c9b76cdb50da381cda31cc",
+      "installedRoot": "D:\\PROJ\\.cockpit-integration\\COCKPIT-NATIVE-20261009-FULL\\QA\\agents-integration-20261011\\native-profile\\extensions\\juliandatapass.datapass-pm-0.5.4",
+      "payloadEntriesVerified": 121,
+      "state": "INSTALLED_PAYLOAD_MATCHES_EXACT_VSIX",
+      "manifestHandling": "Only installer-added __metadata ignored; all original public fields equal"
+    },
+    {
+      "product": "agent",
+      "id": "juliandatapass.agent-vscode",
+      "version": "0.11.4",
+      "vsixPath": "D:\\PROJ\\.cockpit-integration\\COMPLETE-NATIVE-20261012\\worktrees\\ARCHIVE\\workflow\\2026-10-12\\COCKPIT-NATIVE-20261009-FULL\\first-jul-journey-20261013\\rc2\\carrier-agent-17146561460/agent-vscode-0.11.4.vsix",
+      "vsixSha256": "a0b95f40ba53be6daf0a101758f2396891e8a2be93f085b537862f127b3e0e56",
+      "installedRoot": "D:\\PROJ\\.cockpit-integration\\COCKPIT-NATIVE-20261009-FULL\\QA\\agents-integration-20261011\\native-profile\\extensions\\juliandatapass.agent-vscode-0.11.4",
+      "payloadEntriesVerified": 9,
+      "state": "INSTALLED_PAYLOAD_MATCHES_EXACT_VSIX",
+      "manifestHandling": "Only installer-added __metadata ignored; all original public fields equal"
+    }
+  ],
+  "auth": "UNKNOWN",
+  "nativeLaunched": false
+}

@@ -1,0 +1,225 @@
+{
+  "schema": "datapass.cockpit-rc2/1",
+  "capturedAt": "2026-10-13T16:22:36.986Z",
+  "result": "RC2_IMPLEMENTED_LIVE_BLOCKED",
+  "products": {
+    "pm": {
+      "version": "0.5.4",
+      "source": "f8b1466e80e30d08fb431c7d6fd95cf4cf0884ba",
+      "sourceTree": "909b9d8fee0cb7a9df11bb574c9114b55850c3ea",
+      "branch": "codex/complete-native-cockpit-20261012",
+      "pr": "https://github.com/julian-passebecq/datapass-pm/pull/4",
+      "artifact": {
+        "filename": "datapass-pm-0.5.4.vsix",
+        "bytes": 1632035,
+        "sha256": "c2cf2732f18b07221aa259e67bf86fc54286916bd3c9b76cdb50da381cda31cc",
+        "sourceSha": "f8b1466e80e30d08fb431c7d6fd95cf4cf0884ba",
+        "os": "Windows",
+        "localPath": "D:\\PROJ\\.cockpit-integration\\COMPLETE-NATIVE-20261012\\worktrees\\ARCHIVE\\workflow\\2026-10-12\\COCKPIT-NATIVE-20261009-FULL\\first-jul-journey-20261013\\rc2\\carrier-pm-17145976817\\datapass-pm-0.5.4.vsix",
+        "downloadUrl": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17145976817/artifacts/raw/evidence/datapass-pm-0.5.4.vsix",
+        "browseUrl": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17145976817/artifacts/browse/evidence/",
+        "access": "Authenticated existing private GitLab project developer artifact access",
+        "expiresAt": "2026-11-12T15:55:04.701Z"
+      },
+      "ci": {
+        "jobId": "17145976817",
+        "pipelineId": "2943221123",
+        "url": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17145976817",
+        "runnerId": "56844575",
+        "gates": [
+          {
+            "command": "npm ci",
+            "exitCode": 0,
+            "logSha256": "889a2fb3b1bef2bd30e85238e44cdef818b8156b0f346f0c3683c4b0760b9af5"
+          },
+          {
+            "command": "npm run typecheck",
+            "exitCode": 0,
+            "logSha256": "5e51595d807d3ab6e5f647852cedfcb9e2e8d0fda4fafd6fd3d40a4ead989bfe"
+          },
+          {
+            "command": "npm test",
+            "exitCode": 0,
+            "logSha256": "66e7928b7c6f063bac448fa7fedc4ab175cd731c462d03adaab5e9ad5af97197"
+          },
+          {
+            "command": "npm run package",
+            "exitCode": 0,
+            "logSha256": "c7d7076ccf41f7f22bf5b913ff17e5ac0709f2a179cd37cc337a95a4c1e768f6"
+          }
+        ],
+        "tests": {
+          "total": 219,
+          "passed": 219,
+          "failed": 0,
+          "skipped": 0
+        },
+        "receipt": "carrier-pm-17145976817/verification.json"
+      }
+    },
+    "agent": {
+      "version": "0.11.4",
+      "source": "7d573a909a70c566a4d43a8475cf95628c483159",
+      "sourceTree": "4ff03aa9bb5e39456a28efe5fb5e41f73d154f3f",
+      "branch": "codex/complete-native-cockpit-20261012",
+      "pr": "https://github.com/julian-passebecq/agent-vscode/pull/86",
+      "artifact": {
+        "filename": "agent-vscode-0.11.4.vsix",
+        "bytes": 530434,
+        "sha256": "a0b95f40ba53be6daf0a101758f2396891e8a2be93f085b537862f127b3e0e56",
+        "sourceSha": "7d573a909a70c566a4d43a8475cf95628c483159",
+        "os": "Windows",
+        "localPath": "D:\\PROJ\\.cockpit-integration\\COMPLETE-NATIVE-20261012\\worktrees\\ARCHIVE\\workflow\\2026-10-12\\COCKPIT-NATIVE-20261009-FULL\\first-jul-journey-20261013\\rc2\\carrier-agent-17146561460\\agent-vscode-0.11.4.vsix",
+        "downloadUrl": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17146561460/artifacts/raw/evidence/agent-vscode-0.11.4.vsix",
+        "browseUrl": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17146561460/artifacts/browse/evidence/",
+        "access": "Authenticated existing private GitLab project developer artifact access",
+        "expiresAt": "2026-11-12T16:15:40.120Z"
+      },
+      "ci": {
+        "jobId": "17146561460",
+        "pipelineId": "2943221123",
+        "url": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17146561460",
+        "runnerId": "56844575",
+        "gates": [
+          {
+            "command": "npm ci",
+            "exitCode": 0,
+            "logSha256": "4edff42a6fa7518d0645fe10b76c589d8a91ad1025cbb72a286164ef37ed894c"
+          },
+          {
+            "command": "npm run check",
+            "exitCode": 0,
+            "logSha256": "77771060193cac8a30c2ae726af1ddab82ae06ebd1d2665f80bf325864b52740"
+          },
+          {
+            "command": "npm test",
+            "exitCode": 0,
+            "logSha256": "8788aeaf1875da061a1c91d4428036ac2140618b48813b11ccb8bafb6f2939c2"
+          },
+          {
+            "command": "npm run build",
+            "exitCode": 0,
+            "logSha256": "73a1e634a4a9be921923b685fc8c452319cbe55552245f38347f661689ecbc58"
+          },
+          {
+            "command": "npm run build:provider-kit",
+            "exitCode": 0,
+            "logSha256": "e85b73a6897831762301b7030c88405b342d231a94efc33208649e1e258c24ad"
+          },
+          {
+            "command": "npm run package",
+            "exitCode": 0,
+            "logSha256": "25c2edd832a228e67d927085691a922ace29138eadf53d62ba13a1b167a4661b"
+          }
+        ],
+        "tests": {
+          "total": 511,
+          "passed": 511,
+          "failed": 0,
+          "skipped": 0
+        },
+        "receipt": "carrier-agent-17146561460/verification.json"
+      }
+    }
+  },
+  "unchanged": {
+    "config": {
+      "version": "0.8.1",
+      "source": "7d080980a0c679b6106a7e655450340dc8862edf"
+    },
+    "lens": {
+      "version": "0.3.7",
+      "source": "95ebd7e73ab21ce674c3e77153f6c29677fc0099"
+    }
+  },
+  "qualification": {
+    "codexAHP": "BLOCKED_LIVE_ROUTE_SOURCE_COMPATIBLE_SYNTHETIC_PASS",
+    "claudeAHP": "BLOCKED_LIVE_ROUTE_SOURCE_COMPATIBLE_SYNTHETIC_PASS",
+    "protocolTransport": "PASS_SYNTHETIC_OFFICIAL_SDK_1_0_AND_0_9_AND_OWNED_NAMED_PIPE_WEBSOCKET",
+    "nativeLiveResponse": "BLOCKED_NO_AUTHORIZED_HOST_CONNECTION_OR_TASK",
+    "nativeLiveRecovery": "BLOCKED_NO_NATIVE_TURN",
+    "actualNativeTurns": 0,
+    "actualNativeGuiInputCalls": 0,
+    "installedPackageBytes": "PASS_130_PAYLOAD_ENTRIES",
+    "installedSyntheticAPIRecovery": "PASS_SYNTHETIC_API_ONLY",
+    "installedExtensionHost": "NOT_RUN_SEPARATE_GATE",
+    "installedGui": "BLOCKED_NO_APPROVED_INDEPENDENT_AUTOMATION_ENVIRONMENT",
+    "rc2PackageReadiness": "YES_EXACT_CARRIER_AND_INSTALLED_SYNTHETIC_SCOPE",
+    "fullContractComplete": "NO",
+    "automaticSameSessionReveal": "UNQUALIFIED_NO_SUPPORTED_PUBLIC_EXTENSION_OR_CLI_ACTION",
+    "effectiveModelAndEffort": "UNKNOWN_NOT_INFERRED_FROM_REQUEST_ECHO",
+    "planGoal": "UNQUALIFIED_AHP_DEFAULT_ORDINARY_ONLY"
+  },
+  "protocolEvidence": "pm-agent-protocol.json",
+  "compatibilityEvidence": "compatibility.json",
+  "installedEvidence": "final-install/installed-payload.json",
+  "syntheticSmokeEvidence": "rc2-installed-package-smoke.json",
+  "githubRequiredChecks": {
+    "state": "BILLING_BLOCKED_BEFORE_STEPS",
+    "receipt": "github-required-checks.json",
+    "carrierIsHostedSuccess": false
+  },
+  "ciAttempts": [
+    {
+      "pilot": "pm",
+      "job": "17145976817",
+      "state": "PASS_219_OF_219"
+    },
+    {
+      "pilot": "agent",
+      "job": "17145976818",
+      "state": "FAIL_510_OF_511_COLD_LOAD_20341MS_THRESHOLD_20000MS",
+      "packageQualified": false
+    },
+    {
+      "pilot": "agent",
+      "job": "17146561460",
+      "state": "PASS_511_OF_511_UNCHANGED_SOURCE_AND_RECIPE_RETRY"
+    }
+  ],
+  "performanceFollowup": "Focused unchanged performance test passed; resource/timing sensitivity is an inference. Failed job retained; no threshold relaxation or PM rerun.",
+  "sourceOwnership": "Agent owns official protocol SDK/transport and DTO; PM consumes additive agentHostV1. Config/Lens untouched. Protected direct-spawn Ed25519/isolation implementation unchanged.",
+  "fullScope": {
+    "canonicalClauses": 219,
+    "refinements": 63,
+    "journeys": 30,
+    "gateReceipt": "remaining-gates.json",
+    "status": "OPEN_REUSE_OTHER_DISPOSITIONS"
+  },
+  "nextBoundary": {
+    "option": "Reuse existing Insiders editor Agent Host in a specifically approved native execution environment; standalone authority remains separate and unnecessary.",
+    "prerequisites": [
+      "An available existing editor host in the selected approved environment",
+      "Exact separate consent to selected documented local endpoint bearer access",
+      "Exactly one native README task grant for synthetic workspace HEAD 185131ecf82d60f306bf96d030cb3ad9d017c0c9",
+      "Normal native authentication/permissions and an authorized way to handle any input",
+      "Independent approved automation environment for the separate GUI gate"
+    ],
+    "task": "Read this synthetic project's README.md and briefly summarize it. Do not change files, use network tools, or delegate.",
+    "safeguards": [
+      "No copied credentials, automatic tool approval, uncertain retry, continuation, new harness or paid fallback",
+      "Select exact host identity, actual provider/model inventory, task/source and permission evidence before dispatch",
+      "Display bounded source-labelled response and recover exact session/chat/turn without resending"
+    ],
+    "risks": [
+      "Native provider account/model/tool entitlement remains unknown until normal authorized runtime inspection",
+      "A profile provides storage separation, not an independent OS sandbox",
+      "No public same-session reveal qualified; generic Chat Open and observed reference Copy remain explicit"
+    ]
+  },
+  "privacy": {
+    "rawTraceRead": false,
+    "rawHistoryExport": false,
+    "liveEndpointCredentialRead": false,
+    "collectedGateLogsChecked": 16,
+    "patternScan": "No collected credential patterns; only approved product gate outputs and synthetic evidence retained",
+    "settings": "UNCHANGED_NO_CONTENT_READ",
+    "gateOutputHandling": "Full collected gate outputs retained locally and in authorized private carrier artifacts; excluded from Archive Git publication. Sanitized receipts, hashes and failure summary are published."
+  },
+  "publication": {
+    "state": "QUALIFIED_PRIVATE_PACKAGE_ARTIFACTS_AVAILABLE",
+    "archiveBaseline": "6ac6d517355749815fdbf8e193d64cf7f9ac11e6",
+    "productDocsAfterPackageSources": "DOCUMENTATION_ONLY_NO_PRODUCT_RUNTIME_CHANGES",
+    "finalProof": "Archive rc2/publication-verification.json records subsequent product/evidence commit and remote byte checks"
+  }
+}

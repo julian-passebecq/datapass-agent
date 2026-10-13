@@ -1,0 +1,85 @@
+{
+  "schema": "datapass.rc2-pm-agent-protocol-qualification/1",
+  "capturedAt": "2026-10-13T15:53:10.807Z",
+  "state": "PASS_SYNTHETIC_ONLY",
+  "sources": {
+    "pm": {
+      "head": "f8b1466e80e30d08fb431c7d6fd95cf4cf0884ba",
+      "state": "EXACT_COMMIT"
+    },
+    "agent": {
+      "head": "7d573a909a70c566a4d43a8475cf95628c483159",
+      "state": "EXACT_COMMIT"
+    }
+  },
+  "workspace": {
+    "root": "D:/PROJ/.cockpit-integration/COMPLETE-NATIVE-20261012/qualification/isolated-profile-reuse/workspace",
+    "head": "185131ecf82d60f306bf96d030cb3ad9d017c0c9",
+    "readmeSha256": "e76c1795a6cbdc301dd090c47cb63bf4422512a2bc2557a53b580e836b6730b7",
+    "writes": 0
+  },
+  "providers": [
+    {
+      "provider": "codex",
+      "state": "PASS_SYNTHETIC_OFFICIAL_AHP_PM_AGENT_WORKFLOW",
+      "protocolVersion": "1.0.0",
+      "hostKind": "SYNTHETIC",
+      "nativeLiveVerified": false,
+      "sessionId": "ahp-session:/2c214a29-d7d9-4a38-932f-e1e0fcc6b049",
+      "chatId": "ahp-chat:/1bf76583-3a2a-47d2-a7ee-859abb6f9f75",
+      "turnId": "turn-c46ac976-edbf-4408-a771-2a57af38cc1a",
+      "root": "D:/PROJ/.cockpit-integration/COMPLETE-NATIVE-20261012/qualification/isolated-profile-reuse/workspace",
+      "revision": "185131ecf82d60f306bf96d030cb3ad9d017c0c9",
+      "promptHash": "0acbfad694a65d3d183f4187a0854d1a6f86a85c9018c1dc4057ee7fe93288de",
+      "resultHash": "48ec65a9f61622716d70db322e1a60e663a194b11ab051d28d1e4f5807232d8a",
+      "resultText": "Synthetic README response. api_key=\"[REDACTED]\"",
+      "modelRequested": "fixture-codex",
+      "modelObserved": null,
+      "effortRequested": "medium",
+      "effortObserved": null,
+      "streamLastSequence": 5,
+      "createdSessions": 1,
+      "promptsSent": 1,
+      "recoveredSameIdentities": true,
+      "duplicateGORefused": true,
+      "sourceRevocationRefused": true,
+      "acceptedTaskCompletion": false
+    },
+    {
+      "provider": "claude",
+      "state": "PASS_SYNTHETIC_OFFICIAL_AHP_PM_AGENT_WORKFLOW",
+      "protocolVersion": "0.9.0",
+      "hostKind": "SYNTHETIC",
+      "nativeLiveVerified": false,
+      "sessionId": "ahp-session:/69ecfc6c-a0e6-4b1e-874d-f2882d4585eb",
+      "chatId": "ahp-chat:/7b9972a6-0b8d-4ac6-a545-ae274fc96167",
+      "turnId": "turn-d9c0a33d-5f87-4e9b-af86-90e17631c390",
+      "root": "D:/PROJ/.cockpit-integration/COMPLETE-NATIVE-20261012/qualification/isolated-profile-reuse/workspace",
+      "revision": "185131ecf82d60f306bf96d030cb3ad9d017c0c9",
+      "promptHash": "0acbfad694a65d3d183f4187a0854d1a6f86a85c9018c1dc4057ee7fe93288de",
+      "resultHash": "48ec65a9f61622716d70db322e1a60e663a194b11ab051d28d1e4f5807232d8a",
+      "resultText": "Synthetic README response. api_key=\"[REDACTED]\"",
+      "modelRequested": "fixture-claude",
+      "modelObserved": null,
+      "effortRequested": "medium",
+      "effortObserved": null,
+      "streamLastSequence": 5,
+      "createdSessions": 1,
+      "promptsSent": 1,
+      "recoveredSameIdentities": true,
+      "duplicateGORefused": true,
+      "sourceRevocationRefused": true,
+      "acceptedTaskCompletion": false
+    }
+  ],
+  "officialClient": {
+    "package": "@microsoft/agent-host-protocol",
+    "version": "1.0.0"
+  },
+  "config": "Synthetic immutable Config task with source hashes consumed by actual PM controller; existing Config implementation qualification reused",
+  "transport": "Official SDK InMemoryTransport and typed reducers with deterministic protocol host; named-pipe WebSocket separate Agent gate",
+  "actualNativeProviderTurns": 0,
+  "nativeGuiInputCalls": 0,
+  "liveNativeResponse": "BLOCKED",
+  "installedExtensionHost": "NOT_CLAIMED"
+}

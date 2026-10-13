@@ -1,0 +1,118 @@
+{
+  "schema": "datapass.rc2-hosted-checks/1",
+  "capturedAt": "2026-10-13T15:54:21.784Z",
+  "runs": [
+    {
+      "pilot": "pm",
+      "source": "f8b1466e80e30d08fb431c7d6fd95cf4cf0884ba",
+      "id": 38425603583,
+      "name": "Candidate checks",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/julian-passebecq/datapass-pm/actions/runs/38425603583",
+      "jobs": [
+        {
+          "id": 115394062948,
+          "name": "verify (windows-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "steps": 0,
+          "url": "https://github.com/julian-passebecq/datapass-pm/actions/runs/38425603583/job/115394062948",
+          "annotations": [
+            {
+              "level": "failure",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings"
+            }
+          ]
+        },
+        {
+          "id": 115394063399,
+          "name": "verify (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "steps": 0,
+          "url": "https://github.com/julian-passebecq/datapass-pm/actions/runs/38425603583/job/115394063399",
+          "annotations": [
+            {
+              "level": "failure",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings"
+            },
+            {
+              "level": "notice",
+              "message": "Non-billing annotation; no additional failure classification"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pilot": "pm",
+      "source": "f8b1466e80e30d08fb431c7d6fd95cf4cf0884ba",
+      "id": 38425595731,
+      "name": "Candidate checks",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/julian-passebecq/datapass-pm/actions/runs/38425595731",
+      "jobs": [
+        {
+          "id": 115394035520,
+          "name": "verify (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "steps": 0,
+          "url": "https://github.com/julian-passebecq/datapass-pm/actions/runs/38425595731/job/115394035520",
+          "annotations": [
+            {
+              "level": "failure",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings"
+            },
+            {
+              "level": "notice",
+              "message": "Non-billing annotation; no additional failure classification"
+            }
+          ]
+        },
+        {
+          "id": 115394035956,
+          "name": "verify (windows-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "steps": 0,
+          "url": "https://github.com/julian-passebecq/datapass-pm/actions/runs/38425595731/job/115394035956",
+          "annotations": [
+            {
+              "level": "failure",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pilot": "agent",
+      "source": "7d573a909a70c566a4d43a8475cf95628c483159",
+      "id": 38425524976,
+      "name": "ci",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/julian-passebecq/agent-vscode/actions/runs/38425524976",
+      "jobs": [
+        {
+          "id": 115393790798,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "failure",
+          "steps": 0,
+          "url": "https://github.com/julian-passebecq/agent-vscode/actions/runs/38425524976/job/115393790798",
+          "annotations": [
+            {
+              "level": "failure",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "rawLogsRead": false
+}
