@@ -1,0 +1,219 @@
+{
+  "schema": "datapass.cockpit-rc1/1",
+  "capturedAt": "2026-10-13T13:05:44.282Z",
+  "state": "PRIVATE_DRAFT_CANDIDATE_CODE_PACKAGE_READY_SEPARATE_LIVE_GUI_AND_FULL_GATES_OPEN",
+  "acceptance": {
+    "rc1CodePackageReady": "YES",
+    "assistedWorkflowQualified": "YES_SYNTHETIC_CONTROLLER_TRANSCRIPT_AND_INSTALLED_PACKAGE_API_SCOPE_ONLY",
+    "liveCodexTurnVerified": "BLOCKED",
+    "installedVsCodeGuiQualified": "BLOCKED",
+    "fullContractComplete": "NO"
+  },
+  "packageSources": {
+    "pm": "a05c58167e58040a199ae39e5bebdf9f5a287538",
+    "agent": "b3050cd8ddebc26b69f63953c873a361b389886f",
+    "config": "7d080980a0c679b6106a7e655450340dc8862edf",
+    "lens": "95ebd7e73ab21ce674c3e77153f6c29677fc0099"
+  },
+  "familyVersions": {
+    "pm": "0.5.3",
+    "agent": "0.11.3",
+    "config": "0.8.1",
+    "lens": "0.3.7"
+  },
+  "artifacts": [
+    {
+      "filename": "datapass-pm-0.5.3.vsix",
+      "bytes": 1298609,
+      "sha256": "bb21f4a6b1c3f32ec3be074018b71e864f591f6147e88b34c751660ab30c6cec",
+      "sourceSha": "a05c58167e58040a199ae39e5bebdf9f5a287538",
+      "os": "Windows",
+      "product": "pm",
+      "path": "D:\\PROJ\\.cockpit-integration\\COMPLETE-NATIVE-20261012\\worktrees\\ARCHIVE\\workflow\\2026-10-12\\COCKPIT-NATIVE-20261009-FULL\\first-jul-journey-20261013\\rc1\\carrier-pm-17140362784\\datapass-pm-0.5.3.vsix",
+      "download": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17140362784/artifacts/browse/evidence/",
+      "expiresAt": "2026-11-12T12:59:30.043Z",
+      "qualification": "EXACT_SOURCE_ORIGINAL_WINDOWS_GATES_AND_REMOTE_BYTES_VERIFIED"
+    },
+    {
+      "filename": "agent-vscode-0.11.3.vsix",
+      "bytes": 490142,
+      "sha256": "bad7ead08a894575d3952b2b1bc56774d70e61763e6d6ab6000512dae48e0531",
+      "sourceSha": "b3050cd8ddebc26b69f63953c873a361b389886f",
+      "os": "Windows",
+      "product": "agent",
+      "path": "D:\\PROJ\\.cockpit-integration\\COMPLETE-NATIVE-20261012\\worktrees\\ARCHIVE\\workflow\\2026-10-12\\COCKPIT-NATIVE-20261009-FULL\\first-jul-journey-20261013\\rc1\\carrier-agent-17139915790\\agent-vscode-0.11.3.vsix",
+      "download": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17139915790/artifacts/browse/evidence/",
+      "expiresAt": "2026-11-12T12:49:32.005Z",
+      "qualification": "EXACT_SOURCE_ORIGINAL_WINDOWS_GATES_AND_REMOTE_BYTES_VERIFIED"
+    }
+  ],
+  "ci": {
+    "pm": {
+      "jobId": "17140362784",
+      "url": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17140362784",
+      "tests": {
+        "total": 213,
+        "passed": 213,
+        "failed": 0,
+        "skipped": 0
+      },
+      "mandatoryGates": [
+        {
+          "command": "npm ci",
+          "exitCode": 0,
+          "logSha256": "c3a9382d78660b89ce1b4d8cb79e2134c3c6b7f32f6c75cd2ba0be32c0524e22"
+        },
+        {
+          "command": "npm run typecheck",
+          "exitCode": 0,
+          "logSha256": "991e76781d469675f400ed32d653566f3bdd315ca3773b9e443e9057ef95b3ec"
+        },
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "logSha256": "ebf995dc842aa3a2a131fd5de9992c66bf1c24277a598e21086baa1e9d9ca249"
+        },
+        {
+          "command": "npm run package",
+          "exitCode": 0,
+          "logSha256": "e5ed8b40c9d7a6a4ec5a0a8c0272a2b2873e9c58962d726bbfd5485cc8403a6e"
+        }
+      ]
+    },
+    "agent": {
+      "jobId": "17139915790",
+      "url": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17139915790",
+      "tests": {
+        "total": 495,
+        "passed": 495,
+        "failed": 0,
+        "skipped": 0
+      },
+      "mandatoryGates": [
+        {
+          "command": "npm ci",
+          "exitCode": 0,
+          "logSha256": "f67714a57545a6502a1952dc1b8b9d085ea1996a3c2c6bd046661d1d26e810f3"
+        },
+        {
+          "command": "npm run check",
+          "exitCode": 0,
+          "logSha256": "8c6ec4e2f3e70a44b880d67510dce99e3588942fa1e72c0f6697c91b629c5e74"
+        },
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "logSha256": "3069a4e5d9c1e4b64120d534fd428499181cdb82b152b33215d1528741713294"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "logSha256": "029e5fabc9ad80669722eabac70352dad525e5aa9785e18fb31fb97d9619e93c"
+        },
+        {
+          "command": "npm run build:provider-kit",
+          "exitCode": 0,
+          "logSha256": "cbdad1982d9e70039c84dfc47dc939f8bc88e8ed0352ee4e0e74115cf5c2cadb"
+        },
+        {
+          "command": "npm run package",
+          "exitCode": 0,
+          "logSha256": "78a5feb2406c6288f19d35e4591cfc06b28a05086d00fa0ec01f6fdfaa9b93ef"
+        }
+      ]
+    },
+    "hostedChecks": {
+      "schema": "datapass.rc1-required-hosted-checks/1",
+      "state": "BLOCKED_BEFORE_STEPS",
+      "reason": "GitHub check annotations report recent account payment failure or spending limit; no hosted product test steps ran",
+      "pm": {
+        "source": "a05c58167e58040a199ae39e5bebdf9f5a287538",
+        "runId": 38400700827,
+        "jobs": [
+          115307268804,
+          115307269050
+        ],
+        "url": "https://github.com/julian-passebecq/datapass-pm/actions/runs/38400700827"
+      },
+      "agent": {
+        "source": "b3050cd8ddebc26b69f63953c873a361b389886f",
+        "runId": 38398746774,
+        "jobs": [
+          115300597332
+        ],
+        "url": "https://github.com/julian-passebecq/agent-vscode/actions/runs/38398746774"
+      },
+      "carrier": "Independent exact-source Windows gate receipts retained; not a replacement for required hosted checks"
+    },
+    "retainedCounterEvidence": {
+      "pmFirstCarrier": "carrier-pm-17139915789/verification.json; 212/213, stale readiness assertion fixed at a05c581; superseded package not qualified",
+      "agentLocal": "Product rc1-agent-tests.log retains unchanged catalog responsiveness timing failure; exact carrier has 495/495"
+    }
+  },
+  "installation": {
+    "profileIdentity": "e047a6bc253165bc9faa71a03b17fb74eabc892e9bd167b69ede17be7b716c9b",
+    "payloadEntries": 121,
+    "receipt": "final-install/installed-payload.json",
+    "registeredFamily": "final-install/registration.json",
+    "state": "CLI_ONLY_BYTES_VERIFIED",
+    "syntheticApiSmoke": {
+      "schema": "datapass.rc1-installed-package-smoke/1",
+      "state": "PASS_SYNTHETIC_API_ONLY",
+      "installedPmVersion": "0.5.3",
+      "installedAgentVersion": "0.11.3",
+      "checks": [
+        "Installed PM activates against bounded synthetic VS Code API",
+        "Installed Agent module exports activate/deactivate",
+        "Copy/Open workflow renders",
+        "Workspace journal survives reactivation",
+        "Exact task/role/prompt/UNAVAILABLE state recovered",
+        "Missing source permissions refuse Copy before native call"
+      ],
+      "nativeCalls": 0,
+      "providerExecution": false,
+      "guiInputCalls": 0,
+      "nativeExtensionHost": "NOT_RUN",
+      "installedGui": "BLOCKED_NO_APPROVED_ISOLATED_GUI_AUTOMATION",
+      "capturedAt": "2026-10-13T13:02:08.018Z"
+    },
+    "settings": "UNCHANGED_METADATA_NO_CONTENT_READ"
+  },
+  "demonstration": {
+    "scope": "Clearly labelled synthetic product HTML and real controller/reader fixtures; no provider execution",
+    "screenshot": "C:\\Users\\julia\\.codex\\worktrees\\2899\\datapass-pm\\docs\\first-jul-journey-20261013\\rc1-manual-ui-synthetic.png",
+    "screenshotSha256": "a9e4678edb4d9e16e42bebb5713d18279281736864b1fb76dc164af14cbe9801",
+    "controller": [
+      "Exact selected persisted task and reviewed Jul/Config role binding",
+      "Real temporary Git root and local-only repository identity",
+      "Copy exact message and native Open with zero submit arguments",
+      "Explicit reviewed exact provider/session/root association",
+      "Bounded parser-derived synthetic reply and observed model provenance",
+      "Journal reactivation recovers task, role, prompt and reviewed relationship",
+      "Missing task authority, revoked source, changed role/root/provider/identity and rewritten source fail closed"
+    ],
+    "negativeScope": "Missing/unreviewed IDs, literal identity/cwd mismatch, revoked scope, malformed/incomplete/bounded sources, duplicate/absent prompts, fresh same-size rewrites and concurrent remapping; no fixture is labelled a real native turn"
+  },
+  "remainingGates": {
+    "native": "LIVE_NATIVE_TURN_BLOCKED_OWNER_INTERACTION_REQUIRED; no authorized independently approved noninteractive route available; owner manual QA requirement withdrawn",
+    "gui": "BLOCKED_NO_APPROVED_ISOLATED_GUI_AUTOMATION; prepared same-account directories are not an OS sandbox",
+    "automatic": "AHP endpoint/auth/protocol/version and actual dispatch/result retrieval remain unqualified",
+    "directSpawn": "Original independent signed platform receipt, independently qualified execution host and installed capability qualification remain separately protected",
+    "hosted": "Required GitHub checks blocked before steps by billing",
+    "full": "Original selected 219 clauses, 63 refinements, 30 journeys and all existing gate IDs retained; voice, modes and organization adoption remain open"
+  },
+  "publication": {
+    "pmPr": "https://github.com/julian-passebecq/datapass-pm/pull/4",
+    "agentPr": "https://github.com/julian-passebecq/agent-vscode/pull/86",
+    "branch": "codex/complete-native-cockpit-20261012",
+    "status": "DRAFT_NONFORCE_NO_MERGE_DEPLOY_OR_PUBLIC_RELEASE"
+  },
+  "boundaries": {
+    "nativeTasksExecuted": 0,
+    "guiInputCalls": 0,
+    "activeDesktopControl": false,
+    "authAccess": false,
+    "configLensWrites": false,
+    "platformProofChanges": false
+  },
+  "scopeNote": "Package source commits are immutable tested inputs. Subsequent documentation/evidence commits do not rebuild or retroactively change package qualification."
+}

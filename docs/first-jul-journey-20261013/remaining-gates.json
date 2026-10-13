@@ -10,15 +10,15 @@
   "gates": [
     {
       "id": "native-provider-journeys",
-      "state": "BLOCKED_NOT_EXECUTED",
-      "reason": "Independent execution isolation remains unverified; last isolated profile authentication evidence is NOT_AUTHENTICATED. Home-path mismatch and installed protocol sandbox mismatch fixed. No provider task dispatched.",
-      "requires": "Independently verified supported execution isolation, then owner sign-in in the corrected isolated home and the already-authorized one read-only task plus one owned continuation. No new live-task authority required for those two conditional tasks."
+      "state": "LIVE_NATIVE_TURN_BLOCKED_OWNER_INTERACTION_REQUIRED",
+      "reason": "RC1 assisted fallback implemented and fixture qualified. No approved noninteractive native turn route is available; no native task executed. Owner manual QA requirement withdrawn. Protected direct-spawn checks remain separate and unchanged.",
+      "requires": "An independently approved supported native route with authentication and native permission interaction, under applicable separate authorization. This gate does not block RC1 code/package delivery."
     },
     {
       "id": "installed-family-gui",
-      "state": "BLOCKED_NOT_EXECUTED",
-      "reason": "Qualified PM0.5.2 and Agent0.11.2 installed into the reused prepared profile and changed payloads verified. Path separation still is not independent GUI isolation; no installed GUI journey executed.",
-      "requires": "Qualify changed PM/Agent vector in supported isolated GUI; retain unchanged prior Computer Use evidence"
+      "state": "BLOCKED_NO_APPROVED_ISOLATED_GUI_AUTOMATION",
+      "reason": "PM0.5.3 and Agent0.11.3 installed, all121 payloads verified and synthetic installed API recovery passed. No installed VS Code GUI or native extension-host journey executed.",
+      "requires": "Existing independently approved GUI environment and supported automation; no active-desktop control or profile recreation."
     },
     {
       "id": "required-github-checks",
@@ -52,10 +52,12 @@
     }
   ],
   "exclusions": [
-    "No merge or deployment",
-    "No permission changes or active desktop operation",
+    "No merge, deployment or public release",
+    "No permission/account/security changes or active desktop operation",
     "No raw history export",
-    "No live execution until both approved prerequisites pass; no additional live tasks"
+    "No native task executed or additional native grant inferred"
   ],
-  "repeatPolicy": "Only affected tests and outstanding gates; no unchanged Config/Lens or Computer Use reruns"
+  "repeatPolicy": "Only affected tests and outstanding gates; no unchanged Config/Lens or Computer Use reruns",
+  "rc1Evidence": "rc1/RC1.json",
+  "ownerManualQa": "WITHDRAWN_NOT_A_REQUIRED_RC1_STEP"
 }
