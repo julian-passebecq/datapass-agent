@@ -1,0 +1,154 @@
+TAP version 13
+# Subtest: SYNTHETIC official SDK negotiation, inventory, one exact prompt, deltas, redaction and recovered completion
+ok 1 - SYNTHETIC official SDK negotiation, inventory, one exact prompt, deltas, redaction and recovered completion
+  ---
+  duration_ms: 109.4629
+  type: 'test'
+  ...
+# Subtest: SYNTHETIC Stable-compatible 0.9 negotiation; unknown version and absent provider refuse preparation
+ok 2 - SYNTHETIC Stable-compatible 0.9 negotiation; unknown version and absent provider refuse preparation
+  ---
+  duration_ms: 4.0837
+  type: 'test'
+  ...
+# Subtest: SYNTHETIC host startup and mid-turn disappearance retain uncertain durable identity without resends
+ok 3 - SYNTHETIC host startup and mid-turn disappearance retain uncertain durable identity without resends
+  ---
+  duration_ms: 82.1426
+  type: 'test'
+  ...
+# Subtest: SYNTHETIC pending tool permission and auth remain native; no approval actions are emitted
+ok 4 - SYNTHETIC pending tool permission and auth remain native; no approval actions are emitted
+  ---
+  duration_ms: 156.1545
+  type: 'test'
+  ...
+# Subtest: SYNTHETIC exact scope, root, revision, mode, model, effort and task approval deny mismatches
+ok 5 - SYNTHETIC exact scope, root, revision, mode, model, effort and task approval deny mismatches
+  ---
+  duration_ms: 4.4818
+  type: 'test'
+  ...
+# Subtest: SYNTHETIC multiple hosts require exact selection; host identity collisions are rejected
+ok 6 - SYNTHETIC multiple hosts require exact selection; host identity collisions are rejected
+  ---
+  duration_ms: 1.1536
+  type: 'test'
+  ...
+# Subtest: SYNTHETIC reopened scope and connection grants are independent; changed source and corruption deny recovery
+ok 7 - SYNTHETIC reopened scope and connection grants are independent; changed source and corruption deny recovery
+  ---
+  duration_ms: 40.6634
+  type: 'test'
+  ...
+# Subtest: selected endpoint metadata validator rejects stale PID, malformed schema/name and nonlocal addresses without token reads
+ok 8 - selected endpoint metadata validator rejects stale PID, malformed schema/name and nonlocal addresses without token reads
+  ---
+  duration_ms: 1.4675
+  type: 'test'
+  ...
+# Subtest: SYNTHETIC changed provider capability blocks send; changed session root and ambiguous turn block recovery
+ok 9 - SYNTHETIC changed provider capability blocks send; changed session root and ambiguous turn block recovery
+  ---
+  duration_ms: 202.4901
+  type: 'test'
+  ...
+# Subtest: SYNTHETIC denied native tool permission is observed, never approved by Agent
+ok 10 - SYNTHETIC denied native tool permission is observed, never approved by Agent
+  ---
+  duration_ms: 107.9983
+  type: 'test'
+  ...
+# Subtest: inert real Git identity maps PM local and supported remote aliases to the exact root and HEAD
+ok 11 - inert real Git identity maps PM local and supported remote aliases to the exact root and HEAD
+  ---
+  duration_ms: 1785.5985
+  type: 'test'
+  ...
+# Subtest: SYNTHETIC documented local WebSocket transport uses selected named pipe and private synthetic bearer; metadata drift denies reconnect
+ok 12 - SYNTHETIC documented local WebSocket transport uses selected named pipe and private synthetic bearer; metadata drift denies reconnect
+  ---
+  duration_ms: 59.1225
+  type: 'test'
+  ...
+# Subtest: SYNTHETIC source-qualified Codex and Claude thinkingLevel selections use only exact provider/model enums
+ok 13 - SYNTHETIC source-qualified Codex and Claude thinkingLevel selections use only exact provider/model enums
+  ---
+  duration_ms: 159.1207
+  type: 'test'
+  ...
+# Subtest: SYNTHETIC effort never maps arbitrary permission enums or malformed/extraneous thinkingLevel values
+ok 14 - SYNTHETIC effort never maps arbitrary permission enums or malformed/extraneous thinkingLevel values
+  ---
+  duration_ms: 3.0716
+  type: 'test'
+  ...
+# Subtest: no reviewed endpoint is UNAVAILABLE with liveness UNKNOWN, distinct from native account authentication
+ok 15 - no reviewed endpoint is UNAVAILABLE with liveness UNKNOWN, distinct from native account authentication
+  ---
+  duration_ms: 0.5969
+  type: 'test'
+  ...
+# Subtest: SYNTHETIC exact task action deduplicates across restart while reviewed task revision and provider remain distinct
+ok 16 - SYNTHETIC exact task action deduplicates across restart while reviewed task revision and provider remain distinct
+  ---
+  duration_ms: 78.6524
+  type: 'test'
+  ...
+# Subtest: standalone kit uses the Agent collector, stable safe hashes and no history/secret payloads
+ok 17 - standalone kit uses the Agent collector, stable safe hashes and no history/secret payloads
+  ---
+  duration_ms: 252.3625
+  type: 'test'
+  ...
+# Subtest: Codex evidence captures a genuine exact turn with redacted replies, excludes tools/reasoning/other turns
+ok 18 - Codex evidence captures a genuine exact turn with redacted replies, excludes tools/reasoning/other turns
+  ---
+  duration_ms: 113.6718
+  type: 'test'
+  ...
+# Subtest: selected source without exact prompt or with repeated prompt has no result; exact pending turn is native-visible-only
+ok 19 - selected source without exact prompt or with repeated prompt has no result; exact pending turn is native-visible-only
+  ---
+  duration_ms: 103.9726
+  type: 'test'
+  ...
+# Subtest: oversized or normalized-expansion prompts cannot certify an exact truncated prefix
+ok 20 - oversized or normalized-expansion prompts cannot certify an exact truncated prefix
+  ---
+  duration_ms: 61.8854
+  type: 'test'
+  ...
+# Subtest: scope revocation and nonexistent/unreviewed sessions cannot expose evidence
+ok 21 - scope revocation and nonexistent/unreviewed sessions cannot expose evidence
+  ---
+  duration_ms: 46.7928
+  type: 'test'
+  ...
+# Subtest: literal provider identity and cwd must match; malformed, oversized and linked sources stay unavailable
+ok 22 - literal provider identity and cwd must match; malformed, oversized and linked sources stay unavailable
+  ---
+  duration_ms: 141.6644
+  type: 'test'
+  ...
+# Subtest: fresh evidence reparses same-size rewritten sources and fails closed on concurrent store remapping
+ok 23 - fresh evidence reparses same-size rewritten sources and fails closed on concurrent store remapping
+  ---
+  duration_ms: 90.4819
+  type: 'test'
+  ...
+# Subtest: existing Claude reader returns only redacted reply blocks for a genuine recorded session and prompt
+ok 24 - existing Claude reader returns only redacted reply blocks for a genuine recorded session and prompt
+  ---
+  duration_ms: 83.0703
+  type: 'test'
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 24
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2980.8726

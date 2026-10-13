@@ -7,7 +7,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "out",
-    "rootDir": "."
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": { "@microsoft/agent-host-protocol/client": ["node_modules/@microsoft/agent-host-protocol/dist/client/index.d.ts"] }
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
 }

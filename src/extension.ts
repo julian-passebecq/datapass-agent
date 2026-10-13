@@ -20,12 +20,14 @@ import {developmentObservations} from './export/development';
 import { registerCockpit } from './ui/cockpit';
 import { NativeTaskRunner, NativeTransportFacade, NativePlatformVerifier, validateNativePlatformVerifier, safeLocalSource } from './provider-kit';
 import { localHost } from './cockpit/facade';
+import { AgentHostAdapter, ahpHash, selectedEndpointHost, verifyAHPProject } from './provider-kit';
 
 const TERN_COMMANDS = ['tern.revealWorktree', 'tern.revealRevision', 'tern.revealChangeSet'];
 
 export interface AgentApi {
   cockpitV1: import('./cockpit/facade').CockpitFacade['api'];
   nativeTransportV1: import('./provider-kit').NativeTransportApi;
+  agentHostV1: import('./provider-kit').AgentHostApi;
   store: SessionStore;
   openWorkspace(view?: string, key?: string): void;
   installed: { claude?: InstalledVersion; codex?: InstalledVersion };
@@ -65,6 +67,28 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<AgentApi> 
   const workspace = new WorkspacePanel(store, m => onMessage(m), () => ternAvailable);
   const facade = registerCockpit(ctx, store, () => ternAvailable, m => onMessage(m), () => api.installed);
   api.cockpitV1 = facade.api;
+  const ahpConnections=new Set<string>();
+  const ahp=new AgentHostAdapter({
+    storage:{load:()=>ctx.workspaceState.get('agentHostLedgerV1'),save:records=>Promise.resolve(ctx.workspaceState.update('agentHostLedgerV1',records))},
+    authorize:r=>!!facade.policy.authorize(r)&&vscode.workspace.isTrusted,
+    sourceGrantCurrent:r=>vscode.workspace.isTrusted&&(r.epoch===undefined||r.epoch===facade.policy.epoch),
+    verifySource:async (b,r)=>vscode.workspace.isTrusted&&await verifyAHPProject(b,r?.scope.repoIds),
+    reviewProject:async(r,b)=>vscode.workspace.isTrusted&&await vscode.window.showWarningMessage('Review this exact project for Agent Host dispatch?',{modal:true,detail:`Project: ${r.scope.projectIds.join(', ')}\nRoot: ${b.root}\nRevision: ${b.revision}\nRole: ${b.roleId}\nScope: ${ahpHash(r.scope)}\nThis is a source grant only. Host connection credentials and each task need separate approval.`},'Review exact project')==='Review exact project',
+    reviewConnection:async(r,b)=>{
+      if(!vscode.workspace.isTrusted)return null;
+      const picked=await vscode.window.showOpenDialog({canSelectMany:false,filters:{'Agent Host endpoint entry':['json']},title:'Select one documented entry from the intended approved profile: agent-host/local-endpoint/entries/<identity>.json'});if(!picked?.[0])return null;
+      const file=picked[0].fsPath,entries=path.dirname(file),userData=path.resolve(entries,'../../..');
+      if(path.basename(entries)!=='entries'||path.basename(path.dirname(entries))!=='local-endpoint'||path.basename(path.dirname(path.dirname(entries)))!=='agent-host')throw Error('Select an exact documented per-instance endpoint entry.');
+      const consent=await vscode.window.showWarningMessage('Authorize access to this sensitive Agent Host connection entry?',{modal:true,detail:`Profile user data: ${userData}\nEntry: ${file}\nProject root: ${b.root}\nRevision: ${b.revision}\nScope: ${ahpHash(r.scope)}\nThe file contains a bearer credential. Agent will read it privately and connect only to this exact local endpoint. Native account authentication and permissions stay native. This grant is not proof of independent execution isolation. Do not choose an unrelated personal host. A standalone host is a separate session authority.`},'Authorize selected connection');
+      if(consent!=='Authorize selected connection')return null;
+      if(!await verifyAHPProject(b,r.scope.repoIds)||(r.epoch!==undefined&&r.epoch!==facade.policy.epoch))throw Error('Reviewed source scope changed before credential access.');
+      const grant=ahpHash({file,scope:r.scope,root:b.root,revision:b.revision});ahpConnections.add(grant);
+      try{return await selectedEndpointHost({file,userData,root:b.root,revision:b.revision,scopeHash:ahpHash(r.scope),authorized:()=>vscode.workspace.isTrusted&&ahpConnections.has(grant)});}catch{ahpConnections.delete(grant);throw Error('Selected Agent Host entry unavailable, malformed, unsafe or stale.');}
+    },
+    reviewTask:async p=>vscode.workspace.isTrusted&&await vscode.window.showWarningMessage('Run this exact approved ordinary task via Agent Host?',{modal:true,detail:`Task: ${p.binding.taskId}\nRoot: ${p.binding.root}\nRevision: ${p.binding.revision}\nHost: ${p.hostId}\nProvider: ${p.binding.provider}\nProtocol: ${p.protocolVersion}\nRequested model: ${p.binding.requestedModel??'Native default'}\nRequested effort: ${p.binding.requestedEffort??'Native default'}\nPrepared: ${p.preparedHash}\nPrompt: ${p.binding.promptHash}\n\n${p.binding.prompt}\n\nThis submits one task only. Native tools/permissions are not automatically approved; no dependent chaining or uncertain retries.`},'Run exact task')==='Run exact task',
+  });
+  api.agentHostV1=ahp.api;
+  ctx.subscriptions.push({dispose:()=>{ahpConnections.clear();void ahp.dispose();}},vscode.commands.registerCommand('agent.revokeAgentHostConnections',()=>{ahpConnections.clear();ahp.revoke();}));
   const nativeVerifierKey='nativePlatformVerifiersV1';
   const trustedNativeVerifiers=()=>ctx.globalState.get<NativePlatformVerifier[]>(nativeVerifierKey,[]).filter(validateNativePlatformVerifier).slice(0,20);
   ctx.subscriptions.push(vscode.commands.registerCommand('agent.reviewNativePlatformVerifier',async()=>{

@@ -2,7 +2,7 @@
   "name": "agent-vscode",
   "displayName": "DataPass Agent",
   "description": "Local observer for Claude Code and Codex sessions: what is running, where, and what changed.",
-  "version": "0.11.3",
+  "version": "0.11.4",
   "publisher": "juliandatapass",
   "private": true,
   "license": "UNLICENSED",
@@ -248,6 +248,10 @@
       {
         "command": "agent.reviewNativePlatformVerifier",
         "title": "Agent: Review Independent Native Platform Verifier"
+      },
+      {
+        "command": "agent.revokeAgentHostConnections",
+        "title": "Agent: Revoke Agent Host Source and Connection Grants"
       }
     ],
     "keybindings": [
@@ -761,7 +765,7 @@
   "scripts": {
     "check": "tsc -p . --noEmit",
     "build": "node scripts/build.mjs",
-    "compile-tests": "tsc -p tsconfig.test.json",
+    "compile-tests": "tsc -p tsconfig.test.json && node scripts/build-agent-host-tests.mjs",
     "test": "npm run compile-tests && node --test \"out-test/test/*.test.js\"",
     "package": "npm run build && vsce package --no-dependencies",
     "smoke": "node scripts/smoke.mjs",
@@ -777,9 +781,14 @@
     "@galaxy/dev-context": "file:vendor/galaxy-dev-context-0.1.0.tgz",
     "@types/node": "^20.11.1",
     "@types/vscode": "^1.95.0",
+    "@types/ws": "8.18.1",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.24.0",
     "playwright-core": "^1.48.0",
     "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "@microsoft/agent-host-protocol": "1.0.0",
+    "ws": "8.21.3"
   }
 }
