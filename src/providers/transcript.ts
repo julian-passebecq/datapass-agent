@@ -55,11 +55,19 @@ export interface Transcript {
   dropped: number;
   at: number;
   error?: string;
+  /** Literal provider-record identity, never inferred from the filename or prompt. */
+  identity?: TranscriptIdentity;
+  /** Bytes awaiting a terminating newline; evidence must not certify a partial record. */
+  pendingBytes?: number;
 }
+
+export interface TranscriptIdentity { nativeId:string|null; cwd:string|null; conflict:boolean; }
 
 export interface ReadOpts {
   maxBytes?: number;
   maxEntries?: number;
+  /** Evidence captures reparse the bounded source to avoid stale rewritten-file cache data. */
+  fresh?: boolean;
 }
 
 export const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
@@ -160,6 +168,7 @@ function result(at: number, raw: unknown, error: boolean, extra: Partial<EntryRe
 // ---------------------------------------------------------------- parser state
 
 export interface ParseState {
+  identity?: TranscriptIdentity;
   provider: Provider;
   entries: Entry[];
   byCall: Map<string, Entry>;
@@ -178,6 +187,16 @@ export interface ParseState {
 
 export function newState(provider: Provider): ParseState {
   return { provider, entries: [], byCall: new Map(), seq: 0, dropped: 0, lastAt: 0, seen: new Set() };
+}
+
+function recordIdentity(st:ParseState,id:unknown,cwd:unknown):void {
+  const identity=st.identity ??= {nativeId:null,cwd:null,conflict:false};
+  for(const [key,value,max] of [['nativeId',id,160],['cwd',cwd,4096]] as const){
+    if(typeof value!=='string' || !value)continue;
+    if(value.length>max || /[\x00-\x1f]/.test(value)){identity.conflict=true;continue;}
+    if(identity[key]!==null && identity[key]!==value)identity.conflict=true;
+    else identity[key]=value;
+  }
 }
 
 function repeatedNativeTool(st:ParseState,type:string,id:string):boolean {
@@ -227,6 +246,7 @@ function claudeUserText(st: ParseState, at: number, text: string, images: number
 
 /** Feeds one parsed Claude transcript record. */
 export function claudeRecord(st: ParseState, o: Record<string, unknown>): void {
+  recordIdentity(st,o.sessionId,o.cwd);
   const at = ts(o.timestamp) ?? st.lastAt;
   if (at) st.lastAt = at;
   const type = str(o.type);
@@ -343,6 +363,7 @@ export function codexRecord(st: ParseState, o: Record<string, unknown>): void {
   const p = (o.payload ?? {}) as Record<string, unknown>;
   const pt = str(p.type);
   if (type === 'session_meta') {
+    recordIdentity(st,p.id,p.cwd);
     push(st, { at, kind: 'meta', name: 'session', text: line(`Session started${p.cli_version ? ` · cli ${p.cli_version}` : ''}${p.originator ? ` · ${p.originator}` : ''}${p.source ? ` · ${typeof p.source === 'string' ? p.source : 'sub-agent'}` : ''}`) });
     return;
   }
@@ -481,19 +502,21 @@ export function readTranscript(path: string, provider: Provider, opts: ReadOpts 
   try {
     stat = fs.statSync(path);
   } catch {
-    CACHE.delete(path);
+    if(!opts.fresh)CACHE.delete(path);
     return empty('Transcript file not found (moved, archived or deleted).');
   }
-  let c = CACHE.get(path);
+  let c = opts.fresh ? undefined : CACHE.get(path);
   const size = stat.size;
   if (c && (size < c.offset || stat.mtimeMs < c.mtime || c.st.provider !== provider || size - c.offset > maxBytes)) c = undefined;
   if (!c) {
     const from = Math.max(0, size - maxBytes);
     c = { st: newState(provider), offset: from, from, tail: Buffer.alloc(0), records: 0, bad: 0, mtime: stat.mtimeMs, at: now };
   }
-  CACHE.delete(path);
-  CACHE.set(path, c);
-  while (CACHE.size > CACHE_MAX) CACHE.delete(CACHE.keys().next().value as string);
+  if(!opts.fresh){
+    CACHE.delete(path);
+    CACHE.set(path, c);
+    while (CACHE.size > CACHE_MAX) CACHE.delete(CACHE.keys().next().value as string);
+  }
   if (size > c.offset) {
     let fd: number | undefined;
     try {
@@ -541,5 +564,5 @@ export function readTranscript(path: string, provider: Provider, opts: ReadOpts 
   }
   c.mtime = stat.mtimeMs;
   c.at = now;
-  return { path, provider, entries: c.st.entries, size, from: c.from, records: c.records, bad: c.bad, dropped: c.st.dropped, at: now };
+  return { path, provider, entries: c.st.entries, size, from: c.from, records: c.records, bad: c.bad, dropped: c.st.dropped, at: now, pendingBytes:c.tail.length, ...(c.st.identity?{identity:{...c.st.identity}}:{}) };
 }

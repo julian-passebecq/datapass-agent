@@ -18,6 +18,15 @@ export interface Reply<T> {
 }
 export interface Fact<T> { value: T | null; kind: FactKind; sourceIds: string[]; observedAt?: string; reason?: string; }
 export interface SessionRef { id:string; provider:string; repoId?:string; parentId?:string; state:Fact<string>; model:Fact<string>; effort?:Fact<string>; mode?:Fact<string>; providerVersion?:Fact<string>; worktreeId?:string|null; }
+/** Bounded provider-reader projection of one exactly matched, owner-selected native turn.
+ * Session/task/role association belongs to the reviewing PM owner, never this evidence.
+ */
+export interface SessionEvidence {
+  schema:'datapass.session-evidence/1'; session:SessionRef; nativeId:string;
+  promptHash:string|null; promptMatch:'EXACT'|'AMBIGUOUS'|'ABSENT';
+  resultText:string; resultHash:string|null; sourceHash:string; capturedAt:string;
+  state:'PROVIDER_OBSERVED'|'NATIVE_VISIBLE_ONLY'|'UNAVAILABLE'; omissions:string[];
+}
 export interface ContextRef {
   organizationId:string; privacyDomainId:string; projectId:string; repoId:string;
   hostId:string; worktreeId:string|null; revision:string|null; selectedItemId:string|null; returnToken:string;
@@ -57,6 +66,7 @@ export interface AgentCockpitV1 {
   executeApprovedLocalExport(request:Request & {approval:LocalExportApproval;}):Promise<Reply<ExportReceipt>>;
   getExportReceipt(request:Request & {id:string;}):Promise<Reply<ExportReceipt>>;
   getObservation(request:Request):Promise<Reply<NativeObservation[]>>;
+  getSessionEvidence(request:Request & {sessionId:string;exactPrompt:string}):Promise<Reply<SessionEvidence|null>>;
   getEventPage(request:Request & {afterSequence?:number}):Promise<Reply<EventPage>>;
   revealContext(request:Request & {context:ContextRef}):Promise<Reply<{opened:boolean;returnToken:string|null}>>;
   prepareReply(request:Request & {sessionId:string;questionId:string;text:string}):Promise<Reply<{text:string|null;transport:'MANUAL_COPY'|'UNSUPPORTED';sent:false}>>;

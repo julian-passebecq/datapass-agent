@@ -5,7 +5,7 @@ import { isCredentialPath } from '../util/redact';
 import type { AgentSessionSnapshot } from '../model';
 import { scanBacklog } from '../feeds/backlog';
 import { bounded } from '../util/redact';
-import type { AgentCockpitV1, Capability, ChangeEvent, ExportPlan, ExportReceipt, Fact, HostIdentity, ProviderConfig, Reply, Request, Scope, SessionRef, Summary } from './interfaces';
+import type { AgentCockpitV1, Capability, ChangeEvent, ExportPlan, ExportReceipt, Fact, HostIdentity, ProviderConfig, Reply, Request, Scope, SessionRef, SessionEvidence, Summary } from './interfaces';
 import { digest, idOk, LocalGrant, repoId, ScopePolicy, validateRequest } from './policy';
 import { ConfigRead, readConfiguration, safeLocalSource } from './configuration';
 import { IncrementalExporter } from '../export/incremental';
@@ -15,6 +15,7 @@ import { correlateResourceTime, observeResources, validateResources, SelectedRes
 import { intakeImage, ImageProducerReceipt } from './images';
 import { contextSourceHash, type ContextReturnBinding } from './contextReturn';
 import { safeContext } from './workspaceState';
+import { captureSessionEvidence, sessionEvidenceBinding } from './sessionEvidence';
 
 export interface ContextReceipt { id: string; projectId: string; sourceIds: string[]; backend: string; generationId: string; queriedAt: string; state: string; }
 export interface AcceptedWork { projectId: string; revision: string; counts: { open: number; active: number; done: number; }; }
@@ -70,7 +71,7 @@ export class CockpitFacade {
   constructor(private store: StoreRead, readonly policy: ScopePolicy, private services: HostServices, private exporter: IncrementalExporter) {
     this.host = services.host ?? localHost();
     // Only bounded read/approved-effect methods cross the extension API boundary.
-    const api: typeof this.api = { major: 1, capabilities: () => this.capabilities(), getScopes: async () => this.reply(undefined, policy.scopes(), 'OK'), getSummary: r => this.summary(r), getProviderConfiguration: r => this.configuration(r), reveal: r => this.reveal(r), subscribe: (r, l) => this.subscribe(r, l), planExport: r => this.plan(r), executeApprovedLocalExport: r => this.execute(r), getExportReceipt: r => this.receipt(r), getObservation:r=>this.observation(r),getEventPage:r=>this.eventPage(r),revealContext:r=>this.revealContext(r),prepareReply:r=>this.prepareReply(r),getResourceObservations:r=>this.resources(r),getContextMappings:r=>this.contextMappings(r) };
+    const api: typeof this.api = { major: 1, capabilities: () => this.capabilities(), getScopes: async () => this.reply(undefined, policy.scopes(), 'OK'), getSummary: r => this.summary(r), getProviderConfiguration: r => this.configuration(r), reveal: r => this.reveal(r), subscribe: (r, l) => this.subscribe(r, l), planExport: r => this.plan(r), executeApprovedLocalExport: r => this.execute(r), getExportReceipt: r => this.receipt(r), getObservation:r=>this.observation(r),getSessionEvidence:r=>this.sessionEvidence(r),getEventPage:r=>this.eventPage(r),revealContext:r=>this.revealContext(r),prepareReply:r=>this.prepareReply(r),getResourceObservations:r=>this.resources(r),getContextMappings:r=>this.contextMappings(r) };
     api.getResourceObservations=r=>this.resources(r);
     this.api = Object.freeze(api);
     this.changeSub = store.onDidChange(() => this.changed());
@@ -79,9 +80,22 @@ export class CockpitFacade {
     return structuredClone({ schema: 'datapass.agent-cockpit/1', requestId: r && idOk(r.requestId) ? r.requestId : 'capabilities', scopeHash: r && validateRequest(r) ? digest(r.scope) : '', capturedAt: new Date().toISOString(), host: this.host, state, data, omissions, epoch:this.policy.epoch,...(r?.generation && idOk(r.generation) ? {generation:r.generation}:{}), errors: state === 'DENIED' ? [{ code: 'SCOPE_DENIED', message: 'Host-reviewed local scope is required.' }] : [] });
   }
   private async capabilities(): Promise<Reply<Capability[]>> {
-    return this.reply(undefined, ['summary', 'providerConfiguration', 'reveal', 'subscribe', 'incrementalExport', 'registeredContextReceipts', 'acceptedWork', 'assets', 'getScopes','getObservation','getEventPage','revealContext','prepareReply','getResourceObservations','getContextMappings'].map(name => ({ name, version: 1, state: 'OK' as const })), 'OK', ['Scopes require explicit local review; no caller-created grants.','prepareReply provides manual-copy fallback; native send and provider permissions are not owned by Agent.']);
+    return this.reply(undefined, ['summary', 'providerConfiguration', 'reveal', 'subscribe', 'incrementalExport', 'registeredContextReceipts', 'acceptedWork', 'assets', 'getScopes','getObservation','getSessionEvidence','getEventPage','revealContext','prepareReply','getResourceObservations','getContextMappings'].map(name => ({ name, version: 1, state: 'OK' as const })), 'OK', ['Scopes require explicit local review; no caller-created grants.','prepareReply provides manual-copy fallback; native send and provider permissions are not owned by Agent.']);
   }
   private sessions(g: LocalGrant): AgentSessionSnapshot[] { return this.policy.sessions(g, this.store.all()); }
+  private async sessionEvidence(r:Request & {sessionId:string;exactPrompt:string}):Promise<Reply<SessionEvidence|null>> {
+    if(!validateRequest(r) || !idOk(r.sessionId) || typeof r.exactPrompt!=='string' || !r.exactPrompt.trim() || r.exactPrompt.length>32768)return this.reply(r,null,'DENIED');
+    if(validateRequest(r))r={...structuredClone(r),epoch:r.epoch ?? this.policy.epoch};
+    const g=this.policy.authorize(r);
+    if(!g)return this.reply(r,null,'DENIED');
+    const sessions=this.sessions(g),selected=sessions.filter(s=>s.key===r.sessionId);
+    if(selected.length!==1)return this.reply(r,null,'DENIED',['An exact session selected within the host-reviewed scope is required.']);
+    const snapshot=structuredClone(selected[0]),binding=sessionEvidenceBinding(snapshot);
+    const valid=()=>!!this.policy.authorize(r) && this.sessions(g).filter(s=>s.key===r.sessionId).length===1 && this.sessions(g).some(s=>s.key===r.sessionId && sessionEvidenceBinding(s)===binding);
+    const evidence=await captureSessionEvidence(snapshot,sessionRef(snapshot,new Set(sessions.map(s=>s.key))),r.exactPrompt,valid);
+    if(!evidence || !valid())return this.reply(r,null,'DENIED',['Reviewed source identity or scope changed during capture.']);
+    return this.reply(r,evidence,evidence.state==='PROVIDER_OBSERVED'?'OK':'PARTIAL',evidence.omissions);
+  }
   private async contextMappings(r:Request):Promise<Reply<ContextMapping[]>> {
     if(validateRequest(r))r={...structuredClone(r),epoch:r.epoch ?? this.policy.epoch};
     const g=this.policy.authorize(r);if(!g)return this.reply(r,[],'DENIED');
