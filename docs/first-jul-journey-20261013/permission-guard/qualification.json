@@ -1,0 +1,95 @@
+{
+  "schema": "datapass.rc2-permission-guard-outcome/1",
+  "result": "RC2_LIVE_BLOCKED_EXACT_UNSUPPORTED_PERMISSION_CAPABILITY",
+  "products": {
+    "pm": {
+      "source": "ba623e9892a48694cacfbfd431c811f705ff8eda",
+      "tests": {
+        "total": 220,
+        "passed": 220,
+        "failed": 0,
+        "skipped": 0
+      },
+      "CI": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17150332413",
+      "gates": 4,
+      "package": {
+        "filename": "datapass-pm-0.5.5.vsix",
+        "bytes": 1649530,
+        "sha256": "9334d38a885118c68172882c4135929efa061803d6c25ebba1feaa6a48dfa14a",
+        "sourceSha": "ba623e9892a48694cacfbfd431c811f705ff8eda",
+        "os": "Windows"
+      },
+      "jobId": "17150332413"
+    },
+    "agent": {
+      "source": "109cb142d68b183dee02bca471dc811d3f1ab30c",
+      "tests": {
+        "total": 524,
+        "passed": 524,
+        "failed": 0,
+        "skipped": 0
+      },
+      "CI": "https://gitlab.com/juliandatapass-group/datapass-codex-test/-/jobs/17150332414",
+      "gates": 6,
+      "package": {
+        "filename": "agent-vscode-0.11.5.vsix",
+        "bytes": 532130,
+        "sha256": "88a2e90b38377a61881cab586ea4f0474ce92fec2aadf4fa2076a89299eae516",
+        "sourceSha": "109cb142d68b183dee02bca471dc811d3f1ab30c",
+        "os": "Windows"
+      },
+      "jobId": "17150332414"
+    }
+  },
+  "protocol": "1.0.0",
+  "backend": "d5dfbe9aa2c84cc3cbc3d4926a5155983aceeef1",
+  "SDK": "0.157.0",
+  "guard": {
+    "implementation": "QUALIFIED_WINDOWS_AND_SYNTHETIC_SCOPE",
+    "policy": "READ_ONLY_NO_DELEGATION",
+    "sourcePolicyOwnership": "Config testEnvelope.nativeExecutionPolicy; full test policy hash is retained",
+    "configTransmitted": "SYNTHETIC_CREATE_SESSION_AND_NATIVE_RESOLVE_REQUEST_ONLY",
+    "nativeCreateSession": false,
+    "nativeEffective": "UNKNOWN",
+    "hostTools": "UNVERIFIED",
+    "nativeGuardRefusal": {
+      "state": "PERMISSION_REQUIRED",
+      "message": "Host auto-approval, network or artifact controls are unsafe or unknown.",
+      "prepared": false,
+      "policyHash": "097516d2940977e0895c1a9507397f27c39e5b5087e2077de65dad96841eb934",
+      "kitVersion": "1.1.4",
+      "source": "109cb142d68b183dee02bca471dc811d3f1ab30c"
+    }
+  },
+  "exactNativeCapabilityGap": "Native public resolveSessionConfig schema omits required raw Codex restrictive axes while echoing their requested values. Complete independent native/host permission enforcement evidence is not exposed. Guard refuses before creation; source inspection or echoed configuration is not counted as enforcement.",
+  "authentication": {
+    "state": "NOT_AUTHENTICATED",
+    "basis": "Reuse prior prepared-home Not logged in receipt; no repeated probe",
+    "requested": false,
+    "attempted": false,
+    "next": "Supported subscription OAuth remains prepared; do not request sign-in until the permission capability gate is resolved"
+  },
+  "actualTask": {
+    "sessions": 0,
+    "turns": 0,
+    "continuations": 0,
+    "oneTaskGrant": "UNUSED",
+    "reply": null,
+    "AgentAndPMNativeResponseRecovery": "NOT_RUN_NO_RESPONSE",
+    "syntheticPolicyRecovery": "QUALIFIED"
+  },
+  "installedPackages": "HASH_MATCHED_AND_REGISTERED_PREPARED_PROFILE",
+  "installedGUI": "NOT_CLAIMED_SEPARATE",
+  "fullContractComplete": false,
+  "hostedCI": "GITHUB_BILLING_BLOCKED_BEFORE_STEPS; exact Windows GitLab original mandatory recipes PASS",
+  "sourceBoundaries": {
+    "ConfigLens": "UNCHANGED",
+    "directSpawnSignedPlatformProof": "UNCHANGED",
+    "MicrosoftBinaries": "UNCHANGED",
+    "ownerDesktop": "NO_CONTROL"
+  },
+  "externalNextStep": "A supported Microsoft/provider public permission contract exposing the required restrictive schema and effective native/host enforcement evidence is needed for this automatic read-only route. No further owner QA or generic approval is requested.",
+  "product": "agent",
+  "qualifiedSource": "109cb142d68b183dee02bca471dc811d3f1ab30c",
+  "scope": "Product-owned sanitized RC2 permission continuation; fixture evidence and native blocked probe kept separate"
+}
