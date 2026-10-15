@@ -21,5 +21,5 @@ export async function returnToPm(context:ContextRef,binding:ContextReturnBinding
     if(ack.returned!==true)return ack.returned===false?'DENIED':'UNVERIFIED';
     return (Object.keys(binding) as (keyof ContextReturnBinding)[]).every(key=>ack[key]===binding[key])?'RETURNED':'DENIED';
   }
-  await transport.copy(context.returnToken);return 'COPIED';
+  await transport.copy(context.returnToken);return valid()?'COPIED':'DENIED';
 }

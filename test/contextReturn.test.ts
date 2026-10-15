@@ -27,6 +27,8 @@ test('owner return executes only fixed PM command; absence copies token; drift d
     commands=[PM_RETURN_COMMAND];effects.length=0;f.snapshots[0].headAfter='a'.repeat(40);assert.equal(await returnToPm(context,binding,valid,transport),'DENIED');assert.deepEqual(effects,[]);f.snapshots[0].headAfter=undefined;
     assert.equal(await returnToPm(context,{...binding,returnToken:'arbitrary.command'},valid,transport),'DENIED');
     assert.equal(await returnToPm(context,binding,valid,{...transport,async commands(){policy.clear();return commands;}}),'DENIED');assert.deepEqual(effects,[]);
+    policy.set(f.grant);const fresh={...binding,epoch:policy.epoch};
+    assert.equal(await returnToPm(context,fresh,()=>!!policy.authorize({requestId:'copy:late',scope:f.grant.scope,epoch:fresh.epoch}),{...transport,async copy(){policy.clear();}},true),'DENIED','late clipboard acknowledgement cannot report a current return after revocation');
     policy.set(f.grant);assert.equal(await returnToPm(context,binding,valid,transport,true),'DENIED');
     assert.ok(validateMessage({type:'cmd',cmd:'returnToPm',key:''},()=>false));assert.equal(validateMessage({type:'cmd',cmd:'datapassPm.returnFromAgent',key:''},()=>false),undefined);
     const html=renderContextBridge({sessions:[],providers:[],events:[],now:Date.now(),ternAvailable:false,cockpitInputs:{contexts:[],acceptedWork:[],assets:[],panelContext:{valid:true,context,projectId:'fixture'}}});assert.match(html,/data-cmd="returnToPm"/);assert.match(html,/Copy return token/);
