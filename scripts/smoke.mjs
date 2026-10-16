@@ -53,6 +53,14 @@ settings('Default Dark Modern');
 const cliJs = fs.readdirSync(codeDir).map(d => path.join(codeDir, d, 'resources', 'app', 'out', 'cli.js')).find(p => fs.existsSync(p)) ?? path.join(codeDir, 'resources', 'app', 'out', 'cli.js');
 const install = execFileSync(codeExe, [cliJs, '--extensions-dir', extDir, '--user-data-dir', userData, '--install-extension', vsix, '--force'], { encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', VSCODE_DEV: '' } });
 check('VSIX installs into isolated profile', /successfully installed/i.test(install), install.trim().split('\n').pop());
+const installedDirectory=fs.readdirSync(extDir).find(name=>name.toLowerCase()===`juliandatapass.agent-vscode-${result.package.version}`.toLowerCase());
+if(!installedDirectory)throw Error('Exact installed Agent version directory missing');
+const installedRoot=path.join(extDir,installedDirectory),installedManifest=JSON.parse(fs.readFileSync(path.join(installedRoot,'package.json'),'utf8'));
+if(installedManifest.version!==result.package.version||installedManifest.name!=='agent-vscode')throw Error('Installed Agent manifest identity differs');
+const bundledModuleSha256=createHash('sha256').update(fs.readFileSync(path.join(root,'dist','extension.js'))).digest('hex');
+const installedModuleSha256=createHash('sha256').update(fs.readFileSync(path.join(installedRoot,'dist','extension.js'))).digest('hex');
+if(installedModuleSha256!==bundledModuleSha256)throw Error('Installed Agent module differs from the final built package');
+result.installed={extensionPath:installedRoot,version:installedManifest.version,moduleSha256:installedModuleSha256};
 if(pmVsix){
   const installPm=execFileSync(codeExe,[cliJs,'--extensions-dir',extDir,'--user-data-dir',userData,'--install-extension',path.resolve(pmVsix),'--force'],{encoding:'utf8',env:{...process.env,ELECTRON_RUN_AS_NODE:'1',VSCODE_DEV:''}});
   check('PM VSIX installs into the same isolated profile',/successfully installed/i.test(installPm));
@@ -452,6 +460,7 @@ check('Agent output log shows activation + discovery timing', activated.length >
 result.fixtureObserverErrors=fixtureObserverErrors;
 if(pmFixture&&fs.existsSync(pmFixture.observerDiagnosticFile)){const diagnostic=JSON.parse(fs.readFileSync(pmFixture.observerDiagnosticFile,'utf8'));diagnostic.extensionHostErrors=fixtureObserverErrors;fs.writeFileSync(pmFixture.observerDiagnosticFile,JSON.stringify(diagnostic,null,2));}
 result.activationLog = activated;
+result.installed.activationObserved=activated.length>0;
 result.agentErrors = agentErrors;
 result.shutdownCancellations = shutdownNoise;
 if (shutdownNoise.length) console.log(`NOTE ${shutdownNoise.length} cancellation(s) logged while the extension host was terminating for reload`);
