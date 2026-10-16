@@ -1,10 +1,10 @@
 {
   "schema":"galaxy.ci-product-gates-template/1",
   "repository":"julian-passebecq/agent-vscode",
-  "version":"0.11.6",
+  "version":"0.11.7",
   "sourceSha":"PINNED_BY_CARRIER_INPUT",
   "runnerOS":"Windows",
-  "artifact":"agent-vscode-0.11.6.vsix",
+  "artifact":"agent-vscode-0.11.7.vsix",
   "npmGates":[["ci"],["run","check"],["test"],["run","build"],["run","build:provider-kit"],["run","package"]],
   "coverage":"Original mandatory Candidate checks and additive provider-kit build; test includes compile-tests. Official-SDK synthetic AHP protocol, native live/account/GUI and direct-spawn platform qualification remain separate."
 }

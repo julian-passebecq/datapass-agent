@@ -3,4 +3,6 @@
 !media/**
 !package.json
 !README.md
+!CHANGELOG.md
+!RELEASE-20261017.md
 !LICENSE.md

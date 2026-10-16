@@ -31,6 +31,7 @@ const base = fs.mkdtempSync(path.join(root, '.smoke', 'run-'));
 const userData = path.join(base, 'user-data');
 const extDir = path.join(base, 'extensions');
 const result = { checks: [], screenshots: [], errors: [] };
+result.package={version:JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')).version,sha256:createHash('sha256').update(fs.readFileSync(vsix)).digest('hex'),sourceSha:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()};
 const check = (name, ok, detail = '') => {
   result.checks.push({ name, ok: !!ok, detail });
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);
@@ -69,7 +70,13 @@ if(pmFixture){
   pmFixture.observerPackage={role:'FIXED_RUNNER_QUALIFICATION_SUPPORT',extensionId:'fixture.pm-agent-observer',version:'1.0.0',bytes:fs.statSync(observerVsix).size,sha256:createHash('sha256').update(fs.readFileSync(observerVsix)).digest('hex'),sourceSha256:createHash('sha256').update(fs.readFileSync(path.join(pmFixture.observerDirectory,'extension.cjs'))).digest('hex'),transport:'ACTUAL_PUBLIC_VSCODE_CLI_INSTALL',productTransportMocked:false};
   const diagnostic=JSON.parse(fs.readFileSync(pmFixture.observerDiagnosticFile,'utf8'));diagnostic.events.push({name:'PUBLIC_CLI_INSTALLED',at:Date.now(),success:/successfully installed/i.test(installedObserver)});fs.writeFileSync(pmFixture.observerDiagnosticFile,JSON.stringify(diagnostic,null,2));
 }
-const workspace = pmFixture?.repository ?? root;
+let standaloneRepository;
+if(fixtureHome&&!pmFixture){
+  standaloneRepository=path.join(base,'owned-repository');fs.mkdirSync(standaloneRepository);
+  fs.writeFileSync(path.join(standaloneRepository,'README.md'),'# Generated Agent standalone qualification\n');
+  for(const args of [['init'],['-c','user.name=Galaxy Fixture','-c','user.email=fixture@example.invalid','add','README.md'],['-c','user.name=Galaxy Fixture','-c','user.email=fixture@example.invalid','commit','-m','Generated standalone fixture']])execFileSync('git',args,{cwd:standaloneRepository,windowsHide:true});
+}
+const workspace = pmFixture?.repository ?? standaloneRepository ?? root;
 // Synthetic home (--fixture-home): rebuilt before each launch so its newest record is always a minute old.
 const homeDir = fixtureHome ? fs.mkdtempSync(path.join(os.tmpdir(), 'agent-smoke-home-')) : undefined;
 const createdHome=homeDir?{path:path.resolve(homeDir),parent:path.resolve(os.tmpdir()),role:'GENERATED_DIRECT_TEMP_CHILD'}:undefined;
@@ -80,12 +87,17 @@ if (homeDir) console.log(`Fixture home: ${homeDir}`);
 async function launch() {
   const app = await electron.launch({
     executablePath: codeExe,
-    args: ['--extensions-dir', extDir, '--user-data-dir', userData, '--disable-gpu-sandbox', '--skip-release-notes', '--skip-welcome', '--disable-workspace-trust', '--new-window', workspace],
+    args: ['--extensions-dir', extDir, '--user-data-dir', userData, '--disable-gpu-sandbox', '--skip-release-notes', '--skip-welcome', '--new-window', workspace],
     timeout: 60_000,
     ...(homeDir ? { env: homeEnv() } : {}),
   });
   const win = await app.firstWindow();
   await win.waitForSelector('.monaco-workbench', { timeout: 60_000 });
+  if(fixtureHome){
+    const trust=win.getByRole('button',{name:/^Yes, I trust the authors/});
+    try{await trust.waitFor({state:'visible',timeout:10000});await win.screenshot({path:path.join(shots,'workspace-trust-before-grant.png')});await trust.click();check('Owned fixture Workspace Trust granted through visible native dialog',true);result.workspaceTrust={interaction:'VISIBLE_DIALOG_GRANT',workspace};}
+    catch(error){if(await trust.isVisible().catch(()=>false))throw error;if(!result.workspaceTrust)throw new Error('Fresh owned fixture did not show Workspace Trust; refusing to infer a grant. '+error.message);}
+  }
   await win.setViewportSize?.({ width: 1500, height: 950 }).catch(() => {});
   return { app, win };
 }
