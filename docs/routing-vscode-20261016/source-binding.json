@@ -1,0 +1,12 @@
+{
+  "product": "Agent",
+  "localDirectory": "AGENT",
+  "sourceSha": "b65c6b7b7de9fa95afe0a5cc2a6bb63669b4f92f",
+  "repository": "julian-passebecq/agent-vscode",
+  "repositoryId": 1404682511,
+  "canonicalUrl": "https://github.com/julian-passebecq/agent-vscode.git",
+  "reviewedDefaultSha": "875a2de0c358cbf54ca40e3378621fea64e8559e",
+  "patch": null,
+  "circleProject": "NONE",
+  "githubJobsAllowed": 0
+}
