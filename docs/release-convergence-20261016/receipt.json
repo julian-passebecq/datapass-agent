@@ -1,0 +1,112 @@
+{
+  "schema": "galaxy.product-release-receipt/1",
+  "campaign": "GALAXY-RELEASE-CONVERGENCE-20261016",
+  "product": "Agent",
+  "version": "0.11.6",
+  "repository": {
+    "provider": "github",
+    "hostname": "github.com",
+    "repoId": "julian-passebecq/agent-vscode",
+    "privateRequired": true
+  },
+  "candidate": {
+    "sourceSha": "b65c6b7b7de9fa95afe0a5cc2a6bb63669b4f92f",
+    "parents": [
+      "c3af7e8c847f9fb9603a1ef30d2887692e72d4d3"
+    ],
+    "treeSha": "4c7fd08894b51d0d47b28885e70865df6abb32fd",
+    "branch": "delivery/galaxy-rc-20261016",
+    "sourceBranchMustRemainExact": true
+  },
+  "package": {
+    "name": "agent-vscode-0.11.6.vsix",
+    "sha256": "4e5c98c62a4bcedeb2227e292bfa276fb2c4540afc462ceb54379997289643bf",
+    "bytes": 532134,
+    "integrity": "LOCAL_BYTES_VERIFIED_AND_INDEPENDENT_REVIEWED",
+    "installation": "NOT_RUN_CURRENT_CANDIDATE"
+  },
+  "localTests": [
+    {
+      "runtime": "v26.9.0",
+      "command": "C:\\Program Files\\nodejs\\node.exe node_modules/typescript/bin/tsc -p . --noEmit",
+      "exitCode": 0,
+      "pass": null,
+      "fail": null,
+      "skip": null,
+      "tests": null,
+      "kind": "STATIC_TYPECHECK",
+      "sourceSha": "b65c6b7b7de9fa95afe0a5cc2a6bb63669b4f92f",
+      "sourceUnchanged": true,
+      "log": "logs/agent-final-typecheck.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "logBytes": 0
+    },
+    {
+      "runtime": "v26.9.0",
+      "command": "npm.cmd run compile-tests",
+      "exitCode": 0,
+      "pass": null,
+      "fail": null,
+      "skip": null,
+      "tests": null,
+      "kind": "TEST_COMPILATION",
+      "sourceSha": "b65c6b7b7de9fa95afe0a5cc2a6bb63669b4f92f",
+      "sourceUnchanged": true,
+      "log": "logs/agent-final-compile.log",
+      "logSha256": "ad19ab6a06fdcf6d98e2537953ecc8acdc9fb36ffc6d58874749662a129d5500",
+      "logBytes": 164
+    },
+    {
+      "runtime": "v26.9.0",
+      "command": "C:\\Program Files\\nodejs\\node.exe --test --test-concurrency=2 out-test/test/*.test.js",
+      "exitCode": 0,
+      "pass": 524,
+      "fail": 0,
+      "skip": 0,
+      "tests": 524,
+      "kind": "ENGINE_FIXTURE_AND_SYNTHETIC_AHP_HOST",
+      "sourceSha": "b65c6b7b7de9fa95afe0a5cc2a6bb63669b4f92f",
+      "sourceUnchanged": true,
+      "log": "logs/agent-node26-final.log",
+      "logSha256": "0bff69290ee24400f2b68502fb13e2528bbf324e267c75e65fd4d3ceaa938a9c",
+      "logBytes": 56936
+    },
+    {
+      "runtime": "v22.23.3",
+      "command": "C:\\GitLab-Runner\\builds\\.ci-tools\\node\\node-v22.23.3-win-x64\\node.exe --test --test-concurrency=2 out-test/test/*.test.js",
+      "exitCode": 0,
+      "pass": 524,
+      "fail": 0,
+      "skip": 0,
+      "tests": 524,
+      "kind": "ENGINE_FIXTURE_AND_SYNTHETIC_AHP_HOST",
+      "sourceSha": "b65c6b7b7de9fa95afe0a5cc2a6bb63669b4f92f",
+      "sourceUnchanged": true,
+      "log": "logs/agent-node22-final.log",
+      "logSha256": "52014f87a0d3b906f654cb36d896ea2093e8f8ca75245a308c82f8a51c51cb4c",
+      "logBytes": 128198
+    }
+  ],
+  "remoteCI": {
+    "state": "NOT_RUN_NO_EXACT_SOURCE_RUN_OBSERVED",
+    "newDispatch": "NOT_AUTHORIZED",
+    "runnerIsolation": "NOT_QUALIFIED_BY_THIS_RECEIPT"
+  },
+  "installedJourney": "BLOCKED_NO_CURRENT_AUTHORIZED_GUI_ENVIRONMENT",
+  "integration": {
+    "state": "PASS_SCOPED_ENGINE_FIXTURE_NODE22_NODE26",
+    "nativeSessionsObserved": 0,
+    "providerTurn": "NOT_RUN",
+    "commandTransport": "SYNTHETIC"
+  },
+  "nativePermissions": {
+    "state": "UNPROVEN",
+    "restrictiveRoute": "READ_ONLY_NO_DELEGATION_CLOSED",
+    "grantsConferred": "NONE"
+  },
+  "fullSelectedAcceptance": false,
+  "RELEASE_PASS": false,
+  "status": "LOCAL_QUALIFIED_EXTERNAL_GATES_OPEN",
+  "evidenceOwner": "julian-passebecq/agent-vscode",
+  "provenance": "Product-owned bounded receipt, not a copy of native chat/history or a new task database."
+}

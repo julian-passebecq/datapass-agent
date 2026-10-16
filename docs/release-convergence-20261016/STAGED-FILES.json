@@ -1,0 +1,41 @@
+{
+  "schema": "galaxy.product-receipt-files/1",
+  "product": "Agent",
+  "files": [
+    {
+      "path": "logs/agent-final-compile.log",
+      "bytes": 164,
+      "sha256": "ad19ab6a06fdcf6d98e2537953ecc8acdc9fb36ffc6d58874749662a129d5500"
+    },
+    {
+      "path": "logs/agent-final-typecheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "logs/agent-node22-final.log",
+      "bytes": 128198,
+      "sha256": "52014f87a0d3b906f654cb36d896ea2093e8f8ca75245a308c82f8a51c51cb4c"
+    },
+    {
+      "path": "logs/agent-node26-final.log",
+      "bytes": 56936,
+      "sha256": "0bff69290ee24400f2b68502fb13e2528bbf324e267c75e65fd4d3ceaa938a9c"
+    },
+    {
+      "path": "README.md",
+      "bytes": 248,
+      "sha256": "dfc17c9a53d99082e3a58b75cf2c4c8d57a56f3fa50e172c30bdf9a2aa3179a5"
+    },
+    {
+      "path": "receipt.json",
+      "bytes": 3868,
+      "sha256": "bc0f1449f09912392f9acc20355f5ee9ad00badcb33eaeb21baebe52a7d31b31"
+    },
+    {
+      "path": ".gitattributes",
+      "bytes": 8,
+      "sha256": "705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da"
+    }
+  ]
+}

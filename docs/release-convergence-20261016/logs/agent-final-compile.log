@@ -1,0 +1,5 @@
+
+> agent-vscode@0.11.6 compile-tests
+> tsc -p tsconfig.test.json && node scripts/build-agent-host-tests.mjs
+
+bundled official AHP SDK synthetic protocol tests
