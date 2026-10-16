@@ -120,6 +120,26 @@ test('redact: linear on 1 MB adversarial inputs', () => {
   }
 });
 
+test('redact: AWS candidate fast path preserves matching and boundary rules', () => {
+  const secret = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
+  assert.equal(secret.length, 40);
+  for (const anchor of ['aws', 'AWS', 'AKIAIOSFODNN7EXAMPLE', 'ASIAIOSFODNN7EXAMPLE']) {
+    const safeAnchor = anchor.length === 20 ? MARK : anchor;
+    for (const gap of [' ', ' '.repeat(160)]) {
+      assert.equal(redact(`${anchor}${gap}${secret}`), `${safeAnchor}${gap}${MARK}`);
+    }
+  }
+  for (const text of [
+    `aws ${secret.slice(0, 39)}`, `aws ${secret}a`, `aws ${secret}=`,
+    `aws ${'A'.repeat(40)}`, `aws ${'a'.repeat(40)}`,
+    `aws\n${secret}`, `aws${' '.repeat(161)}${secret}`,
+  ]) assert.equal(redact(text), text, text);
+  assert.equal(redact(`aws ${secret}; aws ${secret}`), `aws ${MARK}; aws ${MARK}`);
+  // The necessary-condition regex must have no state between calls.
+  assert.equal(redact(`aws ${secret}`), `aws ${MARK}`);
+  assert.equal(redact(`aws ${secret}`), `aws ${MARK}`);
+});
+
 test('redactDeep: secret-named keys and every nested string', () => {
   const v = redactDeep({ headers: { Authorization: 'Bearer zzzzzzzzzzzzzzzz', 'x-api-key': 'k' }, env: { AZURE_OPENAI_KEY: 'v1', PATH: '/bin' }, usage: { input_tokens: 5 }, list: ['ghp_abcdefghijklmnopqrstuvwxyz123'], ok: true });
   assert.deepEqual(v, { headers: { Authorization: MARK, 'x-api-key': MARK }, env: { AZURE_OPENAI_KEY: MARK, PATH: '/bin' }, usage: { input_tokens: 5 }, list: [MARK], ok: true });

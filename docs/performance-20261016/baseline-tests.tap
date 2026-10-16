@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: launcher: labelled as the only screen that starts sessions; untrusted workspace never starts or resumes
+ok 1 - launcher: labelled as the only screen that starts sessions; untrusted workspace never starts or resumes
+  ---
+  duration_ms: 10.8005
+  type: 'test'
+  ...
+# Subtest: redact: every audit sample and named token format is removed
+ok 2 - redact: every audit sample and named token format is removed
+  ---
+  duration_ms: 7.8147
+  type: 'test'
+  ...
+# Subtest: redact: structure and harmless text survive
+ok 3 - redact: structure and harmless text survive
+  ---
+  duration_ms: 0.8394
+  type: 'test'
+  ...
+# Subtest: redact: linear on 1 MB adversarial inputs
+ok 4 - redact: linear on 1 MB adversarial inputs
+  ---
+  duration_ms: 1071.3403
+  type: 'test'
+  ...
+# Subtest: redactDeep: secret-named keys and every nested string
+ok 5 - redactDeep: secret-named keys and every nested string
+  ---
+  duration_ms: 3.9041
+  type: 'test'
+  ...
+# Subtest: isCredentialPath: auth and credential files are refused
+ok 6 - isCredentialPath: auth and credential files are refused
+  ---
+  duration_ms: 1.4191
+  type: 'test'
+  ...
+# Subtest: transcript screen and markdown export never show a secret from tool inputs, results or text
+ok 7 - transcript screen and markdown export never show a secret from tool inputs, results or text
+  ---
+  duration_ms: 83.0055
+  type: 'test'
+  ...
+# Subtest: audit JSONL export never carries a secret from titles or labels
+ok 8 - audit JSONL export never carries a secret from titles or labels
+  ---
+  duration_ms: 2.4435
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2902.6034

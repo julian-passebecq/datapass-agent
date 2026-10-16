@@ -1,0 +1,23 @@
+{
+  "runtime": "v22.23.3",
+  "v8": "12.4.254.21-node.57",
+  "platform": "win32",
+  "arch": "x64",
+  "sourceSha256": "8b238882a489f29ce0fb5c98f75260f0691d4bdba808fafeed52e7c355818c9a",
+  "mode": "aws",
+  "rounds": 4,
+  "coldMeaning": "First invocation in this new process; not an OS cold-cache claim.",
+  "samples": [
+    {
+      "prefix": "aws aws aws ",
+      "length": 1048576,
+      "sha256": "4ca1cb7e9f829443c257dd9fef80fe322dca41637efb1acf20787d7f21e194c2",
+      "timingsMs": [
+        37.392,
+        30.813,
+        30.955,
+        32.661
+      ]
+    }
+  ]
+}

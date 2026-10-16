@@ -1,0 +1,247 @@
+{
+  "runtime": "v22.23.3",
+  "v8": "12.4.254.21-node.57",
+  "platform": "win32",
+  "arch": "x64",
+  "sourceSha256": "8b238882a489f29ce0fb5c98f75260f0691d4bdba808fafeed52e7c355818c9a",
+  "mode": "rules",
+  "rounds": 4,
+  "coldMeaning": "First invocation in this new process; not an OS cold-cache claim.",
+  "sample": {
+    "prefix": "aws aws aws ",
+    "length": 1048576,
+    "sha256": "4ca1cb7e9f829443c257dd9fef80fe322dca41637efb1acf20787d7f21e194c2"
+  },
+  "rules": [
+    {
+      "index": 0,
+      "regex": "/-----BEGIN [A-Z0-9 ]{0,40}PRIVATE KEY[A-Z ]{0,10}-----[\\s\\S]*?(?:-----END [A-Z0-9 ]{0,40}PRIVATE KEY[A-Z ]{0,10}-----|$)/g",
+      "timingsMs": [
+        0.368,
+        0.191,
+        0.11,
+        0.106
+      ]
+    },
+    {
+      "index": 1,
+      "regex": "/(\\b(?:AKIA|ASIA)[0-9A-Z]{16}\\b|\\baws\\b)([^\\n]{0,160}?)(?<![A-Za-z0-9/+])([A-Za-z0-9/+]{40})(?![A-Za-z0-9/+=])/gi",
+      "timingsMs": [
+        18.192,
+        51.888,
+        11.981,
+        11.914
+      ]
+    },
+    {
+      "index": 2,
+      "regex": "/\\bsk-ant-[A-Za-z0-9_-]{8,}/g",
+      "timingsMs": [
+        0.526,
+        0.423,
+        0.924,
+        1.01
+      ]
+    },
+    {
+      "index": 3,
+      "regex": "/\\b(?:sk|pk|rk)-[A-Za-z0-9_-]{12,}/g",
+      "timingsMs": [
+        0.695,
+        0.387,
+        0.497,
+        0.613
+      ]
+    },
+    {
+      "index": 4,
+      "regex": "/\\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{10,}/g",
+      "timingsMs": [
+        0.32,
+        0.161,
+        0.128,
+        0.126
+      ]
+    },
+    {
+      "index": 5,
+      "regex": "/\\bgithub_pat_[A-Za-z0-9_]{20,}/g",
+      "timingsMs": [
+        0.236,
+        0.114,
+        0.117,
+        0.121
+      ]
+    },
+    {
+      "index": 6,
+      "regex": "/\\bgh[pousr]_[A-Za-z0-9]{20,}/g",
+      "timingsMs": [
+        0.492,
+        0.477,
+        0.519,
+        0.387
+      ]
+    },
+    {
+      "index": 7,
+      "regex": "/\\bglpat-[A-Za-z0-9_-]{16,}/g",
+      "timingsMs": [
+        0.309,
+        0.179,
+        0.145,
+        0.13
+      ]
+    },
+    {
+      "index": 8,
+      "regex": "/\\bnpm_[A-Za-z0-9]{30,}/g",
+      "timingsMs": [
+        0.279,
+        0.252,
+        0.193,
+        0.219
+      ]
+    },
+    {
+      "index": 9,
+      "regex": "/\\bAIza[0-9A-Za-z_-]{30,}/g",
+      "timingsMs": [
+        0.315,
+        0.236,
+        0.273,
+        0.237
+      ]
+    },
+    {
+      "index": 10,
+      "regex": "/\\bya29\\.[0-9A-Za-z_-]{20,}/g",
+      "timingsMs": [
+        0.353,
+        0.234,
+        0.284,
+        0.231
+      ]
+    },
+    {
+      "index": 11,
+      "regex": "/\\bxox[abprse]-[A-Za-z0-9-]{10,}/g",
+      "timingsMs": [
+        0.379,
+        0.333,
+        0.301,
+        0.284
+      ]
+    },
+    {
+      "index": 12,
+      "regex": "/\\bxapp-[A-Za-z0-9-]{10,}/g",
+      "timingsMs": [
+        0.341,
+        0.267,
+        0.31,
+        0.28
+      ]
+    },
+    {
+      "index": 13,
+      "regex": "/\\b(?:AKIA|ASIA)[0-9A-Z]{16}\\b/g",
+      "timingsMs": [
+        0.278,
+        0.188,
+        0.162,
+        0.166
+      ]
+    },
+    {
+      "index": 14,
+      "regex": "/\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{5,}/g",
+      "timingsMs": [
+        0.327,
+        0.297,
+        0.279,
+        0.433
+      ]
+    },
+    {
+      "index": 15,
+      "regex": "/\\b((?:proxy-)?authorization[\"']?\\s*[:=]\\s*)(\"(?:[^\"\\\\\\n]|\\\\.)*\"|'[^'\\n]*'|[^\\s,;\"']+(?:[ \\t]+[^\\s,;\"']+)?)/gi",
+      "timingsMs": [
+        0.318,
+        0.112,
+        0.117,
+        0.12
+      ]
+    },
+    {
+      "index": 16,
+      "regex": "/\\b((?:x-api-key|api-key|x-auth-token|x-goog-api-key|ocp-apim-subscription-key|set-cookie|cookie)[ \\t]*:[ \\t]*)(?![\"'\\\\])[^\\r\\n\"'\\\\]+/gi",
+      "timingsMs": [
+        1.401,
+        0.902,
+        1.303,
+        1.124
+      ]
+    },
+    {
+      "index": 17,
+      "regex": "/\\b(bearer|basic)\\s+[A-Za-z0-9._~+/-]{12,}=*/gi",
+      "timingsMs": [
+        1.228,
+        0.551,
+        0.613,
+        0.65
+      ]
+    },
+    {
+      "index": 18,
+      "regex": "/([?&](?:amp;)?(?:key|sig|signature|code|auth|password|pwd|passwd|token|access_token|refresh_token|id_token|api_key|apikey|secret|client_secret|x-amz-signature|x-amz-credential|x-amz-security-token)=)[^&\\s#\"'<>]+/gi",
+      "timingsMs": [
+        1.169,
+        1.233,
+        0.841,
+        0.611
+      ]
+    },
+    {
+      "index": 19,
+      "regex": "/(:\\/\\/[^/\\s:@]+:)[^\\s/]*@(?=[^@\\s/]*(?:[/?#\\s\"'<>]|$))/g",
+      "timingsMs": [
+        0.738,
+        0.232,
+        0.208,
+        1.499
+      ]
+    },
+    {
+      "index": 20,
+      "regex": "/(?<![A-Za-z0-9_.-])((\\\\?[\"']?)([A-Za-z0-9_.-]{0,40}(?:token|secret|passw(?:or)?d|pwd|passphrase|api[_-]?key|access[_-]?key|private[_-]?key|account[_-]?key|shared[_-]?access[_-]?(?:key|signature)|subscription[_-]?key|client[_-]?secret|credentials?|session[_-]?(?:id|token|key)|cookie|auth[_-]?(?:token|key|code)|signing[_-]?key|encryption[_-]?key|conn(?:ection)?[_-]?string|[_-]key)[A-Za-z0-9_.-]{0,40})\\\\?[\"']?(\\s*[:=]\\s*))(\\\\\"(?:(?!\\\\\")[^\\n])*\\\\\"|\"(?:[^\"\\\\\\n]|\\\\.)*\"|'[^'\\n]*'|(?![{\\[])[^\\s,;}\\]&\"'\\\\<>]+)/gi",
+      "timingsMs": [
+        18.973,
+        15.685,
+        12.373,
+        12.444
+      ]
+    },
+    {
+      "index": 21,
+      "regex": "/(--?(?:password|passwd|pwd|token|secret|api-key|apikey|access-token|auth-token|client-secret)[= ])(\\S+)/gi",
+      "timingsMs": [
+        0.755,
+        0.518,
+        0.518,
+        0.706
+      ]
+    },
+    {
+      "index": 22,
+      "regex": "/(\\b(?:mysql|mysqldump|mysqladmin|mariadb|mariadb-dump)\\b[^\\n|;&]{0,200}?\\s-p)([ \\t]*)(?!-)(\\S+)/g",
+      "timingsMs": [
+        0.652,
+        0.4,
+        0.425,
+        0.397
+      ]
+    }
+  ]
+}

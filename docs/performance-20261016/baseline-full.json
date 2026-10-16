@@ -1,0 +1,100 @@
+{
+  "runtime": "v22.23.3",
+  "v8": "12.4.254.21-node.57",
+  "platform": "win32",
+  "arch": "x64",
+  "sourceSha256": "91c3b2757cdb018f367a4b235c85465994d9c912a869dcd6c2fe99043a8fbe90",
+  "mode": "full",
+  "rounds": 4,
+  "coldMeaning": "First invocation in this new process; not an OS cold-cache claim.",
+  "samples": [
+    {
+      "prefix": "aaaaaaaaaaaa",
+      "length": 1048576,
+      "sha256": "9bc1b2a288b26af7257a36277ae3816a7d4f16e89c1e7e77d0a5c48bad62b360",
+      "timingsMs": [
+        26.453,
+        23.955,
+        21.778,
+        15.141
+      ]
+    },
+    {
+      "prefix": "passwordpass",
+      "length": 1048576,
+      "sha256": "c2745cec86a82357c0324f2d9c42606a60ed4e84b03c4d7390d53f06abc16296",
+      "timingsMs": [
+        16.184,
+        17.717,
+        17.124,
+        16.266
+      ]
+    },
+    {
+      "prefix": "aws aws aws ",
+      "length": 1048576,
+      "sha256": "4ca1cb7e9f829443c257dd9fef80fe322dca41637efb1acf20787d7f21e194c2",
+      "timingsMs": [
+        452.189,
+        484.29,
+        457.474,
+        424.158
+      ]
+    },
+    {
+      "prefix": "://u:://u::/",
+      "length": 1310720,
+      "sha256": "b8925433b0cc2650e3e25de16abc2ac1e2f0ef03059bea4d9ec43d1f60d7b76d",
+      "timingsMs": [
+        28.096,
+        31.915,
+        29.944,
+        65.589
+      ]
+    },
+    {
+      "prefix": "mysql mysql ",
+      "length": 786432,
+      "sha256": "500aca929c82bda0152843f998d1b604c7f64e3a4b880155d55db0967070fa5c",
+      "timingsMs": [
+        91.967,
+        93.622,
+        96.382,
+        84.179
+      ]
+    },
+    {
+      "prefix": "-----BEGIN P",
+      "length": 884736,
+      "sha256": "99ca696b3b56d3cca65be61404bfb892e7b74c21e9edacd59d15cefa18518f67",
+      "timingsMs": [
+        1.387,
+        1.385,
+        1.122,
+        1.506
+      ]
+    },
+    {
+      "prefix": "\"token\":\"\"to",
+      "length": 1179648,
+      "sha256": "cc86e8b0e742fa3e1846484383ab59c53e9a46aa2030e3da2a1894190743c08b",
+      "timingsMs": [
+        198.959,
+        202.093,
+        194.067,
+        158.389
+      ]
+    },
+    {
+      "prefix": "x_key_x_key_",
+      "length": 786432,
+      "sha256": "281aa0ac756b635eaa3ae67df454189812a00125232aed82e0fb6c5b91d610e5",
+      "timingsMs": [
+        14.946,
+        14.775,
+        10.381,
+        9.577
+      ]
+    }
+  ]
+}

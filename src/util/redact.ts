@@ -7,6 +7,8 @@ export const MARK = '[REDACTED]';
 
 interface Rule {
   re: RegExp;
+  /** Non-global necessary condition: skip expensive searches when a match is impossible. */
+  requires?: RegExp;
   /** Replacement; default replaces the whole match with MARK. */
   to?: (m: string, ...g: string[]) => string;
 }
@@ -52,6 +54,9 @@ const RULES: Rule[] = [
   { re: /-----BEGIN [A-Z0-9 ]{0,40}PRIVATE KEY[A-Z ]{0,10}-----[\s\S]*?(?:-----END [A-Z0-9 ]{0,40}PRIVATE KEY[A-Z ]{0,10}-----|$)/g },
   // AWS secret access key without a label, on the same line as an access key id or the word "aws".
   {
+    // Without a 40-character candidate, repeated "aws " would each search the next 160 characters.
+    // This single linear scan cannot exclude anything the full rule could match.
+    requires: /[A-Za-z0-9/+]{40}/,
     re: /(\b(?:AKIA|ASIA)[0-9A-Z]{16}\b|\baws\b)([^\n]{0,160}?)(?<![A-Za-z0-9/+])([A-Za-z0-9/+]{40})(?![A-Za-z0-9/+=])/gi,
     to: (m, a, mid, s) => (/[A-Z]/.test(s) && /[a-z]/.test(s) ? `${a}${mid}${MARK}` : m),
   },
@@ -102,7 +107,10 @@ export function redact(text: string): string {
   if (typeof text !== 'string') return '';
   if (!text) return text;
   let out = text;
-  for (const r of RULES) out = out.replace(r.re, (m: string, ...g: unknown[]) => (r.to ? r.to(m, ...(g as string[])) : MARK));
+  for (const r of RULES) {
+    if (r.requires && !r.requires.test(out)) continue;
+    out = out.replace(r.re, (m: string, ...g: unknown[]) => (r.to ? r.to(m, ...(g as string[])) : MARK));
+  }
   // Archive gates scan token shapes anywhere, including tokens embedded in another word.
   // Keep this in the shared redaction layer; exports must not implement a weaker parallel policy.
   for (const re of [
