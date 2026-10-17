@@ -12,6 +12,7 @@ import type { Scope } from '../cockpit/interfaces';
 import type { ImageProducerReceipt } from '../cockpit/images';
 import { contextSourceHash, returnToPm } from '../cockpit/contextReturn';
 import { revealContextInLens } from '../cockpit/lensContext';
+import { enrollDiagnosticResources } from '../cockpit/resourceEnrollment';
 
 export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStore, ternAvailable: () => boolean, onMessage: (m: WebviewMessage) => void, installed: () => import('../extension').AgentApi['installed']): CockpitFacade {
   const policy = new ScopePolicy(), panels = new Set<WorkspacePanel>();
@@ -101,9 +102,15 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
     }),
     vscode.commands.registerCommand('agent.inspectSelectedResources',async()=>{
       const g=await chooseScope();if(!g)return;
-      const files=await vscode.window.showOpenDialog({title:'Select exact diagnostic files (metadata only; no execution)',canSelectMany:true});if(!files?.length)return;
-      facade.registerResources(g,files.slice(0,50).map(f=>({id:'resource:'+digest(f.fsPath).slice(0,24),file:f.fsPath,kind:/\.lock$/i.test(f.fsPath)?'LOCK':/\.(py|ps1|js|mjs)$/i.test(f.fsPath)?'SCRIPT':'FILE',enabled:null,staleAfterMs:3600000})));
-      const reply=await facade.api.getResourceObservations({requestId:'local-resource-read',scope:g.scope});
+      const epoch=policy.epoch;
+      const enrolled=await enrollDiagnosticResources({
+        chooseFiles:async()=>{const files=await vscode.window.showOpenDialog({title:'Select exact diagnostic files (metadata only; no execution)',canSelectMany:true});return files?.map(file=>file.fsPath);},
+        reviewEnabled:async choices=>(await vscode.window.showQuickPick([...choices],{title:'Review enabled-state metadata for selected resources',placeHolder:'Reviewer assertion only. This does not enable, disable, execute or re-enable a resource.'}))?.id,
+        stillAuthorized:()=>!!policy.authorize({requestId:'local-resource-enroll',scope:g.scope,epoch}),
+        register:items=>facade.registerResources(g,items),
+      });
+      if(!enrolled)return;
+      const reply=await facade.api.getResourceObservations({requestId:'local-resource-read',scope:g.scope,epoch});
       await vscode.window.showTextDocument(await vscode.workspace.openTextDocument({language:'json',content:JSON.stringify(reply,null,2)}),{preview:true});
     }),
     vscode.commands.registerCommand('agent.importImageReceipt',async()=>{
