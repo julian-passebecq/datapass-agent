@@ -11,11 +11,12 @@ import type { AgentSessionSnapshot } from '../model';
 import type { ProviderAdapter } from '../providers/types';
 
 interface Cursor { id: string; sourceId: string; identity: string; bytes: number; prefixHash: string; }
-interface Capture extends Cursor { file: string; root: string; kind: 'new' | 'appended' | 'rewritten' | 'unchanged'; }
+interface Capture extends Cursor { file: string; root: string; kind: 'new' | 'appended' | 'rewritten' | 'unchanged'; expectedPreviousCursorHash: string; expectedPreviousManifestHash: string | null; }
 interface Plan extends ExportPlan { scopeHash: string; destination: string; sources: Capture[]; }
 interface Manifest { schema: 'datapass.incremental-history/1'; planHash: string; committedAt: string; scopeHash: string; cursors: Cursor[]; artifacts: { file: string; hash: string; records: number; }[]; projection: 'selected-full-session-resnapshot'; }
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
 const textHash = (text: string) => createHash('sha256').update(text).digest('hex');
+const cursorHash = (cursor: Cursor | undefined) => digest(cursor ? [cursor.id, cursor.sourceId, cursor.identity, cursor.bytes, cursor.prefixHash] : null);
 async function plainDirectory(directory: string): Promise<void> {
   for (let p = directory; p !== path.dirname(p); p = path.dirname(p)) {
     try { if ((await fs.lstat(p)).isSymbolicLink()) throw new Error('Linked export directory refused.'); }
@@ -78,8 +79,8 @@ export class IncrementalExporter {
     const out = await resolveDestination(path.resolve(destination));
     const roots = await Promise.all(this.adapters.map(a => fs.realpath(a.root)));
     if (roots.some(root => { const r = path.relative(root, out); return r === '' || !r.startsWith('..' + path.sep) && r !== '..' && !path.isAbsolute(r); })) throw new Error('Destination is inside provider storage.');
-    const previous = new Map<string, Cursor>();
-    for (const m of await this.manifests(out)) for (const c of m.cursors) previous.set(c.id, c);
+    const previous = new Map<string, Cursor>(), previousManifests = new Map<string, string>();
+    for (const m of await this.manifests(out)) { const manifestHash = digest(m); for (const c of m.cursors) { previous.set(c.id, c); previousManifests.set(c.id, manifestHash); } }
     const captures: Capture[] = [];
     for (const s of selected as AgentSessionSnapshot[]) {
       const a = this.adapters.find(a => a.provider === s.provider); if (!a) throw new Error('Provider reader unavailable.');
@@ -107,7 +108,9 @@ export class IncrementalExporter {
       const old = previous.get(id);
       let kind: Capture['kind'] = 'new';
       if (old) kind = bytes === old.bytes && prefixHash === old.prefixHash ? 'unchanged' : bytes >= old.bytes && await hashPrefix(file, old.bytes) === old.prefixHash ? 'appended' : 'rewritten';
-      captures.push({ id, sourceId: s.key, identity: s.key, bytes, prefixHash, file, root, kind });
+      // Content-only binding keeps unchanged re-plans idempotent. Changed captures also bind
+      // the prior immutable commit so a truncate/reappend cycle cannot reuse an old capture.
+      captures.push({ id, sourceId: s.key, identity: s.key, bytes, prefixHash, file, root, kind, expectedPreviousCursorHash: cursorHash(old), expectedPreviousManifestHash: kind === 'unchanged' ? null : previousManifests.get(id) ?? null });
     }
     const base = { exporterVersion: 'incremental/1', scopeHash: grant.scope.policyHash, destination: out, sources: captures };
     const hash = digest(base), plan: Plan = { ...base, id: 'plan:' + hash, hash, newCount: captures.filter(c => c.kind === 'new').length, appendedCount: captures.filter(c => c.kind === 'appended').length, rewrittenCount: captures.filter(c => c.kind === 'rewritten').length, unchangedCount: captures.filter(c => c.kind === 'unchanged').length, omittedCount: 0 };
@@ -135,8 +138,10 @@ export class IncrementalExporter {
         }
         return this.receipt(committed);
       }
-      const latest = new Map<string, Cursor>(); for (const m of manifests) for (const c of m.cursors) latest.set(c.id, c);
-      for (const c of p.sources) if ((latest.get(c.id)?.bytes ?? 0) > c.bytes) throw new Error('A newer export committed; preview again.');
+      const latest = new Map<string, Cursor>(), latestManifests = new Map<string, string>();
+      for (const m of manifests) { const manifestHash = digest(m); for (const c of m.cursors) { latest.set(c.id, c); latestManifests.set(c.id, manifestHash); } }
+      // A shorter reviewed resnapshot is valid; a plan based on a replaced predecessor is not.
+      for (const c of p.sources) if (cursorHash(latest.get(c.id)) !== c.expectedPreviousCursorHash || c.kind !== 'unchanged' && (latestManifests.get(c.id) ?? null) !== c.expectedPreviousManifestHash) throw new Error('A newer export committed; preview again.');
       await plainDirectory(path.join(out, 'objects'));
       await fs.mkdir(stage); await fs.mkdir(path.join(out, 'objects'), { recursive: true }); await fs.mkdir(path.join(out, 'commits'), { recursive: true });
       const artifacts: Manifest['artifacts'] = [];

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.9 — 2026-10-17 (private qualification candidate)
+
+- Fix fresh reviewed truncations being refused as a newer export. A shorter selected full-session resnapshot may commit only while its reviewed prior cursor and commit remain current.
+- Bind changed capture plans to their previous immutable manifest, refusing stale new/append/rewrite plans even when byte lengths match. Preserve unchanged re-plan/repeat idempotence and historical receipt recovery.
+- Preserve exact source/approval/hash/lock/staging checks, curated redaction and immutable prior objects. No provider history is written.
+- New source tests cover positive truncation/reappend, concurrent stale plans and original 0.11.8-format receipt/object bytes. Exact new installed export qualification remains pending; prior 0.11.8 smoke results retain their original package scope.
+
 ## 0.11.8 — 2026-10-17 (private qualification candidate)
 
 - Let the existing diagnostic-file enrollment explicitly record UNKNOWN, Enabled or Disabled metadata, after exact source-scope and file selection.
