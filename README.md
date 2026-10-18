@@ -1,3 +1,7 @@
+# Agent 0.11.10 scoped-validity candidate
+
+Scoped panels now refresh their refusal state when a reviewed source disappears without a store-version change. See [candidate scope and qualification limits](RELEASE-0.11.10.md). The notes below retain earlier Agent history; prior installed evidence is not new-version acceptance.
+
 # DataPass Agent 0.10.8
 
 Repeated native Claude tool calls and Codex completed tool items now appear once in the transcript and markdown export. Installed Windows qualification reproduced both duplicate counts; the reader fix keeps distinct calls, anonymous records and streamed assistant text. See [installed qualification scope and receipts](docs/PM-AGENT-INSTALLED-QUALIFICATION.md).
