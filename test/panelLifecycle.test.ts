@@ -61,7 +61,7 @@ test('serializer adopts existing public panel, restores selected screen, persist
 
 test('scoped UI binds exports to reviewed sources and suspends missing, replaced or linked provider paths',async()=>{
   const f=await cockpitFixture();const handlers=new Map<string,Function>();let exportPermission=false,dialogs=0;const forwarded:unknown[]=[],panels:any[]=[],warnings:string[]=[];
-  class Panel {constructor(...args:any[]){panels.push(this);Object.assign(this,{message:args[1],read:args[4],inputs:args[5]});}open(){}dispose(){}}
+  class Panel {constructor(...args:any[]){panels.push(this);Object.assign(this,{message:args[1],read:args[4],inputs:args[5]});}open(){}validityChanged(){}dispose(){}}
   const vscode={commands:{registerCommand(id:string,fn:Function){handlers.set(id,fn);return {dispose(){}};}},window:{async showQuickPick(items:any[],opts:any){return opts.canPickMany?[items[0]]:items.find(x=>x.exportConsent===exportPermission);},async showInputBox(opts:any){return opts.title==='Organization ID'?'local':'fixture';},showInformationMessage(){},showWarningMessage(message:string){warnings.push(message);},async showOpenDialog(){dialogs++;return [{fsPath:path.join(f.temp,'export')}];}},env:{clipboard:{async writeText(){}}}};
   const source=fs.readFileSync(path.resolve(__dirname,'../../src/ui/cockpit.ts'),'utf8'),compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
   const localRequire=createRequire(path.resolve(__dirname,'../src/ui/cockpit.js')),module={exports:{} as {registerCockpit:Function}};

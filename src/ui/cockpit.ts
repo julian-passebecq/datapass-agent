@@ -16,6 +16,7 @@ import { enrollDiagnosticResources } from '../cockpit/resourceEnrollment';
 
 export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStore, ternAvailable: () => boolean, onMessage: (m: WebviewMessage) => void, installed: () => import('../extension').AgentApi['installed']): CockpitFacade {
   const policy = new ScopePolicy(), panels = new Set<WorkspacePanel>();
+  const policyChanged = () => panels.forEach(panel => panel.validityChanged());
   // Previously saved grants are retired. Navigation restoration never restores authority.
   void ctx.globalState.update('cockpit.scopes.v1', undefined);
   const facade = new CockpitFacade(store, policy, {
@@ -132,9 +133,10 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
       const permission = await vscode.window.showQuickPick([{ label: 'Observation only', configuration: false, exportConsent: false }, { label: 'Observation and sanitized provider configuration', configuration: true, exportConsent: false }, { label: 'Observation, sanitized configuration, and reviewed local export', configuration: true, exportConsent: true }], { title: 'Allowed cockpit scope', placeHolder: 'Export still requires a specific plan review and destination.' }); if (!permission) return;
       const grant = makeGrant({ id: organization + ':' + project, organization, project, privacy, sessions: sessions.filter(s => selected.some(p => p.key === s.key)), ...permission });
       policy.set(grant);
+      policyChanged();
       void vscode.window.showInformationMessage(`Agent: reviewed ${grant.sessionKeys.length} sessions for ${project}.`);
     }),
-    vscode.commands.registerCommand('agent.revokeCockpitScopes', async () => { policy.clear(); await ctx.globalState.update('cockpit.scopes.v1', undefined); }),
+    vscode.commands.registerCommand('agent.revokeCockpitScopes', async () => { policy.clear(); policyChanged(); await ctx.globalState.update('cockpit.scopes.v1', undefined); }),
     vscode.commands.registerCommand('agent.importCockpitReceipts', async () => {
       const g = await chooseScope(); if (!g) return;
       const files = await vscode.window.showOpenDialog({ title: 'Import registered scoped receipts', canSelectMany: false, filters: { JSON: ['json'] } }); if (!files?.[0]) return;

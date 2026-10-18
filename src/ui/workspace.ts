@@ -238,6 +238,11 @@ export class WorkspacePanel implements vscode.Disposable {
     return r ? { refreshMs: r.ms, gitMs: r.gitMs, bytesRead: r.bytesRead, artifacts: r.artifacts, heapMB: Math.round(process.memoryUsage().heapUsed / 2 ** 20), at: r.at } : undefined;
   }
 
+  /** Recheck a reviewed grant without refreshing provider sources or forcing a page build. */
+  validityChanged(): void {
+    if (this.readContextValidity) this.storeChanged();
+  }
+
   /** A store notification: skip building the page when the projection did not move (idle refresh), except to keep
    *  relative times and the refresh line from going stale for more than VIEW_STALE_MS. */
   private storeChanged(): void {

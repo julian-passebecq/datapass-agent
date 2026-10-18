@@ -1,3 +1,7 @@
+# Agent 0.11.11 policy-invalidation candidate
+
+Reviewed scope changes now notify existing scoped panels through the normal coalesced render path, including revoke and re-review without a provider-store event. See [candidate scope and qualification limits](RELEASE-0.11.11.md). Earlier candidate notes and installed history remain below with their original identities.
+
 # Agent 0.11.10 scoped-validity candidate
 
 Scoped panels now refresh their refusal state when a reviewed source disappears without a store-version change. See [candidate scope and qualification limits](RELEASE-0.11.10.md). The notes below retain earlier Agent history; prior installed evidence is not new-version acceptance.
