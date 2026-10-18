@@ -60,7 +60,7 @@ export function registerCockpit(ctx: vscode.ExtensionContext, store: SessionStor
       };
       const reason=()=>!valid()?'The reviewed source grant changed or was revoked.':!read().length?'The reviewed provider source disappeared or is unavailable. Activity is UNKNOWN.':context && !validReturn()?'The selected provider source disappeared or its repository, worktree, or revision changed.':undefined;
       const guardedRead=()=>reason()?[]:read();
-      panel = new WorkspacePanel(store, scopedMessage, ternAvailable, p => { panels.delete(p); p.dispose(); }, guardedRead, () => ({...(!reason()?facade.scopedInputs(grant):{contexts:[],acceptedWork:[],assets:[]}),panelContext:{valid:!reason(),context,projectId:grant.scope.projectIds.join(', '),reason:reason(),exportAllowed:grant.exportConsent}}),context);
+      panel = new WorkspacePanel(store, scopedMessage, ternAvailable, p => { panels.delete(p); p.dispose(); }, guardedRead, () => ({...(!reason()?facade.scopedInputs(grant):{contexts:[],acceptedWork:[],assets:[]}),panelContext:{valid:!reason(),context,projectId:grant.scope.projectIds.join(', '),reason:reason(),exportAllowed:grant.exportConsent}}),context,()=>!reason());
       panels.add(panel); panel.open(view === 'settings' || view === 'catalog' ? view : 'compact', view === 'session' ? id : undefined, { 'compact-scope': view === 'session' ? 'session' : 'all', 'compact-view': view === 'project' ? 'factory' : 'live' });
     },
     openSource: async file => { await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true }); },

@@ -27,10 +27,11 @@ export class WorkspacePanel implements vscode.Disposable {
   private renderedVersion = -1;
   private renderedAt = 0;
   private feedPending = false;
+  private renderedContextValid?: boolean;
   private sub: { dispose(): void };
   private terminals = new Map<string, vscode.Terminal>();
 
-  constructor(private store: SessionStore, private onMessage: (m: WebviewMessage) => void, private ternAvailable: () => boolean, private onClosed?: (p: WorkspacePanel) => void, private readSessions?: () => import('../model').AgentSessionSnapshot[], private readInputs?: () => import('../cockpit/facade').ScopedInputs, private context?: ContextRef) {
+  constructor(private store: SessionStore, private onMessage: (m: WebviewMessage) => void, private ternAvailable: () => boolean, private onClosed?: (p: WorkspacePanel) => void, private readSessions?: () => import('../model').AgentSessionSnapshot[], private readInputs?: () => import('../cockpit/facade').ScopedInputs, private context?: ContextRef, private readContextValidity?: () => boolean) {
     this.sub = store.onDidChange(() => this.storeChanged());
     WorkspacePanel.panels.add(this);
     for (const v of extraViews()) EXTRA_NAV.add(v.id);
@@ -240,7 +241,9 @@ export class WorkspacePanel implements vscode.Disposable {
   /** A store notification: skip building the page when the projection did not move (idle refresh), except to keep
    *  relative times and the refresh line from going stale for more than VIEW_STALE_MS. */
   private storeChanged(): void {
-    if (!viewNeedsRender({ version: this.store.version, renderedVersion: this.renderedVersion, renderedAt: this.renderedAt, feedPending: this.feedPending, now: Date.now() })) return;
+    // Reviewed source/grant validity can change without changing the session projection.
+    const contextValidityChanged = !!this.readContextValidity && this.readContextValidity() !== this.renderedContextValid;
+    if (!contextValidityChanged && !viewNeedsRender({ version: this.store.version, renderedVersion: this.renderedVersion, renderedAt: this.renderedAt, feedPending: this.feedPending, now: Date.now() })) return;
     this.schedule();
   }
 
@@ -259,6 +262,7 @@ export class WorkspacePanel implements vscode.Disposable {
     this.renderedVersion = this.store.version;
     this.renderedAt = Date.now();
     this.feedPending = false;
+    this.renderedContextValid = this.readContextValidity?.();
     const html = this.body();
     const state=this.metadata(),metadata=JSON.stringify(state);
     if (!force && html === this.last && metadata===this.lastMetadata) return;
