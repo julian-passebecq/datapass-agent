@@ -2,12 +2,13 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { bounded, boundedMultiline } from '../util/redact';
 import { hasLinkedAncestor, isPlausibleLocalPath } from '../util/paths';
 import { NativeIdentity, NativeSelection, PreparedNativeTask, nativeEnvironment, nativeHash, nativeIdOk, nativeLaunchArguments, preflightNativeTransport, prepareNativeTask, nativeSelectionBinding } from './nativeTransport';
 import { readNativeRepositoryIdentity } from './nativeProjectScope';
 import type { NativePlatformVerifier } from './nativePlatform';
+import { MafRuntime, mafActionHash } from './nativeMaf';
 
 export type NativeTaskState = 'SPAWN_INTENT' | 'RUNNING' | 'NEEDS_INPUT' | 'COMPLETED' | 'FAILED' | 'INTERRUPTED' | 'UNCERTAIN';
 export interface NativeTaskObservation {
@@ -19,6 +20,7 @@ export interface NativeTaskObservation {
   /** Native completion is not independent acceptance or Git/CI verification. */
   evidence:'NATIVE_REPORTED' | 'NO_COMPLETION_EVIDENCE';
   quiescence:'NATIVE_TURN_SETTLED'|'UNKNOWN';
+  maf?:{mode:'offline-replay';actionHash:string;artifact:{filename:string;sha256:string;bytes:number};sessionSha256:string};
 }
 export interface NativeTaskEvent { type:'STATE'|'PROGRESS'|'MESSAGE'; observation:NativeTaskObservation; }
 export interface NativeTaskHandle {
@@ -30,11 +32,12 @@ interface LiveTask { handle:NativeTaskHandle; cancel:()=>Promise<NativeTaskObser
 /** The standalone kit is a transport, never a scheduler/cognitive loop. The installed facade supplies authority. */
 export class NativeTaskRunner {
   private live=new Map<string,LiveTask>();
-  constructor(readonly ledgerDirectory:string, private spawnProcess:typeof spawn=spawn,private platformVerifiers:()=>NativePlatformVerifier[]=()=>[]) {
+  constructor(readonly ledgerDirectory:string, private spawnProcess:typeof spawn=spawn,private platformVerifiers:()=>NativePlatformVerifier[]=()=>[],private mafRuntime?:MafRuntime) {
+    this.mafRuntime=mafRuntime?structuredClone(mafRuntime):undefined;
     let ancestor=ledgerDirectory;while(!fsSync.existsSync(ancestor) && ancestor!==path.dirname(ancestor))ancestor=path.dirname(ancestor);
     if(!isPlausibleLocalPath(ledgerDirectory) || hasLinkedAncestor(ancestor))throw Error('A real owned ledger directory is required.');
   }
-  preflight(selection:NativeSelection){return preflightNativeTransport(selection,this.platformVerifiers());}
+  preflight(selection:NativeSelection){return preflightNativeTransport(selection,this.platformVerifiers(),this.mafRuntime);}
   private file(id:string):string {if(!nativeIdOk(id))throw Error('Invalid owned task identity.');return path.join(this.ledgerDirectory,nativeHash(id)+'.json');}
   async lookup(id:string):Promise<NativeTaskObservation|null> {
     if(this.live.has(id))return this.live.get(id)!.handle.observation();
@@ -69,6 +72,12 @@ export class NativeTaskRunner {
     let observation:NativeTaskObservation={schema:'datapass.native-task-observation/1',taskId:task.taskId,preparedHash,selectionHash:nativeSelectionBinding(selection),targetHash:task.targetHash,permissionHash:task.permissionHash,configHash:task.configHash,presetHash:task.presetHash,promptHash:task.promptHash,bindingHash:task.bindingHash,scopeHash:task.scopeHash,configScopeHash:task.configScopeHash,state:'SPAWN_INTENT',sessionId:resumeId??null,turnId:null,sequence:0,requestedIdentity:selection.requestedIdentity,observedIdentity:{model:null,effort:null,accountId:null},resultText:'',resultHash:null,reason:null,updatedAt:new Date().toISOString(),evidence:'NO_COMPLETION_EVIDENCE',quiescence:'UNKNOWN'};
     // Exclusive durable intent is committed BEFORE spawn; a failed/uncertain start is never retried.
     const intent=await fs.open(filename,'wx',0o600);try{await intent.writeFile(JSON.stringify(observation));await intent.sync();}finally{await intent.close();}
+    const mafDirectory=selection.transport==='maf-harness'?path.join(this.ledgerDirectory,'maf-'+preparedHash):undefined;
+    if(mafDirectory){
+      await fs.mkdir(mafDirectory); // An existing attempt directory is never reused for execution.
+      const fd=await fs.open(path.join(mafDirectory,'host-approval.json'),'wx',0o600);
+      try{await fd.writeFile(JSON.stringify({schema:'datapass.maf-host-approval/1',taskId:task.taskId,preparedHash,scopeHash:task.scopeHash,actionHash:mafActionHash(task.mafAction!),runtimeHash:selection.mafRuntimeHash}));await fd.sync();}finally{await fd.close();}
+    }
     // A session lease prevents concurrent different task IDs from resuming the same thread.
     const lease=resumeId?path.join(this.ledgerDirectory,'session-'+nativeHash(resumeId)+'.lease'):undefined;
     if(lease){const fd=await fs.open(lease,'wx',0o600);try{await fd.writeFile(task.taskId);await fd.sync();}finally{await fd.close();}}
@@ -79,6 +88,8 @@ export class NativeTaskRunner {
       try{for(const key of [...new Set(keys)].sort()){const file=path.join(this.ledgerDirectory,'repo-'+key+'.lease'),fd=await fs.open(file,'wx',0o600);try{await fd.writeFile(JSON.stringify({taskId:task.taskId,preparedHash,identityHash:nativeHash(identity)}));await fd.sync();}finally{await fd.close();}repoLeases.push(file);}}catch(e){for(const file of repoLeases)await fs.unlink(file);throw Error('Another owned native writer or uncertain write lease holds this canonical repository.');}
     }
     let child:ChildProcessWithoutNullStreams|undefined, finished=false, cancelRequested=false, cliCompleted=false, nativeTerminal=false, buffer='', resultText='', queued:Promise<void>=Promise.resolve();
+    let mafStarted=false,mafApproved=false;
+    const mafBinding={schema:'datapass.maf-wire/1',taskId:task.taskId,preparedHash,scopeHash:task.scopeHash,sessionId:'maf:'+preparedHash};
     let complete!:(value:NativeTaskObservation)=>void;
     const result=new Promise<NativeTaskObservation>(resolve=>{complete=resolve;});
     const listeners=new Set<(event:NativeTaskEvent)=>void>();
@@ -114,7 +125,33 @@ export class NativeTaskRunner {
     const turnParams=()=>({threadId:observation.sessionId,input:[{type:'text',text:task.text}],cwd:selection.cwd,model:selection.requestedIdentity.model,...(selection.requestedIdentity.effort?{effort:selection.requestedIdentity.effort}:{}),approvalPolicy:'never',sandboxPolicy:selection.permission==='read-only'?{type:'readOnly',networkAccess:false}:{type:'workspaceWrite',writableRoots:[selection.cwd],networkAccess:false}});
     const consume=async(message:any)=>{
       if(finished)return;if(!stillAuthorized()){await cancel();return;}
-      if(selection.transport==='codex-app-server'){
+      if(selection.transport==='maf-harness'){
+        if(cancelRequested)return;
+        if(!message || Object.entries(mafBinding).some(([k,v])=>message[k]!==v) || nativeTerminal){await finish('UNCERTAIN','MAF event identity/order mismatch; retain the attempt and write lease.');return;}
+        if(message.type==='started' && !mafStarted){
+          mafStarted=true;await update({sessionId:mafBinding.sessionId,turnId:preparedHash,observedIdentity:{model:'offline-replay-v1',effort:null,accountId:null}});return;
+        }
+        if(message.type==='approval' && mafStarted && !mafApproved && typeof message.approvalId==='string' && message.approvalId.length<=160 && message.actionHash===mafActionHash(task.mafAction!)){
+          await update({state:'NEEDS_INPUT'});
+          const fd=await fs.open(path.join(mafDirectory!,'tool-approval.json'),'wx',0o600);
+          try{await fd.writeFile(JSON.stringify({...mafBinding,approvalId:message.approvalId,actionHash:message.actionHash,approved:true}));await fd.sync();}finally{await fd.close();}
+          if(cancelRequested||!stillAuthorized()){await cancel();return;}
+          mafApproved=true;send({...mafBinding,type:'approval-response',approvalId:message.approvalId,actionHash:message.actionHash,approved:true});
+          await update({state:'RUNNING'});return;
+        }
+        if(message.type==='completed' && mafStarted && mafApproved && message.actionHash===mafActionHash(task.mafAction!)){
+          const artifact=message.artifact,artifactFile=path.join(selection.cwd,task.mafAction!.filename),sessionFile=path.join(mafDirectory!,'session.json');
+          if(!artifact || artifact.filename!==task.mafAction!.filename || artifact.bytes!==Buffer.byteLength(task.mafAction!.content) || artifact.sha256!==createHash('sha256').update(task.mafAction!.content).digest('hex') || hasLinkedAncestor(artifactFile) || hasLinkedAncestor(sessionFile))throw Error('MAF artifact identity mismatch.');
+          const artifactStat=await fs.lstat(artifactFile),sessionStat=await fs.lstat(sessionFile);
+          if(!artifactStat.isFile()||artifactStat.size!==artifact.bytes||!sessionStat.isFile()||sessionStat.size>1024*1024)throw Error('MAF evidence is not a bounded regular file.');
+          const bytes=await fs.readFile(artifactFile),session=await fs.readFile(sessionFile);
+          if(bytes.length!==artifact.bytes || createHash('sha256').update(bytes).digest('hex')!==artifact.sha256 || session.length>1024*1024 || createHash('sha256').update(session).digest('hex')!==message.sessionSha256)throw Error('MAF artifact/session evidence changed.');
+          resultText='Wrote approved artifact '+artifact.filename;
+          await update({maf:{mode:'offline-replay',actionHash:message.actionHash,artifact:{filename:artifact.filename,sha256:artifact.sha256,bytes:artifact.bytes},sessionSha256:message.sessionSha256}});
+          cliCompleted=true;nativeTerminal=true;return;
+        }
+        await finish('UNCERTAIN','Unrecognized MAF event or tool request; no additional action is authorized.');return;
+      }else if(selection.transport==='codex-app-server'){
         if(message.error){await finish('FAILED','Native protocol request failed.');return;}
         if(message.id===0 && message.result){send({method:'initialized',params:{}});send({id:1,method:resumeId?'thread/resume':'thread/start',params:threadParams});return;}
         if(message.id===1 && message.result?.thread){
@@ -178,10 +215,10 @@ export class NativeTaskRunner {
     try {
       if(!stillAuthorized())throw Error('Native authority revoked before spawn.');
       const immediate=await this.preflight(selection);if(immediate.state!=='READY')throw Error('Native startup proof drifted before process creation.');
-      child=this.spawnProcess(selection.executable,nativeLaunchArguments(task,resumeId),{cwd:selection.cwd,env:nativeEnvironment(selection),windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']}) as ChildProcessWithoutNullStreams;
+      child=this.spawnProcess(selection.executable,nativeLaunchArguments(task,resumeId,this.mafRuntime),{cwd:selection.cwd,env:nativeEnvironment(selection),windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']}) as ChildProcessWithoutNullStreams;
       child.on('error',()=>enqueue(()=>finish('UNCERTAIN','Native process startup outcome uncertain; no blind retry.')));
-      child.stdin.on('error',()=>enqueue(()=>finish('UNCERTAIN','Native stdin failed after launch; no blind retry.')));
-      child.on('spawn',()=>enqueue(async()=>{await update({state:'RUNNING'});if(selection.transport==='codex-app-server')send({id:0,method:'initialize',params:{clientInfo:{name:'datapass_agent',title:'DataPass Agent',version:'1.0.0'}}});else child!.stdin.end(task.text+'\n');}));
+      child.stdin.on('error',()=>{if(!cancelRequested)enqueue(()=>finish('UNCERTAIN','Native stdin failed after launch; no blind retry.'));});
+      child.on('spawn',()=>enqueue(async()=>{if(finished||cancelRequested){child?.kill();return;}await update({state:'RUNNING'});if(finished||cancelRequested){child?.kill();return;}if(selection.transport==='maf-harness')send({...mafBinding,type:'start',action:task.mafAction,cwd:selection.cwd,stateDirectory:mafDirectory});else if(selection.transport==='codex-app-server')send({id:0,method:'initialize',params:{clientInfo:{name:'datapass_agent',title:'DataPass Agent',version:'1.0.0'}}});else child!.stdin.end(task.text+'\n');}));
       let totalBytes=0,totalRecords=0;
       child.stdout.setEncoding('utf8');child.stdout.on('data',(data:string)=>{
         if(finished)return;buffer+=data;
@@ -191,7 +228,7 @@ export class NativeTaskRunner {
       });
       // Stderr is never published: native diagnostics may carry paths, tokens or reasoning.
       child.stderr.on('data',()=>{});
-      child.on('close',(code,signal)=>enqueue(async()=>{if(buffer.trim()){try{await consume(JSON.parse(buffer));}catch{await finish('UNCERTAIN','Incomplete native event on process close.');}}if(!finished)await finish(cancelRequested?'INTERRUPTED':code===0&&cliCompleted?'COMPLETED':nativeTerminal?'FAILED':code===0?'UNCERTAIN':'FAILED',cancelRequested?'Owned process cancellation observed.':code===0&&cliCompleted?null:'Native process exited without a matching successful completion event.',!cancelRequested&&nativeTerminal);}));
+      child.on('close',(code,signal)=>enqueue(async()=>{if(buffer.trim()){try{await consume(JSON.parse(buffer));}catch{await finish('UNCERTAIN','Incomplete native event on process close.');}}if(!finished && selection.transport==='maf-harness' && !cancelRequested && !(code===0&&cliCompleted)){await finish('UNCERTAIN','MAF worker exited without a verified successful terminal result; retain the attempt and write lease.');return;}if(!finished)await finish(cancelRequested?'INTERRUPTED':code===0&&cliCompleted?'COMPLETED':nativeTerminal?'FAILED':code===0?'UNCERTAIN':'FAILED',cancelRequested?'Owned process cancellation observed.':code===0&&cliCompleted?null:'Native process exited without a matching successful completion event.',!cancelRequested&&nativeTerminal);}));
     }catch{await finish('UNCERTAIN','Native spawn attempt could not be confirmed; intent is retained, no blind retry.');}
     return handle;
   }

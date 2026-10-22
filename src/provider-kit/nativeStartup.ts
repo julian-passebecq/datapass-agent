@@ -15,9 +15,19 @@ export interface NativeStartupManifest {
 }
 const hash=(value:unknown)=>sha256(canonicalJson(value));
 /** Fixed startup inventory only. No CLI, auth store, history, arbitrary file path or payload projection. */
-export async function captureNativeStartupManifest(selection:Pick<NativeSelection,'transport'|'cwd'|'home'|'providerHome'>):Promise<NativeStartupManifest>{
+export async function captureNativeStartupManifest(selection:Pick<NativeSelection,'transport'|'cwd'|'home'|'providerHome'|'mafRuntimeHash'>):Promise<NativeStartupManifest>{
   const s={...structuredClone(selection),home:selection.providerHome??selection.home};
-  if(!s || !['codex-app-server','codex-cli','claude-cli'].includes(s.transport) || ![s.cwd,s.home].every(p=>isPlausibleLocalPath(p)&&!hasLinkedAncestor(p)))throw Error('Invalid bounded startup inventory.');
+  if(!s || !['codex-app-server','codex-cli','claude-cli','maf-harness'].includes(s.transport) || ![s.cwd,s.home].every(p=>isPlausibleLocalPath(p)&&!hasLinkedAncestor(p)))throw Error('Invalid bounded startup inventory.');
+  if(s.transport==='maf-harness'){
+    if(!/^[a-f0-9]{64}$/.test(s.mafRuntimeHash??''))throw Error('MAF runtime binding is missing.');
+    // The fixed worker uses Python -I -S and a sealed import tree. It discovers no home,
+    // project, .pth, sitecustomize, skills, hook or MCP configuration. Preflight separately
+    // hashes the host-registered worker and full import tree; this manifest is not that check.
+    const value={schema:'datapass.native-startup-manifest/1' as const,transport:s.transport,cwd:s.cwd,home:s.home,
+      files:[],directories:[],localState:'VERIFIED_NO_CUSTOMIZATIONS' as const,managedState:'UNKNOWN' as const,isolationState:'ASSERTED' as const,
+      omissions:['Fixed MAF startup; no native configuration discovery.','Runtime binding: '+s.mafRuntimeHash,'Runtime bytes and independent platform isolation still require preflight verification.']};
+    return {...value,manifestHash:hash(value)};
+  }
   const files:NativeStartupManifest['files']=[],directories:NativeStartupManifest['directories']=[],issues:string[]=[];
   const codex=s.transport!=='claude-cli';
   const file=async(id:string,p:string,read:boolean)=>{

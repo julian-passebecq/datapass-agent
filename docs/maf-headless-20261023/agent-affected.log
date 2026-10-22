@@ -1,0 +1,33 @@
+✔ MAF foreign-session cannot create a completed receipt or authorize another effect (964.707ms)
+✔ MAF stale-preparation cannot create a completed receipt or authorize another effect (901.4477ms)
+✔ MAF foreign-action cannot create a completed receipt or authorize another effect (902.7047ms)
+✔ MAF duplicate-approval cannot create a completed receipt or authorize another effect (1126.4783ms)
+✔ MAF eof cannot create a completed receipt or authorize another effect (1240.8495ms)
+✔ MAF runtime seal rejects added, changed and missing import files (530.9089ms)
+✔ native preflight is inert and exact binary/startup/capability mismatches block (858.6194ms)
+✔ native commands have no caller shell/argv/env or credential inheritance (194.0748ms)
+✔ owned app-server handshake, exact task, sanitized streams, completed ledger and duplicate refusal (688.756ms)
+✔ native failure/security refusal cannot become success or approval (1013.7488ms)
+✔ uncertain durable intent blocks blind retries and reload does not claim stopped (922.8813ms)
+✔ owned completed session can resume; changed target/permission/Config binding cannot (1388.5758ms)
+✔ codex-cli requires native completion AND zero exit; requested identity never inferred (1345.511ms)
+✔ claude-cli requires native completion AND zero exit; requested identity never inferred (1263.3641ms)
+✔ host facade requires independent exact approval, scope/epoch guards and own Config role association (801.3454ms)
+✔ empty owned project receives a separate reviewed execution scope; Git/root/revision and trust are verified (2255.8762ms)
+✔ durable native writer lease excludes same repo, linked worktrees and proven same-origin clones; uncertainty retains lease (2778.972ms)
+✔ proven native completed write releases lease for a newly reviewed owned task (1661.6519ms)
+✔ startup manifest missing/drifted config and untrusted/expired platform proof cannot create native process (1245.2693ms)
+✔ current hook/MCP/plugin/inherited coverage blocks; auth/history bytes are never part of the startup manifest (714.0999ms)
+✔ proof drift after intent/lease work is checked again immediately before process creation (667.7926ms)
+✔ explicit Config mapped native tools are signed and never auto-approved; usability remains unknown (907.5772ms)
+✔ Separate provider home binds the same Codex state directory as owner sign-in and keeps legacy homes explicit (562.3221ms)
+✔ Owned Codex text streams complete redacted lines before terminal completion and preserves the final receipt (732.4714ms)
+✔ standalone kit uses the Agent collector, stable safe hashes and no history/secret payloads (135.1377ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20170.0207
