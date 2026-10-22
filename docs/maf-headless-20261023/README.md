@@ -10,4 +10,6 @@ The packaged kit is [datapass-provider-kit-1.2.0.tgz](datapass-provider-kit-1.2.
 
 Problems and questions: live model/provider integration, the actual host review UI and isolated-host qualification remain open. The adapter intentionally refuses MAF execution resume; uncertain effects retain the task and lease for reconciliation. Kill-during-write and a deployed product path remain unqualified. No user decision is required to review this source contribution. The earlier Oracle success applies to source `185b3450`, not this new adapter; no further CI attempt was submitted. `releasePass=false`.
 
+Publication correction: the initial contribution was mistakenly pushed to the inherited public origin. Its newly created branch was deleted and the work moved to the verified private repository. GitHub object deletion cannot be guaranteed. See [PUBLICATION-CORRECTION.md](PUBLICATION-CORRECTION.md). The private review is [Agent PR #87](https://github.com/julian-passebecq/agent-vscode/pull/87), paired with [PM PR #7](https://github.com/julian-passebecq/datapass-pm/pull/7).
+
 All work from this pass is published on the private review branch `codex/agent-maf-headless-20261023`, based on the existing immutable candidate source. No original owner checkout or frozen package was modified.
