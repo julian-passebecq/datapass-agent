@@ -6,11 +6,14 @@ import { createRequire } from 'node:module';
 import * as ts from 'typescript';
 import { cockpitFixture } from './cockpitFixture';
 import { localHost } from '../src/cockpit/facade';
-import { repoId } from '../src/cockpit/policy';
+import { digest, repoId } from '../src/cockpit/policy';
 
-async function scopedFixture(t: TestContext) {
+async function scopedFixture(t: TestContext, reviewOptions: { cancelAt?: string; holdPermission?: boolean } = {}) {
   const fixture = await cockpitFixture(), commands = new Map<string, Function>();
   const nativePanels: any[] = [], listeners = new Set<Function>();
+  const prompts: { title: string; ignoreFocusOut?: boolean }[] = [], informationMessages: string[] = [];
+  let permissionReached!: () => void, approvePermission!: () => void;
+  const awaitingPermission = new Promise<void>(resolve => { permissionReached = resolve; });
   let refreshes = 0;
   const store = {
     all: () => fixture.snapshots, adapters: [fixture.adapter], version: 1,
@@ -44,9 +47,21 @@ async function scopedFixture(t: TestContext) {
         };
         nativePanels.push(panel); return panel;
       },
-      async showQuickPick(items: unknown[], options: { canPickMany?: boolean }) { return options.canPickMany ? [items[0]] : items[0]; },
-      async showInputBox(options: { title: string }) { return options.title === 'Organization ID' ? 'local' : 'fixture'; },
-      showInformationMessage() {},
+      async showQuickPick(items: unknown[], options: { title: string; canPickMany?: boolean; ignoreFocusOut?: boolean }) {
+        prompts.push(options);
+        if (options.title === reviewOptions.cancelAt) return undefined;
+        if (!options.canPickMany && reviewOptions.holdPermission) {
+          permissionReached();
+          return new Promise<unknown>(resolve => { approvePermission = () => resolve(items[0]); });
+        }
+        return options.canPickMany ? [items[0]] : items[0];
+      },
+      async showInputBox(options: { title: string; ignoreFocusOut?: boolean }) {
+        prompts.push(options);
+        if (options.title === reviewOptions.cancelAt) return undefined;
+        return options.title === 'Organization ID' ? 'local' : 'fixture';
+      },
+      showInformationMessage(message: string) { informationMessages.push(message); },
     },
     workspace: { isTrusted: false, getConfiguration() { return { get(_key: string, fallback: unknown) { return fallback; } }; } },
   };
@@ -80,8 +95,44 @@ async function scopedFixture(t: TestContext) {
     assert.match(panel.messages.at(-1).html, /data-cmd="returnToPm"/);
     return { panel, scope, epoch: reply.epoch };
   };
-  return { review, revoke, open, facade, store, listeners, nativePanels, refreshes: () => refreshes };
+  return { review, revoke, open, facade, store, listeners, nativePanels, refreshes: () => refreshes, prompts, informationMessages, awaitingPermission, approvePermission: () => approvePermission(), selectedSessionKey: fixture.snapshots[0].key };
 }
+
+const reviewStages = ['Associate native sessions to a cockpit project', 'Reviewed project ID', 'Organization ID', 'Privacy domain ID', 'Allowed cockpit scope'];
+
+for (const [stage, title] of reviewStages.entries()) {
+  test(`canceling scope review at ${title} leaves policy unchanged`, async t => {
+    const f = await scopedFixture(t, { cancelAt: title });
+    const before = await f.facade.api.getScopes();
+    await f.review();
+    const after = await f.facade.api.getScopes();
+    assert.deepEqual(after.data, before.data);
+    assert.equal(after.epoch, before.epoch);
+    assert.deepEqual(f.prompts.map(prompt => prompt.title), reviewStages.slice(0, stage + 1));
+    assert.deepEqual(f.informationMessages, []);
+    assert.equal(f.refreshes(), 0);
+  });
+}
+
+test('focus-retaining review creates no scope until the final explicit observation choice', async t => {
+  const f = await scopedFixture(t, { holdPermission: true });
+  const before = await f.facade.api.getScopes(), reviewing = f.review();
+  await f.awaitingPermission;
+  const pending = await f.facade.api.getScopes();
+  assert.deepEqual(pending.data, before.data);
+  assert.equal(pending.epoch, before.epoch);
+  assert.deepEqual(f.informationMessages, []);
+  assert.deepEqual(f.prompts.map(prompt => prompt.title), reviewStages);
+  assert.ok(f.prompts.every(prompt => prompt.ignoreFocusOut === true));
+  f.approvePermission();
+  await reviewing;
+  const after = await f.facade.api.getScopes();
+  assert.equal(after.data.length, 1);
+  assert.equal(after.epoch, before.epoch + 1);
+  assert.equal(after.data[0].sourceVectorHash, digest([f.selectedSessionKey]));
+  assert.deepEqual(f.informationMessages, ['Agent: reviewed 1 sessions for fixture.']);
+  assert.equal(f.refreshes(), 0);
+});
 
 function invalid(panel: any) {
   const html = panel.messages.at(-1).html;
