@@ -1,0 +1,24 @@
+ INFO  Files included in the VSIX:
+agent-vscode-0.11.11-review-focus-d29644b-evaluation.vsix
+├─ [Content_Types].xml 
+├─ extension.vsixmanifest 
+└─ extension/
+   ├─ LICENSE.md [0.12 KB]
+   ├─ RELEASE-0.11.10.md [0.73 KB]
+   ├─ RELEASE-0.11.11.md [1.62 KB]
+   ├─ RELEASE-20261017.md [3.81 KB]
+   ├─ changelog.md [2.18 KB]
+   ├─ package.json [26.41 KB]
+   ├─ readme.md [41.63 KB]
+   ├─ dist/
+   │  ├─ RC2-THIRD-PARTY-NOTICES.txt [2.42 KB]
+   │  ├─ export-conversations.cjs [24.55 KB]
+   │  ├─ export-provider-history.cjs [116.13 KB]
+   │  ├─ extension.js [1.41 MB]
+   │  └─ search-knowledge.cjs [11.68 KB]
+   └─ media/
+      └─ agent.svg [0.32 KB]
+
+The file extension/dist/extension.js is large (1.41 MB)
+
+ DONE  Packaged: docs/scope-review-focus-20261023/agent-vscode-0.11.11-review-focus-d29644b-evaluation.vsix (15 files, 525.57 KB)

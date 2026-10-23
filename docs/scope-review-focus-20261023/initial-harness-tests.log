@@ -1,0 +1,126 @@
+✔ facade denies caller-created grants/counts, isolates sessions, and returns detached snapshots (73.7019ms)
+✔ late config answer after grant revocation is denied, and subscriber failure/overflow is isolated (148.8742ms)
+✔ configuration is sanitized/inert, carries provenance, and ignores linked secret files (142.6162ms)
+✔ compact keeps independent roots, escapes labels, isolates project/session selection, and partial windows remain useful (37.0744ms)
+✔ export approval cannot be manufactured in caller JSON; registered context is explicit and scoped (98.8573ms)
+✔ serializer adopts existing public panel, restores selected screen, persists metadata and denies stale source actions (180.9607ms)
+✔ scoped UI binds exports to reviewed sources and suspends missing, replaced or linked provider paths (598.2808ms)
+✖ canceling scope review at Associate native sessions to a cockpit project leaves policy unchanged (676.1886ms)
+✔ canceling scope review at Reviewed project ID leaves policy unchanged (122.4517ms)
+✖ canceling scope review at Organization ID leaves policy unchanged (87.7358ms)
+✖ canceling scope review at Privacy domain ID leaves policy unchanged (90.3695ms)
+✔ canceling scope review at Allowed cockpit scope leaves policy unchanged (114.198ms)
+✖ focus-retaining review creates no scope until the final explicit observation choice (68.085ms)
+✔ actual revoke command invalidates visible scoped panels through the coalesced scheduler without a store event (355.3617ms)
+✔ actual re-review invalidates old scoped panels and only fresh navigation receives the new grant (330.8123ms)
+✔ policy notifications preserve hidden-panel and disposal behavior without provider refresh (315.4585ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 12
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3093.8603
+
+✖ failing tests:
+
+test at out-test\test\scopedPolicyLifecycle.test.js:145:26
+✖ canceling scope review at Associate native sessions to a cockpit project leaves policy unchanged (676.1886ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   capturedAt: '2026-10-23T15:16:58.274Z',
+  -   capturedAt: '2026-10-23T15:16:58.273Z',
+      data: [],
+      epoch: 0,
+      errors: [],
+      host: {
+        architecture: 'x64',
+  
+      at TestContext.<anonymous> (D:\PROJ\.cockpit-integration\GALAXY-V1-RELEASE-20261017\worktrees\Agent-0.11.11\out-test\test\scopedPolicyLifecycle.test.js:149:16)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { schema: 'datapass.agent-cockpit/1', requestId: 'capabilities', scopeHash: '', capturedAt: '2026-10-23T15:16:58.274Z', host: { hostId: 'host:677feaa95bdcb22c', os: 'win32', architecture: 'x64', runtimeVersion: 'v26.9.0' }, state: 'OK', data: [], omissions: [], epoch: 0, errors: [] },
+    expected: { schema: 'datapass.agent-cockpit/1', requestId: 'capabilities', scopeHash: '', capturedAt: '2026-10-23T15:16:58.273Z', host: { hostId: 'host:677feaa95bdcb22c', os: 'win32', architecture: 'x64', runtimeVersion: 'v26.9.0' }, state: 'OK', data: [], omissions: [], epoch: 0, errors: [] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at out-test\test\scopedPolicyLifecycle.test.js:145:26
+✖ canceling scope review at Organization ID leaves policy unchanged (87.7358ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   capturedAt: '2026-10-23T15:16:58.662Z',
+  -   capturedAt: '2026-10-23T15:16:58.661Z',
+      data: [],
+      epoch: 0,
+      errors: [],
+      host: {
+        architecture: 'x64',
+  
+      at TestContext.<anonymous> (D:\PROJ\.cockpit-integration\GALAXY-V1-RELEASE-20261017\worktrees\Agent-0.11.11\out-test\test\scopedPolicyLifecycle.test.js:149:16)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { schema: 'datapass.agent-cockpit/1', requestId: 'capabilities', scopeHash: '', capturedAt: '2026-10-23T15:16:58.662Z', host: { hostId: 'host:677feaa95bdcb22c', os: 'win32', architecture: 'x64', runtimeVersion: 'v26.9.0' }, state: 'OK', data: [], omissions: [], epoch: 0, errors: [] },
+    expected: { schema: 'datapass.agent-cockpit/1', requestId: 'capabilities', scopeHash: '', capturedAt: '2026-10-23T15:16:58.661Z', host: { hostId: 'host:677feaa95bdcb22c', os: 'win32', architecture: 'x64', runtimeVersion: 'v26.9.0' }, state: 'OK', data: [], omissions: [], epoch: 0, errors: [] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at out-test\test\scopedPolicyLifecycle.test.js:145:26
+✖ canceling scope review at Privacy domain ID leaves policy unchanged (90.3695ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   capturedAt: '2026-10-23T15:16:58.752Z',
+  -   capturedAt: '2026-10-23T15:16:58.751Z',
+      data: [],
+      epoch: 0,
+      errors: [],
+      host: {
+        architecture: 'x64',
+  
+      at TestContext.<anonymous> (D:\PROJ\.cockpit-integration\GALAXY-V1-RELEASE-20261017\worktrees\Agent-0.11.11\out-test\test\scopedPolicyLifecycle.test.js:149:16)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { schema: 'datapass.agent-cockpit/1', requestId: 'capabilities', scopeHash: '', capturedAt: '2026-10-23T15:16:58.752Z', host: { hostId: 'host:677feaa95bdcb22c', os: 'win32', architecture: 'x64', runtimeVersion: 'v26.9.0' }, state: 'OK', data: [], omissions: [], epoch: 0, errors: [] },
+    expected: { schema: 'datapass.agent-cockpit/1', requestId: 'capabilities', scopeHash: '', capturedAt: '2026-10-23T15:16:58.751Z', host: { hostId: 'host:677feaa95bdcb22c', os: 'win32', architecture: 'x64', runtimeVersion: 'v26.9.0' }, state: 'OK', data: [], omissions: [], epoch: 0, errors: [] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at out-test\test\scopedPolicyLifecycle.test.js:155:22
+✖ focus-retaining review creates no scope until the final explicit observation choice (68.085ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   capturedAt: '2026-10-23T15:16:58.936Z',
+  -   capturedAt: '2026-10-23T15:16:58.935Z',
+      data: [],
+      epoch: 0,
+      errors: [],
+      host: {
+        architecture: 'x64',
+  
+      at TestContext.<anonymous> (D:\PROJ\.cockpit-integration\GALAXY-V1-RELEASE-20261017\worktrees\Agent-0.11.11\out-test\test\scopedPolicyLifecycle.test.js:159:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { schema: 'datapass.agent-cockpit/1', requestId: 'capabilities', scopeHash: '', capturedAt: '2026-10-23T15:16:58.936Z', host: { hostId: 'host:677feaa95bdcb22c', os: 'win32', architecture: 'x64', runtimeVersion: 'v26.9.0' }, state: 'OK', data: [], omissions: [], epoch: 0, errors: [] },
+    expected: { schema: 'datapass.agent-cockpit/1', requestId: 'capabilities', scopeHash: '', capturedAt: '2026-10-23T15:16:58.935Z', host: { hostId: 'host:677feaa95bdcb22c', os: 'win32', architecture: 'x64', runtimeVersion: 'v26.9.0' }, state: 'OK', data: [], omissions: [], epoch: 0, errors: [] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,24 @@
+✔ facade denies caller-created grants/counts, isolates sessions, and returns detached snapshots (72.5553ms)
+✔ late config answer after grant revocation is denied, and subscriber failure/overflow is isolated (141.9692ms)
+✔ configuration is sanitized/inert, carries provenance, and ignores linked secret files (137.8235ms)
+✔ compact keeps independent roots, escapes labels, isolates project/session selection, and partial windows remain useful (46.8024ms)
+✔ export approval cannot be manufactured in caller JSON; registered context is explicit and scoped (142.8688ms)
+✔ serializer adopts existing public panel, restores selected screen, persists metadata and denies stale source actions (213.8172ms)
+✔ scoped UI binds exports to reviewed sources and suspends missing, replaced or linked provider paths (249.8435ms)
+✔ canceling scope review at Associate native sessions to a cockpit project leaves policy unchanged (551.4352ms)
+✔ canceling scope review at Reviewed project ID leaves policy unchanged (70.681ms)
+✔ canceling scope review at Organization ID leaves policy unchanged (69.5103ms)
+✔ canceling scope review at Privacy domain ID leaves policy unchanged (69.4062ms)
+✔ canceling scope review at Allowed cockpit scope leaves policy unchanged (68.1537ms)
+✔ focus-retaining review creates no scope until the final explicit observation choice (51.614ms)
+✔ actual revoke command invalidates visible scoped panels through the coalesced scheduler without a store event (362.1004ms)
+✔ actual re-review invalidates old scoped panels and only fresh navigation receives the new grant (386.1878ms)
+✔ policy notifications preserve hidden-panel and disposal behavior without provider refresh (434.2759ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2683.4614

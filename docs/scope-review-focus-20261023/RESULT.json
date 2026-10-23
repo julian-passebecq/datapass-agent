@@ -1,0 +1,182 @@
+{
+  "schema": "galaxy.agent.scope-review-focus-evaluation/1",
+  "recordedAt": "2026-10-23T15:20:06.900702+00:00",
+  "sourceCommit": "d29644bb20cbbdca6ad73e1517e993995e76c937",
+  "sourceTree": "99e4fa2a794c4b92b2e580670a07d9d61a8ec4ba",
+  "baseSourceCommit": "cf2a9303d9eeaa784a0d8d05d5c6afe5a2df3bc1",
+  "version": "0.11.11",
+  "evaluationOnly": true,
+  "sameVersionAsPinnedCandidate": true,
+  "package": {
+    "path": "agent-vscode-0.11.11-review-focus-d29644b-evaluation.vsix",
+    "sha256": "01cf2cf9de3852153f1d19f1d62707309ae12e3b933eee545e325ca5a13d88c3",
+    "bytes": 538182,
+    "bundleSha256": "fefe0d53838618d2390560921f6696a8f17e01bf00cdb515e06d6746c06541fd",
+    "entries": [
+      {
+        "path": "extension.vsixmanifest",
+        "bytes": 2702,
+        "sha256": "24aaefbec90988cd0a2277043e90978e8d669efd5b5af56e7e2f168081dbfa54"
+      },
+      {
+        "path": "[Content_Types].xml",
+        "bytes": 532,
+        "sha256": "362493775bcea5ad0d38a516d41d0a02c3a94c7d88da42185d564ebd5a235277"
+      },
+      {
+        "path": "extension/RELEASE-20261017.md",
+        "bytes": 3900,
+        "sha256": "cddc0c6354ce595c1504dcb88d60fac4db6f76ce90412c091117bbe7b2c1046d"
+      },
+      {
+        "path": "extension/RELEASE-0.11.11.md",
+        "bytes": 1662,
+        "sha256": "6258fb06167ce2d03adc11b9afaaad5077cd8ff274c374e14d9abe4e3e24bcc4"
+      },
+      {
+        "path": "extension/RELEASE-0.11.10.md",
+        "bytes": 752,
+        "sha256": "d44656b6c8e7c0095f51717b08f9204197d72f9b51e8cd0827dccd2023bdbbf2"
+      },
+      {
+        "path": "extension/readme.md",
+        "bytes": 43280,
+        "sha256": "1a21083bd7c3f03b8f664fee68032e612d218899cabe85c3306e4f44712311fa"
+      },
+      {
+        "path": "extension/package.json",
+        "bytes": 27041,
+        "sha256": "6ec0b26e0d29b2a25a2067a19b66dba69982be39d795b598a49221ea327638f2"
+      },
+      {
+        "path": "extension/LICENSE.md",
+        "bytes": 123,
+        "sha256": "4bb5ef7edcd111c2fed80a7f9a81ae318266bf9c55f241c9f0df58616e21c52b"
+      },
+      {
+        "path": "extension/changelog.md",
+        "bytes": 2234,
+        "sha256": "42165355943c04d65bc44d93faf6d5ae3afb4e4f19af79a4128f23c066d74594"
+      },
+      {
+        "path": "extension/media/agent.svg",
+        "bytes": 327,
+        "sha256": "07189da5c0c8efb369675d0febb9134eef16b8dd29ece123d7d3da47ee29bdd7"
+      },
+      {
+        "path": "extension/dist/search-knowledge.cjs",
+        "bytes": 11961,
+        "sha256": "60195ec1ed1b6e4799bfd6a06c82336259269e79771937c70c590dba9438e738"
+      },
+      {
+        "path": "extension/dist/RC2-THIRD-PARTY-NOTICES.txt",
+        "bytes": 2478,
+        "sha256": "9c4a9cc3fe9d059615f60e3614def93ec5595e79f2e6d4d974de73e902fb80e8"
+      },
+      {
+        "path": "extension/dist/extension.js",
+        "bytes": 1473870,
+        "sha256": "fefe0d53838618d2390560921f6696a8f17e01bf00cdb515e06d6746c06541fd"
+      },
+      {
+        "path": "extension/dist/export-provider-history.cjs",
+        "bytes": 118915,
+        "sha256": "229a9deed15d5f9fe8006d4ecee68e4e71368bd5804bc6b179935975041b0cbb"
+      },
+      {
+        "path": "extension/dist/export-conversations.cjs",
+        "bytes": 25141,
+        "sha256": "2b937101fb944b975bd46449eaf5675cddbc9109af57833eb07a9719456b085f"
+      }
+    ]
+  },
+  "originalPinnedPackage": {
+    "path": "agent-vscode-0.11.11.vsix",
+    "sha256": "6a500547b5d6e20dd1ac950a1faf4ad72162e23cdba4596ba62aa256bfc681d1",
+    "bytes": 538160,
+    "bundleSha256": "a9c57fbf624095a2548e62ce0a8774f99999b2581b5fd2b2ee265ec52c859fce",
+    "unchanged": true
+  },
+  "archiveComparison": {
+    "differingEntries": [
+      "extension/dist/extension.js"
+    ],
+    "addedEntries": [],
+    "removedEntries": [],
+    "originalIgnoreFocusOutOccurrences": 0,
+    "candidateIgnoreFocusOutOccurrences": 5,
+    "onlyFiveFocusFlagsDiffer": true
+  },
+  "sourceInputs": [
+    {
+      "path": "src/ui/cockpit.ts",
+      "sha256": "84d53354c34027a5171d6552a5677785492172f78527852b49b2272cbb1bcce5"
+    },
+    {
+      "path": "test/scopedPolicyLifecycle.test.ts",
+      "sha256": "d0888adae245668c16ccd2cbc752d417eb95c4db702936b817b079d7adfe4eb2"
+    },
+    {
+      "path": "package.json",
+      "sha256": "6ec0b26e0d29b2a25a2067a19b66dba69982be39d795b598a49221ea327638f2"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "b878c7bc9fed9fecc94b6a082f25dc1e710e23684d891704e1d6e8982d796596"
+    },
+    {
+      "path": "scripts/build.mjs",
+      "sha256": "7f9965c7db11afd938e8b5fe68b5509dec6ad38b8f9e3a26ffd36445e6c7373a"
+    },
+    {
+      "path": ".vscodeignore",
+      "sha256": "7307aba88ae16b8128ab000d8772831837ad9de4376d1d9631d236baaf2201a0"
+    }
+  ],
+  "validation": {
+    "typecheck": {
+      "command": "npm run check",
+      "exitCode": 0,
+      "evidence": "Observed command output; no separate raw log."
+    },
+    "testCompilation": {
+      "command": "npm run compile-tests; final test-only compile: tsc -p tsconfig.test.json",
+      "exitCode": 0
+    },
+    "focusedTests": {
+      "command": "node --test out-test/test/scopedPolicyLifecycle.test.js out-test/test/panelLifecycle.test.js out-test/test/cockpit.test.js",
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "log": "focused-tests.log"
+    },
+    "build": {
+      "command": "npm run build",
+      "exitCode": 0,
+      "log": "build.log"
+    },
+    "package": {
+      "command": "vsce package --no-dependencies --out agent-vscode-0.11.11-review-focus-d29644b-evaluation.vsix",
+      "exitCode": 0,
+      "log": "package.log"
+    }
+  },
+  "initialHarnessAttempt": {
+    "passed": 12,
+    "failed": 4,
+    "reason": "New assertions compared capturedAt timestamps; corrected to compare policy data and epoch. Product behavior was not the cause of these assertion failures.",
+    "log": "initial-harness-tests.log"
+  },
+  "installed": false,
+  "nativeAcceptance": false,
+  "ciQualification": false,
+  "releasePass": false,
+  "providerTurns": 0,
+  "permissionsChanged": false,
+  "notes": [
+    "Five focus-retention flags only in product source. Explicit final choice and all cancel early returns remain unchanged.",
+    "The optional flag is documented by VS Code; recorded earlier UI disappearances do not identify their exact cause.",
+    "Same extension version is retained only for separately named immutable evaluation; do not substitute this hash for the pinned original candidate.",
+    "No installation, native permission action, provider call, or deployment was performed."
+  ]
+}
