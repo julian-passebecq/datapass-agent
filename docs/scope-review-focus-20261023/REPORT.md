@@ -13,7 +13,7 @@ The original wizard omitted this option. The [VS Code API](https://code.visualst
 - Runtime bundle SHA-256: `fefe0d53838618d2390560921f6696a8f17e01bf00cdb515e06d6746c06541fd`.
 - Original `agent-vscode-0.11.11.vsix` remains unchanged at `6a500547b5d6e20dd1ac950a1faf4ad72162e23cdba4596ba62aa256bfc681d1`.
 
-The evaluation intentionally retains version 0.11.11 and has a distinct immutable filename and hash. It is not a replacement for the pinned release candidate. A byte comparison of all 15 archive entries found only `extension/dist/extension.js` changed. Removing the five inserted focus-retention flags from that bundle produces the original bundle exactly. `RESULT.json` records source, package and entry hashes.
+The evaluation intentionally retains version 0.11.11 and has a distinct immutable filename and hash. It is not a replacement for the pinned release candidate. A byte comparison of all 15 archive entries found only `extension/dist/extension.js` changed. Removing the five inserted focus-retention flags from that bundle produces the original bundle exactly. `RESULT.json` records source, package and entry hashes. The archive has no embedded source commit metadata; its source binding is external, through the committed build source and exact bundle comparison.
 
 ## Validation
 

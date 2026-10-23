@@ -178,5 +178,11 @@
     "The optional flag is documented by VS Code; recorded earlier UI disappearances do not identify their exact cause.",
     "Same extension version is retained only for separately named immutable evaluation; do not substitute this hash for the pinned original candidate.",
     "No installation, native permission action, provider call, or deployment was performed."
-  ]
+  ],
+  "sourceBinding": {
+    "kind": "EXTERNAL_COMMITTED_SOURCE_AND_BUNDLE_COMPARISON",
+    "embeddedCommitMetadata": false,
+    "sourceCommit": "d29644bb20cbbdca6ad73e1517e993995e76c937",
+    "evidence": "Source committed before packaging; all archive entries compared with pinned original, and five focus flags are the only runtime delta."
+  }
 }

@@ -1,0 +1,72 @@
+{
+  "schema": "galaxy.github-readback/1",
+  "repository": "julian-passebecq/agent-vscode",
+  "branch": "codex/galaxy-v1-agent-0.11.11-policy-invalidation-20261018",
+  "commit": "811787e7987dac70fc6043455e6a39641f754791",
+  "verifiedAt": "2026-10-23T15:24:27.409266+00:00",
+  "treeBlobs": 484,
+  "rawReadbacks": [
+    {
+      "path": "src/ui/cockpit.ts",
+      "blobSha": "79419c3fda6820d4b34f2d469cb4f5b53e10ec43",
+      "sha256": "84d53354c34027a5171d6552a5677785492172f78527852b49b2272cbb1bcce5",
+      "bytes": 16524
+    },
+    {
+      "path": "test/scopedPolicyLifecycle.test.ts",
+      "blobSha": "0cdf9161eb546f0e5990fdf6f1727c08b230b95e",
+      "sha256": "d0888adae245668c16ccd2cbc752d417eb95c4db702936b817b079d7adfe4eb2",
+      "bytes": 11253
+    },
+    {
+      "path": "docs/scope-review-focus-20261023/.gitattributes",
+      "blobSha": "ecf9aac0ca82e095ab0119de414335ea3bd008fb",
+      "sha256": "9871ac5d7f5decf5c31ae260a4292e515c9207a52c5435fffdab87fe403f8bc2",
+      "bytes": 18
+    },
+    {
+      "path": "docs/scope-review-focus-20261023/REPORT.md",
+      "blobSha": "a6d8c9a859965971e96d0ac21bd1622a26de16f7",
+      "sha256": "8ca13de67f31e04c7572fc9d98209f0f97c45283ee2c5efcd77ef91e0166cce7",
+      "bytes": 3591
+    },
+    {
+      "path": "docs/scope-review-focus-20261023/RESULT.json",
+      "blobSha": "1acdfd77dd0bfd22ecf0035ec33a4e28bf36d3d8",
+      "sha256": "e2fba9ac9df684347ef5346ad90ff546d48fc8b9afe6a388a34b0995f728cd6e",
+      "bytes": 6495
+    },
+    {
+      "path": "docs/scope-review-focus-20261023/agent-vscode-0.11.11-review-focus-d29644b-evaluation.vsix",
+      "blobSha": "b6342d62876f3319d4b3b9d8527738870ca0819f",
+      "sha256": "01cf2cf9de3852153f1d19f1d62707309ae12e3b933eee545e325ca5a13d88c3",
+      "bytes": 538182
+    },
+    {
+      "path": "docs/scope-review-focus-20261023/focused-tests.log",
+      "blobSha": "6a20662c62ec39b0345b59899de7a703da5db895",
+      "sha256": "c9da27a029c50b8eee9db653e95d5bb08e7af81d54a25f6db3ab40fa0a1ce348",
+      "bytes": 1866
+    },
+    {
+      "path": "docs/scope-review-focus-20261023/initial-harness-tests.log",
+      "blobSha": "bbfda41f9b261118a069c2d0257a7a5fbfbfba3d",
+      "sha256": "e3216d69f632e7618816b89fefd37fe46311b2912ae156af1ec958bc8295f792",
+      "bytes": 7886
+    },
+    {
+      "path": "docs/scope-review-focus-20261023/build.log",
+      "blobSha": "9ac5a2b0a7ca5bb74b289140130be607a08ce9dd",
+      "sha256": "6684f302294e7ce4c6f426e343d5ab6ace1fc743e0cf020c8a4cbc97cbade109",
+      "bytes": 195
+    },
+    {
+      "path": "docs/scope-review-focus-20261023/package.log",
+      "blobSha": "4ff1a479965b066390d57fe36d32d162281aed8a",
+      "sha256": "0b2e17dacce50cc263e0805aa16a8fc5078d59f96a41544068e31806bf89b355",
+      "bytes": 939
+    }
+  ],
+  "state": "PASS",
+  "normalization": "Compared against committed Git bytes; original CI artifact ZIPs preserve raw log line endings."
+}
