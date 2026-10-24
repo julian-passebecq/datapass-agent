@@ -1,0 +1,4 @@
+
+> agent-vscode@0.11.11 check
+> tsc -p . --noEmit
+

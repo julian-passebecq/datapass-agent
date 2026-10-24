@@ -1,0 +1,219 @@
+{
+  "schema": "datapass.agent.result-drawer-layout-source-validation/1",
+  "recordedAt": "2026-10-24T02:24:22.811225+00:00",
+  "state": "PASS_SOURCE_TESTS_NATIVE_PENDING",
+  "version": "0.11.11",
+  "sourceBase": "91db279e920881f82060883f821765a95de87d8d",
+  "previousRuntimeSource": "d29644bb20cbbdca6ad73e1517e993995e76c937",
+  "sourceCommit": null,
+  "files": [
+    {
+      "path": "src/render/html.ts",
+      "bytes": 46356,
+      "sha256": "2043b083bc697eeb125ebba19aba51198b7c3eb5c29ea09455da459a1643351f"
+    },
+    {
+      "path": "test/workspaceLayout.test.ts",
+      "bytes": 4831,
+      "sha256": "99e82ec7ced3b205a66f00ffa59f8e01d29c1796ee59a9914720395442786c22"
+    }
+  ],
+  "changes": [
+    "At webview widths 701 through 1100 pixels, place the result drawer only in the content column beside the sticky navigation rail.",
+    "At widths at or below 700 pixels, reset the drawer to the full single-column layout. Desktop positioning above 1100 pixels is unchanged."
+  ],
+  "checks": {
+    "baselineRegression": {
+      "command": [
+        "node",
+        "--test",
+        "--test-reporter=tap",
+        "out-test/test/workspaceLayout.test.js"
+      ],
+      "exitCode": 1,
+      "log": {
+        "path": "docs/result-drawer-layout-20261024/baseline-layout-corrected.log",
+        "bytes": 7037,
+        "sha256": "b06397c12910ee678c86a6523430991398fbbf786ae2fcd2893db7c995d7a1f3"
+      },
+      "tests": 7,
+      "passes": 3,
+      "failures": 4,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "targeted": {
+      "command": [
+        "node",
+        "--test",
+        "--test-reporter=tap",
+        "out-test/test/workspaceLayout.test.js"
+      ],
+      "exitCode": 0,
+      "log": {
+        "path": "docs/result-drawer-layout-20261024/fixed-layout.log",
+        "bytes": 3692,
+        "sha256": "e7744da46154cf55bbe6c33d04e6094f0f81529e7472ae7e906dd7b003e7c09b"
+      },
+      "tests": 7,
+      "passes": 7,
+      "failures": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "fullSuite": {
+      "command": [
+        "npm.cmd",
+        "test"
+      ],
+      "exitCode": 0,
+      "log": {
+        "path": "docs/result-drawer-layout-20261024/full-suite.log",
+        "bytes": 60984,
+        "sha256": "bd2b5c13c147d52c38572f6a6b91ae4f19b1fe28655671fe6e5e75ea5bd7266e"
+      },
+      "tests": 552,
+      "passes": 552,
+      "failures": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "typecheck": {
+      "command": [
+        "npm.cmd",
+        "run",
+        "check"
+      ],
+      "exitCode": 0,
+      "log": {
+        "path": "docs/result-drawer-layout-20261024/typecheck.log",
+        "bytes": 51,
+        "sha256": "64720badb8be824b5d0e88a90ef4499e9792967501f4401c2dddc1684e11dca3"
+      }
+    },
+    "testCompilation": {
+      "command": [
+        "npm.cmd",
+        "run",
+        "compile-tests"
+      ],
+      "exitCode": 0,
+      "log": {
+        "path": "docs/result-drawer-layout-20261024/compile-fixed.log",
+        "bytes": 160,
+        "sha256": "cc172dd270d4fd07ab2044095b10aeee7cfb788fec6231df32348668e1048fc2"
+      }
+    },
+    "diffWhitespace": {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "log": {
+        "path": "docs/result-drawer-layout-20261024/diff-whitespace.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "layout": {
+    "renderer": "Actual renderWorkspace(data,{view:board,selected:generatedSession}) and actual STYLE from source, rendered as an isolated static HTML document.",
+    "widths": [
+      1090,
+      900,
+      701,
+      700,
+      600,
+      1200
+    ],
+    "viewportHeight": 900,
+    "scrollPositions": [
+      "top",
+      "bottom"
+    ],
+    "assertions": [
+      "Visible navigation and result drawer rectangles do not intersect.",
+      "Document horizontal scrollWidth is within one pixel of clientWidth; inner Board scrolling remains allowed.",
+      "Open inspector control is within the viewport and is the element hit at its center after scrolling it into view."
+    ],
+    "baselineFailures": [
+      1090,
+      900,
+      701
+    ],
+    "baselinePassingWidths": [
+      700,
+      600,
+      1200
+    ],
+    "fixedPassingWidths": [
+      1090,
+      900,
+      701,
+      700,
+      600,
+      1200
+    ],
+    "countExplanation": "Six width subtests plus their parent produce seven node:test counts; the failing baseline parent adds one failure to its three failing width subtests.",
+    "browser": {
+      "path": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+      "bytes": 5438320,
+      "sha256": "c2451a012ff88e82449834de5b526ebb42b5a3fc25958d795910d2b172c975b6",
+      "selectionEnvironment": "AGENT_LAYOUT_BROWSER"
+    },
+    "headless": true,
+    "disposableBrowserContexts": true,
+    "contextOffline": true,
+    "allContextRoutesAborted": true,
+    "vsCodeLaunched": false,
+    "nativeDesktopAutomation": false,
+    "downloads": false
+  },
+  "intermediateEvidence": {
+    "initialTestCompilation": {
+      "path": "docs/result-drawer-layout-20261024/compile-tests.log",
+      "bytes": 160,
+      "sha256": "cc172dd270d4fd07ab2044095b10aeee7cfb788fec6231df32348668e1048fc2"
+    },
+    "initialHarnessAttempt": {
+      "path": "docs/result-drawer-layout-20261024/baseline-layout.log",
+      "bytes": 9934,
+      "sha256": "18f94b8f22e7a0896571d35f1e7e7f4e445950da3c1f497179b3e0f6fbd434b5"
+    },
+    "correctedHarnessCompilation": {
+      "path": "docs/result-drawer-layout-20261024/compile-harness-correction.log",
+      "bytes": 160,
+      "sha256": "cc172dd270d4fd07ab2044095b10aeee7cfb788fec6231df32348668e1048fc2"
+    },
+    "explanation": "The first baseline attempt mistakenly passed a function string to Locator.evaluate, which returned undefined for the inspector hit test. Only the test was corrected to an invoked page expression; authoritative baseline-layout-corrected then failed solely on the three medium-width overlap cases. Initial log is retained.",
+    "fullSuiteWrapperDiagnostic": "npm test exited 0 and its complete UTF-8 log was saved. A later wrapper attempt to print the log tail to the Windows cp1252 console raised UnicodeEncodeError; the test result and saved log are unaffected. Counts independently reread from that log are 552/552 with zero failures/skips."
+  },
+  "ownershipPreflight": {
+    "branch": "codex/galaxy-v1-agent-0.11.11-policy-invalidation-20261018",
+    "cleanBeforeEdits": true,
+    "agreedWriter": "infra_release_check subagent, source/test only; root owns Git/package/CI/native integration",
+    "otherAgentMatchesInAppInventory": 0,
+    "appInventoryLimit": "50 recent plus all pinned tasks; absence of a match is not a global locking guarantee.",
+    "instructions": "No AGENTS.md found in this checkout or its ancestors; standing user publication instructions apply."
+  },
+  "problems": [
+    "New source bytes are not packaged, installed, CI-qualified or ordinary-native qualified. Existing d29644b receipts remain historical and cannot qualify this changed source."
+  ],
+  "questions": [],
+  "packageBuildRun": false,
+  "gitMutated": false,
+  "providerCalls": 0,
+  "liveProfileTouched": false,
+  "nativeTested": false,
+  "releasePass": false,
+  "evidenceCopy": {
+    "originalQualification": "docs/result-drawer-layout-20261024/QUALIFICATION-ORIGINAL.json",
+    "originalSha256": "e8077c0dfef672bbfc6cc374a70fbfdb085b9f910f1c2a397aaffaeaef9fa517",
+    "logPathsRebasedOnly": true
+  }
+}

@@ -1,0 +1,65 @@
+TAP version 13
+# Subtest: workspace result drawer stays separate from navigation across responsive breakpoints
+    # Subtest: selected Board session at 1090px
+    ok 1 - selected Board session at 1090px
+      ---
+      duration_ms: 536.6618
+      type: 'test'
+      ...
+    # {"position":"top","rail":{"left":0,"right":130,"top":0,"bottom":880},"detail":{"left":130,"right":1090,"top":880,"bottom":1163.828125},"width":1090,"height":900,"scrollWidth":1090,"scrollY":0}
+    # {"position":"bottom","rail":{"left":0,"right":130,"top":0,"bottom":880},"detail":{"left":130,"right":1090,"top":616,"bottom":899.828125},"width":1090,"height":900,"scrollWidth":1090,"scrollY":264}
+    # Subtest: selected Board session at 900px
+    ok 2 - selected Board session at 900px
+      ---
+      duration_ms: 300.2642
+      type: 'test'
+      ...
+    # {"position":"top","rail":{"left":0,"right":130,"top":0,"bottom":880},"detail":{"left":130,"right":900,"top":880,"bottom":1163.828125},"width":900,"height":900,"scrollWidth":900,"scrollY":0}
+    # {"position":"bottom","rail":{"left":0,"right":130,"top":0,"bottom":880},"detail":{"left":130,"right":900,"top":616,"bottom":899.828125},"width":900,"height":900,"scrollWidth":900,"scrollY":264}
+    # Subtest: selected Board session at 701px
+    ok 3 - selected Board session at 701px
+      ---
+      duration_ms: 344.9087
+      type: 'test'
+      ...
+    # {"position":"top","rail":{"left":0,"right":130,"top":0,"bottom":880},"detail":{"left":130,"right":701,"top":880,"bottom":1163.828125},"width":701,"height":900,"scrollWidth":701,"scrollY":0}
+    # {"position":"bottom","rail":{"left":0,"right":130,"top":0,"bottom":880},"detail":{"left":130,"right":701,"top":616,"bottom":899.828125},"width":701,"height":900,"scrollWidth":701,"scrollY":264}
+    # Subtest: selected Board session at 700px
+    ok 4 - selected Board session at 700px
+      ---
+      duration_ms: 270.1108
+      type: 'test'
+      ...
+    # {"position":"top","rail":{"left":0,"right":700,"top":0,"bottom":146.171875},"detail":{"left":0,"right":700,"top":486.546875,"bottom":884},"width":700,"height":900,"scrollWidth":700,"scrollY":0}
+    # {"position":"bottom","rail":{"left":0,"right":700,"top":0,"bottom":146.171875},"detail":{"left":0,"right":700,"top":486.546875,"bottom":884},"width":700,"height":900,"scrollWidth":700,"scrollY":0}
+    # Subtest: selected Board session at 600px
+    ok 5 - selected Board session at 600px
+      ---
+      duration_ms: 251.1512
+      type: 'test'
+      ...
+    # {"position":"top","rail":{"left":0,"right":600,"top":0,"bottom":146.171875},"detail":{"left":0,"right":600,"top":486.546875,"bottom":884},"width":600,"height":900,"scrollWidth":600,"scrollY":0}
+    # {"position":"bottom","rail":{"left":0,"right":600,"top":0,"bottom":146.171875},"detail":{"left":0,"right":600,"top":486.546875,"bottom":884},"width":600,"height":900,"scrollWidth":600,"scrollY":0}
+    # Subtest: selected Board session at 1200px
+    ok 6 - selected Board session at 1200px
+      ---
+      duration_ms: 259.4379
+      type: 'test'
+      ...
+    # {"position":"top","rail":{"left":0,"right":150,"top":0,"bottom":880},"detail":{"left":900,"right":1200,"top":0,"bottom":900},"width":1200,"height":900,"scrollWidth":1200,"scrollY":0}
+    # {"position":"bottom","rail":{"left":0,"right":150,"top":0,"bottom":880},"detail":{"left":900,"right":1200,"top":0,"bottom":900},"width":1200,"height":900,"scrollWidth":1200,"scrollY":0}
+    1..6
+ok 1 - workspace result drawer stays separate from navigation across responsive breakpoints
+  ---
+  duration_ms: 2508.988
+  type: 'test'
+  ...
+1..1
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2932.576
